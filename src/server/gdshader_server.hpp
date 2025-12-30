@@ -42,8 +42,6 @@ private:
     lsp::Connection connection;
     lsp::MessageHandler handler;
 
-    std::unordered_map<std::string, Document> documents;
-
     void registerHandlers();
     void compileAndPublish(const lsp::DocumentUri& uri, const std::string& code);
 

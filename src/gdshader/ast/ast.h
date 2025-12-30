@@ -148,6 +148,18 @@ struct DiscardNode : public StatementNode {}; // "discard;"
 struct BreakNode : public StatementNode {};
 struct ContinueNode : public StatementNode {};
 
+// Preprocessing
+
+struct DefineNode : public StatementNode {
+    std::string name;
+    std::unique_ptr<ExpressionNode> value;
+};
+
+struct IncludeNode : public StatementNode {
+    std::string path;
+    std::string resolvedPath;
+};
+
 // -------------------------------------------------------------------------
 // TOP LEVEL DECLARATIONS
 // -------------------------------------------------------------------------

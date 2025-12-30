@@ -76,6 +76,14 @@ public:
      */
     std::vector<Symbol> getVisibleSymbolsAt(int line) const;
 
+    /**
+     * @brief Get the Global symbol map from the current ShaderUnit. this is for file linking.
+     * @return const std::unordered_map<std::string, std::vector<Symbol>>& 
+     */
+    const std::unordered_map<std::string, std::vector<Symbol>>& getGlobals() const {
+        return root->symbols;
+    }
+
 private:
    
     std::unique_ptr<Scope> root;

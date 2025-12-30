@@ -1,7 +1,7 @@
 
 #include "gdshader/lexer/lexer.h"
 
-#include <cctype> // for isalpha, isdigit, etc.
+#include <cctype>
 #include <unordered_map>
 
 using namespace gdshader_lsp;

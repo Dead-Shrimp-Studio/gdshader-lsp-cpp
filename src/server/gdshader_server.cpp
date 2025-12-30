@@ -2,6 +2,7 @@
 #include "server/gdshader_server.hpp"
 
 #include "gdshader/semantics/semantic_analyzer.hpp"
+#include "server/project_manager.hpp"
 
 #include <unordered_set>
 
@@ -33,7 +34,19 @@ void GdShaderServer::registerHandlers() {
     // The client sending its capabilities and asking for yours.
     handler.add<lsp::requests::Initialize>(
         [this](lsp::requests::Initialize::Params&& params) {
-            (void)params;
+            
+            if (!params.rootUri.isNull()) {
+                std::string root = std::string(params.rootUri->path());
+                #ifdef _WIN32
+                    if (root.size() > 2 && root[0] == '/' && root[2] == ':' ) {
+                        root = root.substr(1);
+                    } 
+                #endif
+
+                ProjectManager::get_singleton()->setRootPath(root);
+                std::cout << "Project Root set to: " << root << std::endl;
+            }
+
             return lsp::requests::Initialize::Result{
                 .capabilities = {
                     .textDocumentSync = lsp::TextDocumentSyncOptions{
@@ -90,25 +103,31 @@ void GdShaderServer::registerHandlers() {
         {
             lsp::Hover hover;
             std::string path = std::string(params.textDocument.uri.path());
-            if (documents.find(path) == documents.end()) return hover;
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
 
-            auto& doc = documents[path];
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            if (!su->symbols) return hover;
+
             int line = params.position.line;
             int col = params.position.character;
 
-            std::string word = getWordAtPosition(doc.text, line, col);
+            std::string word = getWordAtPosition(su->source_code, line, col);
             if (word.empty()) return hover;
 
-            bool isMember = (col > 0 && getWordBeforeDot(doc.text, col) != ""); 
+            bool isMember = (col > 0 && getWordBeforeDot(su->source_code, col) != ""); 
 
             if (isMember) {
                 // 1. Find the base variable (e.g. "my_instance" from "my_instance.test")
-                std::string baseName = getWordBeforeDot(doc.text, col); // You need to implement/expose this helper
+                std::string baseName = getWordBeforeDot(su->source_code, col); // You need to implement/expose this helper
                 // 2. Look up base
-                const Symbol* baseSym = doc.symbols.lookupAt(baseName, line);
+                const Symbol* baseSym = su->symbols->lookupAt(baseName, line);
                 if (baseSym && baseSym->type) {
                     // 3. Look up member in the base type
-                    TypePtr memberT = doc.types.getMemberType(baseSym->type, word);
+                    TypePtr memberT = su->types.getMemberType(baseSym->type, word);
                     if (memberT->kind != TypeKind::UNKNOWN) {
                         std::string content = "**" + baseSym->name + "**\n\n";
                         content += "Type: `" + baseSym->type->toString() + "`\n";
@@ -126,7 +145,7 @@ void GdShaderServer::registerHandlers() {
                 }
             } else {
 
-                const Symbol* sym = doc.symbols.lookupAt(word, line);
+                const Symbol* sym = su->symbols->lookupAt(word, line);
 
                 if (sym) {
                     std::string content = "**" + sym->name + "**\n\n";
@@ -155,14 +174,20 @@ void GdShaderServer::registerHandlers() {
             result.isIncomplete = false;
 
             std::string path = std::string(params.textDocument.uri.path());
-            if (documents.find(path) == documents.end()) return result;
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
 
-            auto& doc = documents[path];
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            if (!su->symbols) return result;
+
             int line = params.position.line;
             int col = params.position.character;
 
             // 1. Get context (Line content)
-            std::string lineText = getLine(doc.text, line);
+            std::string lineText = getLine(su->source_code, line);
             if (col > (int)lineText.length()) col = lineText.length();
             
             // Check trigger char
@@ -173,7 +198,7 @@ void GdShaderServer::registerHandlers() {
             if (isDotTrigger) 
             {
                 std::string varName = getWordBeforeDot(lineText, col-1);
-                const Symbol* sym = doc.symbols.lookupAt(varName, line);
+                const Symbol* sym = su->symbols->lookupAt(varName, line);
 
                 if (sym && sym->type) {
                     TypePtr t = sym->type;
@@ -204,8 +229,7 @@ void GdShaderServer::registerHandlers() {
                 return result;
             }
 
-            std::vector<Symbol> visible = doc.symbols.getVisibleSymbolsAt(line);
-            
+            std::vector<Symbol> visible = su->symbols->getVisibleSymbolsAt(line);
             std::unordered_set<std::string> seen_functions; 
 
             for (const auto& s : visible) {
@@ -224,9 +248,7 @@ void GdShaderServer::registerHandlers() {
                 if (s.category == SymbolType::Function || s.category == SymbolType::Builtin) {
                     item.kind = lsp::CompletionItemKind::Function;
                     
-                    // Optional: Indicate overloading in the detail text
-                    // You could check if there are multiple, but usually just showing the return type 
-                    // of the first/primary overload is standard.
+                    // Indicate overloading in the detail text ?
                     item.detail = s.type->toString(); 
                     
                     item.insertTextFormat = lsp::InsertTextFormat::Snippet;
@@ -260,24 +282,28 @@ void GdShaderServer::registerHandlers() {
     handler.add<lsp::requests::TextDocument_Definition>(
         [this](lsp::requests::TextDocument_Definition::Params&& params) -> lsp::requests::TextDocument_Definition::Result
         {
+            lsp::Location loc;
             std::string path = std::string(params.textDocument.uri.path());
-            if (documents.find(path) == documents.end()) return nullptr;
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
 
-            auto& doc = documents[path];
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            if (!su->symbols) return loc;
             int line = params.position.line;
             int col = params.position.character;
 
-            std::string word = getWordAtPosition(doc.text, line, col);
+            std::string word = getWordAtPosition(su->source_code, line, col);
             if (word.empty()) return nullptr;
 
-            const Symbol* sym = doc.symbols.lookupAt(word, line);
+            const Symbol* sym = su->symbols->lookupAt(word, line);
 
             // If found and it's not a built-in (line -1)
             if (sym && sym->line >= 0) {
-                lsp::Location loc;
                 loc.uri = params.textDocument.uri;
                 
-                // Construct range (highlight the specific line)
                 loc.range.start = lsp::Position{(unsigned)sym->line, (unsigned)sym->column};
                 loc.range.end   = lsp::Position{(unsigned)sym->line, (unsigned)sym->column + (unsigned)sym->name.length()};
                 
@@ -292,25 +318,31 @@ void GdShaderServer::registerHandlers() {
     handler.add<lsp::requests::TextDocument_SignatureHelp>(
         [this](lsp::requests::TextDocument_SignatureHelp::Params&& params) -> lsp::requests::TextDocument_SignatureHelp::Result
         {
+            lsp::SignatureHelp help;
             std::string path = std::string(params.textDocument.uri.path());
-            if (documents.find(path) == documents.end()) return nullptr;
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
 
-            auto& doc = documents[path];
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            if (!su->symbols) return help;
+
             int line = params.position.line;
             int col = params.position.character;
 
             // 1. Find Context (Name + Arg Index)
-            auto [funcName, argIndex] = getFunctionCallContext(doc.text, line, col);
+            auto [funcName, argIndex] = getFunctionCallContext(su->source_code, line, col);
             
             if (funcName.empty()) return nullptr;
 
             // 2. Lookup Overloads
-            std::vector<const Symbol*> overloads = doc.symbols.lookupFunctions(funcName);
+            std::vector<const Symbol*> overloads = su->symbols->lookupFunctions(funcName);
             
             if (overloads.empty()) return nullptr;
 
             // 3. Construct LSP Result
-            lsp::SignatureHelp help;
             help.activeParameter = argIndex;
             help.activeSignature = 0; // Default to first, or try to match best fit based on arg count
 
@@ -318,10 +350,10 @@ void GdShaderServer::registerHandlers() {
             // (If multiple have same count, we just pick the first one)
             for (size_t i = 0; i < overloads.size(); ++i) {
                 if ((int)overloads[i]->parameterTypes.size() > argIndex) {
-                     help.activeSignature = i;
-                     // Don't break, sometimes we want the *closest* fit, but this is a simple heuristic
-                     // For exact match we'd need to analyze types of previous args, which is hard here.
-                     break; 
+                    help.activeSignature = i;
+                    // Don't break, sometimes we want the *closest* fit, but this is a simple heuristic
+                    // For exact match we'd need to analyze types of previous args, which is hard here.
+                    break; 
                 }
             }
 
@@ -375,12 +407,17 @@ void GdShaderServer::registerHandlers() {
         [this](lsp::requests::TextDocument_DocumentSymbol::Params&& params) -> lsp::requests::TextDocument_DocumentSymbol::Result
         {
             std::string path = std::string(params.textDocument.uri.path());
-            if (documents.find(path) == documents.end()) return {};
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
 
-            auto& doc = documents[path];
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            if (!su->symbols) return nullptr;
             
             // Generate symbol tree from the AST
-            return getDocumentSymbols(doc.ast.get());
+            return getDocumentSymbols(su->ast.get());
         }
     );
 
@@ -391,34 +428,40 @@ void GdShaderServer::registerHandlers() {
 
 void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri, const std::string &code)
 {
-    std::string mapKey = std::string(uri.path());
-    Document& doc = documents[mapKey];
+    std::string path = std::string(uri.path());
+    #ifdef _WIN32
+    if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+    #endif
+
+    auto pm = ProjectManager::get_singleton();
+    pm->updateFile(path, code);
+
+    auto su = pm->getUnit(path);
+
+    SemanticAnalyzer analyzer;
+    analyzer.setFilePath(path);
 
     // 1. Run Lexer & Parser
     Lexer lexer(code);
-    Parser parser(lexer);
+    Parser parser(lexer, path);
     
     auto ast = parser.parse();
     auto errors = parser.getDiagnostics();
 
-    if (ast) {
+    su->defines = parser.getDefines();
 
-        SemanticAnalyzer analyzer;
+    if (ast) {
         auto result = analyzer.analyze(ast.get());
         
-        // Save the Symbol Table for Autocomplete later!
-        // You need to add 'SymbolTable syms' to your 'Document' struct in .hpp
-        doc.symbols = std::move(result.symbols);
-        doc.types   = std::move(result.types);
+        su->symbols = std::make_shared<SymbolTable>(std::move(result.symbols));
+        su->types   = std::move(result.types);
 
-        // Append Semantic Errors (e.g. "Undefined Variable") to Syntax Errors
         auto semanticErrors = result.diagnostics;
         errors.insert(errors.end(), semanticErrors.begin(), semanticErrors.end());
     }
 
-    // 2. Update State (using the mapKey)
-    doc.text = code;
-    doc.ast = std::move(ast);
+    su->ast = std::move(ast);
+    su->diagnostics = errors;
 
     // 3. Convert Diagnostics
     std::vector<lsp::Diagnostic> lspDiagnostics;

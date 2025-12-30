@@ -11,6 +11,28 @@ build_target = env['target']
 print(f"Building for platform: {target_platform} ({build_target})")
 
 # -------------------------------------------------------------------------
+# DEPENDENCIES (LSP LIBRARY)
+# -------------------------------------------------------------------------
+# NOTE: You must have compiled the 'lsp' library for the target platform as well!
+# We assume you have a folder structure like: extern/lsp-framework/build/linux, /windows, etc.
+# If you only have one flat 'build' folder, you will need to recompile the lib every time you switch platform.
+
+lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build')
+# Optional: Try to find a platform specific subdir if you organize it that way
+if os.path.exists(os.path.join(lsp_lib_path, target_platform)):
+    lsp_lib_path = os.path.join(lsp_lib_path, target_platform)
+
+env.Append(CPPPATH=[
+    'src',
+    'extern/lsp-framework',
+    lsp_lib_path
+])
+
+env.Append(LIBPATH=[lsp_lib_path]) 
+env.Append(LIBS=['lsp'])
+
+
+# -------------------------------------------------------------------------
 # COMPILER CONFIGURATION
 # -------------------------------------------------------------------------
 env.Append(CXXFLAGS=['-std=c++20', '-Wall', '-Wextra'])
@@ -43,26 +65,6 @@ elif target_platform == 'linux':
     # Default GCC/Clang on host
     env.Append(LIBS=['pthread'])
 
-# -------------------------------------------------------------------------
-# DEPENDENCIES (LSP LIBRARY)
-# -------------------------------------------------------------------------
-# NOTE: You must have compiled the 'lsp' library for the target platform as well!
-# We assume you have a folder structure like: extern/lsp-framework/build/linux, /windows, etc.
-# If you only have one flat 'build' folder, you will need to recompile the lib every time you switch platform.
-
-lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build')
-# Optional: Try to find a platform specific subdir if you organize it that way
-if os.path.exists(os.path.join(lsp_lib_path, target_platform)):
-    lsp_lib_path = os.path.join(lsp_lib_path, target_platform)
-
-env.Append(CPPPATH=[
-    'src',
-    'extern/lsp-framework',          
-    lsp_lib_path,   
-])
-
-env.Append(LIBPATH=[lsp_lib_path]) 
-env.Append(LIBS=['lsp'])
 
 # -------------------------------------------------------------------------
 # BUILD DIRECTORY SETUP
