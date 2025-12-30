@@ -1,6 +1,6 @@
 # GDShader LSP
 
-A high-performance, standalone **Language Server Protocol (LSP)** implementation for the Godot Shading Language (`.gdshader`), developed in C++17.
+A high-performance, standalone **Language Server Protocol (LSP)** implementation for the Godot Shading Language (`.gdshader`), developed in C++20.
 
 **GDShader LSP** provides enterprise-grade code intelligence, strict semantic analysis, and real-time diagnostics for Godot shaders. It is designed to be editor-agnostic, integrating seamlessly into VSCode, Neovim, Emacs, or directly into the Godot Engine via GDExtension.
 
@@ -46,7 +46,7 @@ This project uses **SCons** as its build system.
 
 ### Prerequisites
 
-* **C++ Compiler**: GCC, Clang, or MSVC supporting **C++17**.
+* **C++ Compiler**: GCC, Clang, or MSVC supporting **C++20**.
 * **SCons**: Install via Python (`pip install scons`).
 
 ### Compilation
