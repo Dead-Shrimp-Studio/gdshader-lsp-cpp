@@ -56,10 +56,28 @@ if target_platform == 'windows':
     env.Append(LINKFLAGS=['-static', '-static-libgcc', '-static-libstdc++'])
 
 elif target_platform == 'macos':
-    # Requires: osxcross (https://github.com/tpoechtrager/osxcross)
     
-    env.Replace(CXX='o64-clang++')
-    env.Replace(AR='x86_64-apple-darwin20.4-ar') # Adjust version as needed
+    vars.Add('macos_arch', 'Target architecture (x86_64, arm64)', 'x86_64')
+    env = Environment(variables=vars, ENV=os.environ)
+    macos_arch = env.get('macos_arch', 'x86_64')
+
+    print(f"Targeting macOS Architecture: {macos_arch}")
+
+    # Use the explicit compiler versions we verified working (Darwin 23.5 / macOS 14)
+    if macos_arch == 'x86_64':
+        env.Replace(CXX='x86_64-apple-darwin23.5-clang++')
+        env.Replace(AR='x86_64-apple-darwin23.5-ar')
+        env.Append(CXXFLAGS=['-arch', 'x86_64'])
+        env.Append(LINKFLAGS=['-arch', 'x86_64'])
+    elif macos_arch == 'arm64':
+        env.Replace(CXX='aarch64-apple-darwin23.5-clang++')
+        env.Replace(AR='aarch64-apple-darwin23.5-ar')
+        env.Append(CXXFLAGS=['-arch', 'arm64'])
+        env.Append(LINKFLAGS=['-arch', 'arm64'])
+    
+    # Force C++20 and newer macOS target (matches what we did in CMake)
+    env.Append(CXXFLAGS=['-std=c++20', '-mmacosx-version-min=12.0'])
+    env.Append(LINKFLAGS=['-mmacosx-version-min=12.0'])
 
 elif target_platform == 'linux':
     # Default GCC/Clang on host
