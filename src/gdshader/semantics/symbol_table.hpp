@@ -32,15 +32,17 @@ struct Symbol
 
     int line;
     int column;
+
     std::string doc_string;
+    std::string hint; 
+    std::vector<std::string> hintArgs; // e.g. hint_range(0, 1)
 
     struct Usage {
         int line;
         int column;
     };
 
-    std::vector<Usage> usages;
-
+    mutable std::vector<Usage> usages;
 };
 
 struct Scope 

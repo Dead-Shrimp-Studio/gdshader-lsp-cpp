@@ -213,6 +213,7 @@ Token Lexer::createToken() {
 
     int startLine = line;
     int startCol = column;
+    // int len = current_pos - startPos;
 
     if (current_pos >= source_len) {
         return {TokenType::TOKEN_EOF, "", startLine, startCol};

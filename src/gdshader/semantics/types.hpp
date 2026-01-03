@@ -82,7 +82,8 @@ struct Type
     }
 };
 
-struct RawToken {
+struct RawToken 
+{
     int line;
     int col;
     int length;

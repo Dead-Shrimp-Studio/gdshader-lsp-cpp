@@ -72,7 +72,7 @@ private:
     std::unique_ptr<ASTNode> parseTypeIdentifierDecl(); 
 
     // --- Function Parsing ---
-    std::unique_ptr<FunctionNode> parseFunction(const std::string& type, const std::string& name);
+    std::unique_ptr<FunctionNode> parseFunction(std::unique_ptr<TypeNode> returnType, const std::string& name);
     std::unique_ptr<BlockNode> parseBlock();
     
     // --- Statement Parsing ---
@@ -104,6 +104,11 @@ private:
     
     // Helper for parsing types (e.g. "vec3", "void", "Sampler2D")
     std::string parseTypeString();
+    std::unique_ptr<TypeNode> parseType();
+
+    void mergeBinaryRange(BinaryOpNode* node);
+    void setRange(ASTNode* node, const Token& start, const Token& end);
+
     bool isTypeStart();
 };
 

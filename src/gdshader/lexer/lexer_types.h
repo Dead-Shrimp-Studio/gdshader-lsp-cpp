@@ -144,6 +144,7 @@ struct Token {
 
     int line;
     int column;
+    int length;
 
     std::string toString() const {
         return "Token(" + std::to_string((int)type) + ", '" + value + "' @" 

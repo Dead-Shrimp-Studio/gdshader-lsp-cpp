@@ -111,7 +111,7 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
         // --- #define NAME value ---
         if (directive == "define") {
             auto node = std::make_unique<DefineNode>();
-            node->line = startLine;
+            node->range.startLine = startLine;
 
             if (match(TokenType::TOKEN_IDENTIFIER)) {
                 node->name = previous_token.value;
@@ -130,7 +130,7 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
         else if (directive == "include") {
             if (match(TokenType::TOKEN_STRING)) {
                 auto node = std::make_unique<IncludeNode>();
-                node->line = startLine;
+                node->range.startLine = startLine;
                 node->path = previous_token.value;
 
                 auto pm = ProjectManager::get_singleton();
@@ -318,7 +318,6 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
         if (match(TokenType::KEYWORD_CONST))       return parseConst();
         if (match(TokenType::KEYWORD_STRUCT))      return parseStruct();
         
-        // Functions or Globals usually start with a type (void, vec3, etc.)
         if (isTypeStart()) {
             return parseTypeIdentifierDecl();
         }
@@ -333,10 +332,10 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
     }
 }
 
-std::unique_ptr<ASTNode> Parser::parseShaderType() {
+std::unique_ptr<ASTNode> Parser::parseShaderType() 
+{
+    Token start = current_token;
     auto node = std::make_unique<ShaderTypeNode>();
-    node->line = previous_token.line;
-    node->column = previous_token.column;
 
     if (current_token.type == TokenType::TOKEN_IDENTIFIER) {
         node->shaderType = current_token.value;
@@ -345,12 +344,15 @@ std::unique_ptr<ASTNode> Parser::parseShaderType() {
         reportError("Expected shader type identifier (e.g. spatial)");
     }
     consume(TokenType::TOKEN_SEMI, "Expected ';' after shader_type");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<ASTNode> Parser::parseRenderMode() {
+std::unique_ptr<ASTNode> Parser::parseRenderMode() 
+{
+    Token start = current_token;
     auto node = std::make_unique<RenderModeNode>();
-    node->line = previous_token.line;
 
     do {
         if (current_token.type == TokenType::TOKEN_IDENTIFIER) {
@@ -362,17 +364,24 @@ std::unique_ptr<ASTNode> Parser::parseRenderMode() {
     } while (match(TokenType::TOKEN_COMMA));
 
     consume(TokenType::TOKEN_SEMI, "Expected ';' after render_mode");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<ASTNode> Parser::parseUniform() {
+std::unique_ptr<ASTNode> Parser::parseUniform() 
+{
+    Token start = current_token;
     auto node = std::make_unique<UniformNode>();
-    node->line = previous_token.line;
 
-    node->type = parseTypeString();
-    
+    node->type = parseType();
+
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         node->name = current_token.value;
+        node->nameRange.startLine = previous_token.line;
+        node->nameRange.startCol = previous_token.column;
+        node->nameRange.endLine = previous_token.line;
+        node->nameRange.endCol = previous_token.column + previous_token.length;
         advance();
     } else {
         reportError("Expected uniform name");
@@ -380,11 +389,10 @@ std::unique_ptr<ASTNode> Parser::parseUniform() {
 
     // Hint:  : hint_range(0, 1)
     if (match(TokenType::TOKEN_COLON)) {
-        // Simple hint parsing: consume ID and optionally parens
         if (check(TokenType::TOKEN_IDENTIFIER)) {
             node->hint = current_token.value;
             advance();
-            // Consume arguments if any: hint(a, b, c)
+
             if (match(TokenType::TOKEN_LPAREN)) {
                 node->hint += "(";
                 while (!check(TokenType::TOKEN_RPAREN) && !check(TokenType::TOKEN_EOF)) {
@@ -404,33 +412,47 @@ std::unique_ptr<ASTNode> Parser::parseUniform() {
     }
 
     consume(TokenType::TOKEN_SEMI, "Expected ';' after uniform declaration");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<ASTNode> Parser::parseVarying() {
+std::unique_ptr<ASTNode> Parser::parseVarying() 
+{
+    Token start = current_token;
     auto node = std::make_unique<VaryingNode>();
-    node->line = previous_token.line;
     
-    node->type = parseTypeString();
+    node->type = parseType();
     
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         node->name = current_token.value;
+        node->nameRange.startLine = previous_token.line;
+        node->nameRange.startCol = previous_token.column;
+        node->nameRange.endLine = previous_token.line;
+        node->nameRange.endCol = previous_token.column + previous_token.length;
         advance();
     } else {
         reportError("Expected varying name");
     }
     consume(TokenType::TOKEN_SEMI, "Expected ';' after varying");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<ASTNode> Parser::parseConst() {
+std::unique_ptr<ASTNode> Parser::parseConst() 
+{
+    Token start = current_token;
     auto node = std::make_unique<ConstNode>();
-    node->line = previous_token.line;
-    
-    node->type = parseTypeString();
+
+    node->type = parseType();
     
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         node->name = current_token.value;
+        node->nameRange.startLine = previous_token.line;
+        node->nameRange.startCol = previous_token.column;
+        node->nameRange.endLine = previous_token.line;
+        node->nameRange.endCol = previous_token.column + previous_token.length;
         advance();
     } else {
         reportError("Expected const name");
@@ -440,16 +462,22 @@ std::unique_ptr<ASTNode> Parser::parseConst() {
     node->value = parseExpression();
 
     consume(TokenType::TOKEN_SEMI, "Expected ';' after const declaration");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
 std::unique_ptr<ASTNode> Parser::parseStruct() 
 {
+    Token start = current_token;
     auto node = std::make_unique<StructNode>();
-    node->line = previous_token.line;
 
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         node->name = current_token.value;
+        node->nameRange.startLine = current_token.line;
+        node->nameRange.startCol  = current_token.column;
+        node->nameRange.endLine   = current_token.line;
+        node->nameRange.endCol    = current_token.column + current_token.length;
         advance();
     } else {
         reportError("Expected struct name");
@@ -458,45 +486,52 @@ std::unique_ptr<ASTNode> Parser::parseStruct()
     consume(TokenType::TOKEN_LBRACE, "Expected '{' before struct body");
 
     while (!check(TokenType::TOKEN_RBRACE) && !check(TokenType::TOKEN_EOF)) {
-        StructNode::Member member;
-        member.type = parseTypeString();
+        Token memberStart = current_token;
+        auto member = std::make_unique<StructMemberNode>();
+
+        member->type = parseType();
+
         if (check(TokenType::TOKEN_IDENTIFIER)) {
-            member.name = current_token.value;
+            member->name = current_token.value;
+            
+            member->nameRange.startLine = current_token.line;
+            member->nameRange.startCol = current_token.column;
+            member->nameRange.endLine = current_token.line;
+            member->nameRange.endCol = current_token.column + current_token.length;
+
             advance();
-
-            if (match(TokenType::TOKEN_LBRACKET)) {
-                // Parse size (must be const int, but for parsing expression is fine)
-                auto sizeExpr = parseExpression(); 
-                consume(TokenType::TOKEN_RBRACKET, "Expected ']' after array size");
-                
-                // For now, we can denote array types in the type string, e.g., "float[3]"
-                // Or just store "float" and a separate is_array flag.
-                // Simple hack for type checking: Append brackets to type string
-                // Note: Getting the exact size value requires evaluating the expression, 
-                // which is hard in the parser. For now, let's just mark it as an array type.
-                member.type += "[]"; 
-            }
-
         } else {
             reportError("Expected struct member name");
         }
 
         consume(TokenType::TOKEN_SEMI, "Expected ';' after struct member");
-        node->members.push_back(member);
+
+        setRange(member.get(), memberStart, previous_token);
+        node->members.push_back(std::move(member));
     }
     consume(TokenType::TOKEN_RBRACE, "Expected '}' after struct body");
     consume(TokenType::TOKEN_SEMI, "Expected ';' after struct definition");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl() {
-    // We have consumed nothing yet, but we verified isTypeStart()
-    int line = current_token.line;
-    std::string type = parseTypeString();
-    
+std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl() 
+{
+    Token start = current_token;
+    std::unique_ptr<TypeNode> typeNode = parseType();
+
     std::string name;
+    SourceRange nameRange;
+
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         name = current_token.value;
+
+        nameRange.startLine = current_token.line;
+        nameRange.startCol = current_token.column;
+        nameRange.endLine = current_token.line;
+        nameRange.endCol = current_token.column + current_token.length;
+
         advance();
     } else {
         reportError("Expected identifier after type");
@@ -505,21 +540,23 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl() {
 
     // Look ahead to decide if Function or Variable
     if (check(TokenType::TOKEN_LPAREN)) {
-        auto funcNode = parseFunction(type, name);
-        funcNode->line = line;
+        auto funcNode = parseFunction(std::move(typeNode), name);
+        funcNode->nameRange = nameRange;
         return funcNode;
     } else {
         // Global Variable
         auto varNode = std::make_unique<VariableDeclNode>();
-        varNode->line = line;
-        varNode->type = type;
+        varNode->type = std::move(typeNode);
         varNode->name = name;
+        varNode->nameRange = nameRange;
         varNode->isConst = false;
 
         if (match(TokenType::TOKEN_EQUAL)) {
             varNode->initializer = parseExpression();
         }
         consume(TokenType::TOKEN_SEMI, "Expected ';' after variable declaration");
+
+        setRange(varNode.get(), start, previous_token);
         return varNode;
     }
 }
@@ -528,29 +565,44 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl() {
 // FUNCTIONS
 // -------------------------------------------------------------------------
 
-std::unique_ptr<FunctionNode> Parser::parseFunction(const std::string& type, const std::string& name) {
+std::unique_ptr<FunctionNode> Parser::parseFunction(std::unique_ptr<TypeNode> returnType, const std::string& name) 
+{
     auto node = std::make_unique<FunctionNode>();
-    node->returnType = type;
+    node->returnType = std::move(returnType);
     node->name = name;
+
+    Token startToken; 
+    startToken.line = node->returnType->range.startLine;
+    startToken.column = node->returnType->range.startCol;
 
     consume(TokenType::TOKEN_LPAREN, "Expected '('");
 
     // Parse Arguments
     if (!check(TokenType::TOKEN_RPAREN)) {
         do {
-            FunctionNode::Argument arg;
+            auto param = std::make_unique<ParameterNode>();
+            Token paramStart = current_token;
             
             // Check for in/out qualifiers
-            if (match(TokenType::KEYWORD_IN)) arg.qualifier = "in";
-            else if (match(TokenType::KEYWORD_OUT)) arg.qualifier = "out";
-            else if (match(TokenType::KEYWORD_INOUT)) arg.qualifier = "inout";
+            if (match(TokenType::KEYWORD_IN)) param->qualifier = "in";
+            else if (match(TokenType::KEYWORD_OUT)) param->qualifier = "out";
+            else if (match(TokenType::KEYWORD_INOUT)) param->qualifier = "inout";
             
-            arg.type = parseTypeString();
+            param->type = parseType();
+
             if (check(TokenType::TOKEN_IDENTIFIER)) {
-                arg.name = current_token.value;
+                param->name = current_token.value;
+                
+                param->nameRange.startLine = current_token.line;
+                param->nameRange.startCol = current_token.column;
+                param->nameRange.endLine = current_token.line;
+                param->nameRange.endCol = current_token.column + current_token.length;
+                
                 advance();
             }
-            node->arguments.push_back(arg);
+
+            setRange(param.get(), paramStart, previous_token);
+            node->parameters.push_back(std::move(param));
 
         } while (match(TokenType::TOKEN_COMMA));
     }
@@ -563,13 +615,17 @@ std::unique_ptr<FunctionNode> Parser::parseFunction(const std::string& type, con
     } else {
         consume(TokenType::TOKEN_SEMI, "Expected body or ';'");
     }
+
+    Token endToken = previous_token;
+    setRange(node.get(), startToken, endToken);
+
     return node;
 }
 
 std::unique_ptr<BlockNode> Parser::parseBlock() 
 {
+    Token start = current_token; // Snapshot '{'
     auto node = std::make_unique<BlockNode>();
-    node->line = current_token.line;
     
     consume(TokenType::TOKEN_LBRACE, "Expected '{'");
     
@@ -594,7 +650,7 @@ std::unique_ptr<BlockNode> Parser::parseBlock()
     }
     
     consume(TokenType::TOKEN_RBRACE, "Expected '}'");
-    node->endLine = previous_token.line;
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
@@ -614,9 +670,12 @@ std::unique_ptr<StatementNode> Parser::parseStatement()
     if (match(TokenType::KEYWORD_CONTINUE)) return parseContinue();
 
     if (match(TokenType::KEYWORD_DISCARD)) {
+
+        Token start = previous_token;
         auto node = std::make_unique<DiscardNode>();
-        node->line = previous_token.line;
         consume(TokenType::TOKEN_SEMI, "Expected ';'");
+
+        setRange(node.get(), start, previous_token);
         return node;
     }
 
@@ -634,12 +693,18 @@ std::unique_ptr<StatementNode> Parser::parseStatement()
 
 std::unique_ptr<StatementNode> Parser::parseVarDecl() 
 {
+    Token start = current_token;
     auto node = std::make_unique<VariableDeclNode>();
-    node->line = current_token.line;
-    node->type = parseTypeString();
+    node->type = parseType();
     
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         node->name = current_token.value;
+
+        node->nameRange.startLine = current_token.line;
+        node->nameRange.startCol = current_token.column;
+        node->nameRange.endLine = current_token.line;
+        node->nameRange.endCol = current_token.column + current_token.length;
+
         advance();
     } else {
         reportError("Expected variable name");
@@ -650,12 +715,15 @@ std::unique_ptr<StatementNode> Parser::parseVarDecl()
     }
 
     consume(TokenType::TOKEN_SEMI, "Expected ';'");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<StatementNode> Parser::parseIf() {
+std::unique_ptr<StatementNode> Parser::parseIf() 
+{
+    Token start = current_token; // Snapshot 'if'
     auto node = std::make_unique<IfNode>();
-    node->line = previous_token.line;
 
     consume(TokenType::TOKEN_LPAREN, "Expected '(' after if");
     node->condition = parseExpression();
@@ -666,12 +734,15 @@ std::unique_ptr<StatementNode> Parser::parseIf() {
     if (match(TokenType::KEYWORD_ELSE)) {
         node->elseBranch = parseStatement();
     }
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<StatementNode> Parser::parseFor() {
+std::unique_ptr<StatementNode> Parser::parseFor() 
+{
+    Token start = current_token; // Snapshot 'for'
     auto node = std::make_unique<ForNode>();
-    node->line = previous_token.line;
 
     consume(TokenType::TOKEN_LPAREN, "Expected '(' after for");
     
@@ -685,7 +756,7 @@ std::unique_ptr<StatementNode> Parser::parseFor() {
         node->condition = parseExpression();
     }
     consume(TokenType::TOKEN_SEMI, "Expected ';' after for loop condition");
-    // Increment
+
     if (!check(TokenType::TOKEN_RPAREN)) {
         node->increment = parseExpression();
     }
@@ -693,42 +764,43 @@ std::unique_ptr<StatementNode> Parser::parseFor() {
 
     node->body = parseStatement();
 
-    if (node->body) {
-        node->endLine = node->body->endLine;
-    } else {
-        node->endLine = node->line;
-    }
-
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<StatementNode> Parser::parseWhile() {
+std::unique_ptr<StatementNode> Parser::parseWhile() 
+{
+    Token start = current_token; // Snapshot 'while'
     auto node = std::make_unique<WhileNode>();
-    node->line = previous_token.line;
-    
+
     consume(TokenType::TOKEN_LPAREN, "Expected '(' after while");
     node->condition = parseExpression();
     consume(TokenType::TOKEN_RPAREN, "Expected ')'");
     
     node->body = parseStatement();
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
-std::unique_ptr<StatementNode> Parser::parseReturn() {
+std::unique_ptr<StatementNode> Parser::parseReturn() 
+{
+    Token start = current_token; // Snapshot 'return'
     auto node = std::make_unique<ReturnNode>();
-    node->line = previous_token.line;
 
     if (!check(TokenType::TOKEN_SEMI)) {
         node->value = parseExpression();
     }
     consume(TokenType::TOKEN_SEMI, "Expected ';'");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
 std::unique_ptr<StatementNode> Parser::parseExpressionStatement() 
 {
+    Token start = current_token;
     auto node = std::make_unique<ExpressionStatementNode>();
-    node->line = current_token.line;
     node->expr = parseExpression();
 
     if (!node->expr) {
@@ -740,13 +812,15 @@ std::unique_ptr<StatementNode> Parser::parseExpressionStatement()
     }
 
     consume(TokenType::TOKEN_SEMI, "Expected ';'");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
 std::unique_ptr<StatementNode> Parser::parseDoWhile() 
 {
+    Token start = current_token; // Snapshot 'do'
     auto node = std::make_unique<DoWhileNode>();
-    node->line = previous_token.line;
     
     // Parse Body (e.g., do { ... })
     node->body = parseStatement();
@@ -759,14 +833,15 @@ std::unique_ptr<StatementNode> Parser::parseDoWhile()
     consume(TokenType::TOKEN_RPAREN, "Expected ')' after condition");
     consume(TokenType::TOKEN_SEMI, "Expected ';' after do-while loop");
     
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
 std::unique_ptr<StatementNode> Parser::parseSwitch() 
 {
+    Token start = current_token; // Snapshot 'switch'
     auto node = std::make_unique<SwitchNode>();
-    node->line = previous_token.line;
-    
+
     consume(TokenType::TOKEN_LPAREN, "Expected '(' after 'switch'");
     node->expression = parseExpression();
     consume(TokenType::TOKEN_RPAREN, "Expected ')' after switch expression");
@@ -788,9 +863,8 @@ std::unique_ptr<StatementNode> Parser::parseSwitch()
             continue;
         }
 
+        Token caseStart = current_token;
         auto caseNode = std::make_unique<CaseNode>();
-        caseNode->line = previous_token.line;
-        caseNode->isDefault = isDefault;
 
         // 2. Parse Value (if not default)
         if (!isDefault) {
@@ -817,26 +891,35 @@ std::unique_ptr<StatementNode> Parser::parseSwitch()
                 advance(); 
             }
         }
+        setRange(caseNode.get(), caseStart, previous_token);
         node->cases.push_back(std::move(caseNode));
     }
     
     consume(TokenType::TOKEN_RBRACE, "Expected '}' after switch body");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
 std::unique_ptr<StatementNode> Parser::parseBreak() 
 {
+    Token start = current_token;
     auto node = std::make_unique<BreakNode>();
-    node->line = previous_token.line;
+
     consume(TokenType::TOKEN_SEMI, "Expected ';' after 'break'");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
 std::unique_ptr<StatementNode> Parser::parseContinue() 
 {
+    Token start = current_token;
     auto node = std::make_unique<ContinueNode>();
-    node->line = previous_token.line;
+
     consume(TokenType::TOKEN_SEMI, "Expected ';' after 'continue'");
+
+    setRange(node.get(), start, previous_token);
     return node;
 }
 
@@ -863,11 +946,11 @@ std::unique_ptr<ExpressionNode> Parser::parseAssignment()
         auto right = parseAssignment();
         
         auto node = std::make_unique<BinaryOpNode>();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->op = op;
         node->left = std::move(expr);
         node->right = std::move(right);
+
+        mergeBinaryRange(node.get());
         return node;
     }
 
@@ -879,8 +962,6 @@ std::unique_ptr<ExpressionNode> Parser::parseTernary() {
     
     if (match(TokenType::TOKEN_QUESTION)) {
         auto node = std::make_unique<TernaryNode>();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->condition = std::move(expr);
         node->trueExpr = parseExpression();
         consume(TokenType::TOKEN_COLON, "Expected ':' in ternary operator");
@@ -894,11 +975,10 @@ std::unique_ptr<ExpressionNode> Parser::parseLogicOr() {
     auto expr = parseLogicAnd();
     while (match(TokenType::TOKEN_OR)) {
         auto node = std::make_unique<BinaryOpNode>();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->op = TokenType::TOKEN_OR;
         node->left = std::move(expr);
         node->right = parseLogicAnd();
+        mergeBinaryRange(node.get());
         expr = std::move(node);
     }
     return expr;
@@ -908,11 +988,10 @@ std::unique_ptr<ExpressionNode> Parser::parseLogicAnd() {
     auto expr = parseEquality();
     while (match(TokenType::TOKEN_AND)) {
         auto node = std::make_unique<BinaryOpNode>();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->op = TokenType::TOKEN_AND;
         node->left = std::move(expr);
         node->right = parseEquality();
+        mergeBinaryRange(node.get());
         expr = std::move(node);
     }
     return expr;
@@ -922,11 +1001,10 @@ std::unique_ptr<ExpressionNode> Parser::parseEquality() {
     auto expr = parseComparison();
     while (match(TokenType::TOKEN_EQ_EQ) || match(TokenType::TOKEN_NOT_EQ)) {
         auto node = std::make_unique<BinaryOpNode>();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->op = previous_token.type;
         node->left = std::move(expr);
         node->right = parseComparison();
+        mergeBinaryRange(node.get());
         expr = std::move(node);
     }
     return expr;
@@ -937,11 +1015,10 @@ std::unique_ptr<ExpressionNode> Parser::parseComparison() {
     while (match(TokenType::TOKEN_LESS) || match(TokenType::TOKEN_LESS_EQ) ||
            match(TokenType::TOKEN_GREATER) || match(TokenType::TOKEN_GREATER_EQ)) {
         auto node = std::make_unique<BinaryOpNode>();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->op = previous_token.type;
         node->left = std::move(expr);
         node->right = parseTerm();
+        mergeBinaryRange(node.get());
         expr = std::move(node);
     }
     return expr;
@@ -951,13 +1028,10 @@ std::unique_ptr<ExpressionNode> Parser::parseTerm() {
     auto expr = parseFactor();
     while (match(TokenType::TOKEN_PLUS) || match(TokenType::TOKEN_MINUS)) {
         auto node = std::make_unique<BinaryOpNode>();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->op = previous_token.type;
-        node->line = previous_token.line; 
-        node->column = previous_token.column;
         node->left = std::move(expr);
         node->right = parseFactor();
+        mergeBinaryRange(node.get());
         expr = std::move(node);
     }
     return expr;
@@ -967,11 +1041,10 @@ std::unique_ptr<ExpressionNode> Parser::parseFactor() {
     auto expr = parseUnary();
     while (match(TokenType::TOKEN_STAR) || match(TokenType::TOKEN_SLASH) || match(TokenType::TOKEN_PERCENT)) {
         auto node = std::make_unique<BinaryOpNode>();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->op = previous_token.type;
         node->left = std::move(expr);
         node->right = parseUnary();
+        mergeBinaryRange(node.get());
         expr = std::move(node);
     }
     return expr;
@@ -979,12 +1052,22 @@ std::unique_ptr<ExpressionNode> Parser::parseFactor() {
 
 std::unique_ptr<ExpressionNode> Parser::parseUnary() {
     if (match(TokenType::TOKEN_MINUS) || match(TokenType::TOKEN_EXCL)) {
+
+        Token start = previous_token;
         auto node = std::make_unique<UnaryOpNode>();
+
         node->op = previous_token.type;
-        node->line = previous_token.line; 
-        node->column = previous_token.column;
         node->operand = parseUnary();
         node->isPostfix = false;
+
+        if (node->operand) {
+            // We can't use setRange(start, previous) because 'previous' might be deep inside the recursion.
+            // We manually construct it:
+            node->range.startLine = start.line;
+            node->range.startCol  = start.column;
+            node->range.endLine   = node->operand->range.endLine;
+            node->range.endCol    = node->operand->range.endCol;
+        }
         return node;
     }
     return parseCallOrAccess();
@@ -998,22 +1081,16 @@ std::unique_ptr<ExpressionNode> Parser::parseCallOrAccess()
     while (true) {
         // Function Call: ident(...)
         if (match(TokenType::TOKEN_LPAREN)) {
-            // Convert the expr (IdentifierNode) into a FunctionCallNode or ConstructorNode
-            // For simplicity, we create a specialized node, or check if expr is Identifier.
-            // If expr is not identifier/type, this is invalid syntax usually.
             
             auto callNode = std::make_unique<FunctionCallNode>();
-            // The identifier was the *previous* expression, so usually strictly speaking
-            // the location is the start of the identifier. 
-            // Ideally, 'expr' (IdentifierNode) already has the correct line.
-            callNode->line = expr->line; 
-            callNode->column = expr->column;
+
+            callNode->range.startLine = expr->range.startLine;
+            callNode->range.startCol  = expr->range.startCol;
             
             if (auto id = dynamic_cast<IdentifierNode*>(expr.get())) {
                 callNode->functionName = id->name;
+                callNode->nameRange = id->range;
             } else {
-                // Could be a constructor like vec3(...)
-                // We'll reuse FunctionCallNode for now or ConstructorNode
                 callNode->functionName = "unknown";
             }
 
@@ -1023,16 +1100,26 @@ std::unique_ptr<ExpressionNode> Parser::parseCallOrAccess()
                 } while (match(TokenType::TOKEN_COMMA));
             }
             consume(TokenType::TOKEN_RPAREN, "Expected ')' after arguments");
+
+            callNode->range.endLine = previous_token.line;
+            callNode->range.endCol  = previous_token.column + previous_token.length;
+
             expr = std::move(callNode);
         }
         // Member Access: .xyz
         else if (match(TokenType::TOKEN_DOT)) {
             auto dotNode = std::make_unique<MemberAccessNode>();
             dotNode->base = std::move(expr);
-            dotNode->line = previous_token.line;
+            
+            dotNode->range.startLine = dotNode->base->range.startLine;
+            dotNode->range.startCol  = dotNode->base->range.startCol;
             
             if (check(TokenType::TOKEN_IDENTIFIER)) {
                 dotNode->member = current_token.value;
+
+                dotNode->range.endLine = previous_token.line;
+                dotNode->range.endCol  = previous_token.column + previous_token.length;
+
                 advance();
             } else {
                 reportError("Expected property name after '.'");
@@ -1043,9 +1130,16 @@ std::unique_ptr<ExpressionNode> Parser::parseCallOrAccess()
         else if (match(TokenType::TOKEN_LBRACKET)) {
             auto indexNode = std::make_unique<ArrayAccessNode>();
             indexNode->base = std::move(expr);
-            indexNode->line = previous_token.line;
+            
+            indexNode->range.startLine = indexNode->base->range.startLine;
+            indexNode->range.startCol  = indexNode->base->range.startCol;
+
             indexNode->index = parseExpression();
             consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
+
+            indexNode->range.endLine = previous_token.line;
+            indexNode->range.endCol  = previous_token.column + previous_token.length;
+
             expr = std::move(indexNode);
         }
         else {
@@ -1059,41 +1153,35 @@ std::unique_ptr<ExpressionNode> Parser::parsePrimary() {
     if (match(TokenType::TOKEN_NUMBER)) {
         auto node = std::make_unique<LiteralNode>();
         node->type = TokenType::TOKEN_NUMBER;
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->value = previous_token.value;
-        node->line = previous_token.line;
+        setRange(node.get(), previous_token, previous_token);
         return node;
     }
     if (match(TokenType::TOKEN_STRING)) {
         auto node = std::make_unique<LiteralNode>();
         node->type = TokenType::TOKEN_STRING;
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->value = previous_token.value;
+        setRange(node.get(), previous_token, previous_token);
         return node;
     }
     if (match(TokenType::KEYWORD_TRUE)) {
         auto node = std::make_unique<LiteralNode>();
         node->type = TokenType::KEYWORD_TRUE;
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->value = "true";
+        setRange(node.get(), previous_token, previous_token);
         return node;
     }
     if (match(TokenType::KEYWORD_FALSE)) {
         auto node = std::make_unique<LiteralNode>();
         node->type = TokenType::KEYWORD_FALSE;
-        node->line = previous_token.line;
-        node->column = previous_token.column;
         node->value = "false";
+        setRange(node.get(), previous_token, previous_token);
         return node;
     }
     if (match(TokenType::TOKEN_IDENTIFIER)) {
         auto node = std::make_unique<IdentifierNode>();
         node->name = previous_token.value;
-        node->line = previous_token.line;
-        node->column = previous_token.column;
+        setRange(node.get(), previous_token, previous_token);
         return node;
     }
     // Types (vec3, float) as primaries (constructors)?
@@ -1102,9 +1190,7 @@ std::unique_ptr<ExpressionNode> Parser::parsePrimary() {
     if (isTypeStart()) {
         auto node = std::make_unique<IdentifierNode>();
         node->name = parseTypeString();
-        node->line = previous_token.line;
-        node->column = previous_token.column;
-        // We consumed the keyword in parseTypeString
+        setRange(node.get(), previous_token, previous_token);
         return node;
     }
 
@@ -1122,10 +1208,79 @@ std::unique_ptr<ExpressionNode> Parser::parsePrimary() {
 // UTILS
 // -------------------------------------------------------------------------
 
-std::string Parser::parseTypeString() {
+std::string Parser::parseTypeString() 
+{
     std::string type = current_token.value;
     advance(); // Consume the keyword/identifier
     return type;
+}
+
+std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
+{
+    Token start = current_token;
+    auto node = std::make_unique<TypeNode>();
+
+    // 1. Optional Precision (highp/lowp) - mostly ignored in Godot but valid syntax
+    if (match(TokenType::KEYWORD_HIGH_PRECISION)) {
+        node->precision = previous_token.value;
+    } 
+    // Add mediump/lowp checks here if you added those tokens
+
+    // 2. Base Type Name
+    if (isTypeStart()) {
+        node->baseName = current_token.value;
+        
+        // Capture specific range for the "float" or "vec3" part (for highlighting)
+        node->baseNameRange.startLine = current_token.line;
+        node->baseNameRange.startCol = current_token.column;
+        node->baseNameRange.endLine = current_token.line;
+        node->baseNameRange.endCol = current_token.column + current_token.length;
+
+        advance(); // Consume the type keyword/identifier
+    } else {
+        reportError("Expected type specifier.");
+    }
+
+    // 3. Array Dimensions: float[5][3]
+    while (match(TokenType::TOKEN_LBRACKET)) {
+        if (match(TokenType::TOKEN_NUMBER)) {
+            try {
+                int size = std::stoi(previous_token.value);
+                node->arraySizes.push_back(size);
+            } catch (...) {
+                reportError("Array dimension specifier must be a integer value,");
+                node->arraySizes.push_back(0); // Error fallback
+            }
+        } else {
+            // Handle complex array sizes (const expressions) if needed, 
+            // or just report error for now.
+            reportError("Expected array size.");
+        }
+        consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
+    }
+
+    setRange(node.get(), start, previous_token);
+    return node;
+}
+
+void gdshader_lsp::Parser::mergeBinaryRange(BinaryOpNode *node)
+{
+    if (node->left) {
+        node->range.startLine = node->left->range.startLine;
+        node->range.startCol  = node->left->range.startCol;
+    }
+    if (node->right) {
+        node->range.endLine = node->right->range.endLine;
+        node->range.endCol  = node->right->range.endCol;
+    }
+}
+
+void gdshader_lsp::Parser::setRange(ASTNode *node, const Token &start, const Token &end)
+{
+    node->range.startLine = start.line;
+    node->range.startCol  = start.column;
+    node->range.endLine   = end.line;
+    node->range.endCol    = end.column + end.length;
 }
 
 bool Parser::isTypeStart() {
@@ -1161,14 +1316,9 @@ bool Parser::isTypeStart() {
             return true;
 
         case TokenType::TOKEN_IDENTIFIER: {
-            // Ambiguity: "Type var;" vs "Var.member;"
-            // We need to peek at the NEXT token.
             
             Token next = lexer.peekToken(0); // Peek next (offset 0 usually means next in queue?)
-            // Wait, check peekToken implementation.
-            // peekToken(0) -> buffer[0].
-            // If buffer empty, it creates token.
-            
+
             if (next.type == TokenType::TOKEN_IDENTIFIER) {
                 // "MyType varName" -> It's a declaration
                 return true;

@@ -94,7 +94,9 @@ private:
     void reportTypeMismatch(const ASTNode* node, const std::string& expected, const std::string& found);
 
     void loadBuiltinsForFunction(const std::string& funcName);
+    
     TypePtr resolveType(const ExpressionNode* node);
+    TypePtr resolveTypeFromNode(const TypeNode* node);
 
     void addToken(const ASTNode* node, uint32_t type, uint32_t modifiers = 0);
     void addToken(int line, int col, int len, uint32_t type, uint32_t modifiers = 0);

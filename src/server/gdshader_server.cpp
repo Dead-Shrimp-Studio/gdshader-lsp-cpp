@@ -3,6 +3,7 @@
 
 #include "gdshader/semantics/semantic_analyzer.hpp"
 #include "server/project_manager.hpp"
+#include "gdshader/ast/ast.h"
 
 #include <unordered_set>
 
@@ -788,8 +789,8 @@ std::vector<lsp::DocumentSymbol> GdShaderServer::getDocumentSymbols(const ASTNod
         std::vector<lsp::DocumentSymbol> children;
         
         // Add Arguments
-        for (const auto& arg : f->arguments) {
-            children.push_back(createSymbol(arg.name, lsp::SymbolKind::Variable, f->line, arg.type, {}));
+        for (const auto& arg : f->parameters) {
+            children.push_back(createSymbol(arg->name, lsp::SymbolKind::Variable, f->range.startLine, arg->type->toString(), {}));
         }
         
         // Add Local Variables (Recurse into body)
@@ -798,27 +799,27 @@ std::vector<lsp::DocumentSymbol> GdShaderServer::getDocumentSymbols(const ASTNod
             children.insert(children.end(), bodySyms.begin(), bodySyms.end());
         }
         
-        symbols.push_back(createSymbol(f->name, lsp::SymbolKind::Function, f->line, f->returnType, children));
+        symbols.push_back(createSymbol(f->name, lsp::SymbolKind::Function, f->range.startLine, f->returnType->toString(), children));
     }
     // 3. STRUCTS
     else if (auto s = dynamic_cast<const StructNode*>(node)) {
         std::vector<lsp::DocumentSymbol> members;
         for (const auto& m : s->members) {
-            members.push_back(createSymbol(m.name, lsp::SymbolKind::Field, s->line, m.type, {}));
+            members.push_back(createSymbol(m->name, lsp::SymbolKind::Field, s->range.startLine, m->type->toString(), {}));
         }
-        symbols.push_back(createSymbol(s->name, lsp::SymbolKind::Struct, s->line, "", members));
+        symbols.push_back(createSymbol(s->name, lsp::SymbolKind::Struct, s->range.startLine, "", members));
     }
     // 4. UNIFORMS
     else if (auto u = dynamic_cast<const UniformNode*>(node)) {
-        symbols.push_back(createSymbol(u->name, lsp::SymbolKind::Constant, u->line, u->type, {}));
+        symbols.push_back(createSymbol(u->name, lsp::SymbolKind::Constant, u->range.startLine, u->type->toString(), {}));
     }
     // 5. VARYINGS
     else if (auto v = dynamic_cast<const VaryingNode*>(node)) {
-        symbols.push_back(createSymbol(v->name, lsp::SymbolKind::Variable, v->line, v->type, {}));
+        symbols.push_back(createSymbol(v->name, lsp::SymbolKind::Variable, v->range.startLine, v->type->toString(), {}));
     }
     // 6. CONSTS
     else if (auto c = dynamic_cast<const ConstNode*>(node)) {
-        symbols.push_back(createSymbol(c->name, lsp::SymbolKind::Constant, c->line, c->type, {}));
+        symbols.push_back(createSymbol(c->name, lsp::SymbolKind::Constant, c->range.startLine, c->type->toString(), {}));
     }
     // 7. BLOCKS (Pass-through to find locals)
     else if (auto b = dynamic_cast<const BlockNode*>(node)) {
@@ -829,7 +830,7 @@ std::vector<lsp::DocumentSymbol> GdShaderServer::getDocumentSymbols(const ASTNod
     }
     // 8. LOCAL VARIABLES
     else if (auto v = dynamic_cast<const VariableDeclNode*>(node)) {
-        symbols.push_back(createSymbol(v->name, lsp::SymbolKind::Variable, v->line, v->type, {}));
+        symbols.push_back(createSymbol(v->name, lsp::SymbolKind::Variable, v->range.startLine, v->type->toString(), {}));
     }
 
     // Note: We intentionally skip If/While/For nodes here to keep the Outline clean.

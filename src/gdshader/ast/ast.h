@@ -10,20 +10,36 @@
 
 namespace gdshader_lsp {
 
+struct SourceRange {
+    int startLine = 0;
+    int startCol = 0;
+    int endLine = 0;
+    int endCol = 0;
+};
+
 // -------------------------------------------------------------------------
 // BASE NODE
 // -------------------------------------------------------------------------
 struct ASTNode {
     virtual ~ASTNode() = default;
-    
-    // Debugging / Visitor helper (optional)
-    virtual std::string toString() const { return "Node"; }
+    SourceRange range;
+};
 
-    // Range for error reporting and highlighting
-    int line = 0;
-    int column = 0;
+struct TypeNode : public ASTNode 
+{
+    std::string baseName; 
+    SourceRange baseNameRange;
 
-    int endLine = 0;
+    std::vector<int> arraySizes; // Supports multi-dim like float[4][4] if needed
+    std::string precision;       // highp, mediump, lowp
+    bool isVoid = false;
+
+    std::string toString() const {
+        std::string s = precision.empty() ? "" : (precision + " ");
+        s += baseName;
+        for (int size : arraySizes) s += "[" + std::to_string(size) + "]";
+        return s;
+    }
 };
 
 // -------------------------------------------------------------------------
@@ -55,6 +71,7 @@ struct UnaryOpNode : public ExpressionNode {
 
 struct FunctionCallNode : public ExpressionNode {
     std::string functionName;
+    SourceRange nameRange; // Specific range for just the "func" part
     std::vector<std::unique_ptr<ExpressionNode>> arguments;
 };
 
@@ -97,12 +114,27 @@ struct ExpressionStatementNode : public StatementNode {
     std::unique_ptr<ExpressionNode> expr;
 };
 
-// int x = 5;
-struct VariableDeclNode : public StatementNode {
-    std::string type; // "int", "vec3"
+struct VariableDeclNode : public StatementNode 
+{
+    std::unique_ptr<TypeNode> type;
     std::string name;
-    bool isConst = false;
+    SourceRange nameRange;
     std::unique_ptr<ExpressionNode> initializer; // Optional assignment
+    bool isConst = false;
+};
+
+struct ParameterNode : public ASTNode 
+{
+    std::unique_ptr<TypeNode> type;
+    std::string name;
+    SourceRange nameRange;
+    std::string qualifier; // in, out, inout
+};
+
+struct StructMemberNode : public ASTNode {
+    std::unique_ptr<TypeNode> type;
+    std::string name;
+    SourceRange nameRange;
 };
 
 struct IfNode : public StatementNode {
@@ -176,49 +208,44 @@ struct RenderModeNode : public ASTNode {
 
 // uniform float height : hint_range(0, 10) = 5.0;
 struct UniformNode : public ASTNode {
-    std::string type;
+    std::unique_ptr<TypeNode> type;
     std::string name;
+    SourceRange nameRange;
     std::string hint; // Null/Empty if none
     std::unique_ptr<ExpressionNode> defaultValue;
 };
 
 // varying vec3 normal;
 struct VaryingNode : public ASTNode {
-    std::string type;
+    std::unique_ptr<TypeNode> type;
     std::string name;
+    SourceRange nameRange;
     std::string interpolation; // flat, smooth
 };
 
 // const float PI = 3.14;
 struct ConstNode : public ASTNode {
-    std::string type;
+    std::unique_ptr<TypeNode> type;
     std::string name;
+    SourceRange nameRange;
     std::unique_ptr<ExpressionNode> value;
 };
 
 // struct Light { vec3 color; };
 struct StructNode : public ASTNode {
-    struct Member {
-        std::string type;
-        std::string name;
-    };
     std::string name;
-    std::vector<Member> members;
+    SourceRange nameRange;
+    std::vector<std::unique_ptr<StructMemberNode>> members;
 };
 
 // void fragment() { ... }
 struct FunctionNode : public ASTNode {
-    std::string returnType;
+    std::unique_ptr<TypeNode> returnType;
     std::string name;
+    SourceRange nameRange;
     
-    struct Argument {
-        std::string type;
-        std::string name;
-        // in, out, inout
-        std::string qualifier; 
-    };
-    std::vector<Argument> arguments;
-    
+    std::vector<std::unique_ptr<ParameterNode>> parameters;
+
     std::unique_ptr<BlockNode> body;
 };
 
