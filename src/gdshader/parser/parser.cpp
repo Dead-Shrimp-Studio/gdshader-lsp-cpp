@@ -1096,6 +1096,7 @@ std::unique_ptr<ExpressionNode> Parser::parseCallOrAccess()
 
             if (!check(TokenType::TOKEN_RPAREN)) {
                 do {
+                    if (check(TokenType::TOKEN_RPAREN)) break; // Handling trailing commata
                     callNode->arguments.push_back(parseExpression());
                 } while (match(TokenType::TOKEN_COMMA));
             }
@@ -1149,7 +1150,8 @@ std::unique_ptr<ExpressionNode> Parser::parseCallOrAccess()
     return expr;
 }
 
-std::unique_ptr<ExpressionNode> Parser::parsePrimary() {
+std::unique_ptr<ExpressionNode> Parser::parsePrimary() 
+{
     if (match(TokenType::TOKEN_NUMBER)) {
         auto node = std::make_unique<LiteralNode>();
         node->type = TokenType::TOKEN_NUMBER;
@@ -1200,7 +1202,11 @@ std::unique_ptr<ExpressionNode> Parser::parsePrimary() {
         return expr;
     }
 
-    reportError("Expect expression.");
+    reportError("Expected expression.");
+
+    std::cout << "ParsePrimary failed on token: " << tokenTypeToString(current_token.type) 
+              << " Value: " << current_token.value << std::endl;
+
     return nullptr;
 }
 

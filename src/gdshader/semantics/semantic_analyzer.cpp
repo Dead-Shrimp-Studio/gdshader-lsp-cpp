@@ -34,7 +34,7 @@ void SemanticAnalyzer::visitShaderType(const ShaderTypeNode* node)
     else if (node->shaderType == "fog") currentShaderType = ShaderType::Fog;
     else if (node->shaderType == "spatial") currentShaderType = ShaderType::Spatial;
     else {
-        reportError(node, "Unknown shader type, must be on of: canvas_item, particles, sky, fog, or spatial.");
+        reportError(node, "Unknown shader type. Must be on of: canvas_item, particles, sky, fog, or spatial.");
         currentShaderType = ShaderType::Spatial;
     }
 }
@@ -967,11 +967,28 @@ void SemanticAnalyzer::validateConstructor(const FunctionCallNode* node, const s
         for (const auto& arg : node->arguments) {
             TypePtr argT = resolveType(arg.get());
             
+            if (argT->kind == TypeKind::UNKNOWN) {
+                if (auto lit = dynamic_cast<const LiteralNode*>(arg.get())) {
+                    if (lit->type == TokenType::TOKEN_STRING) {
+                        reportError(arg.get(), "Cannot construct '" + typeName + "' from a string.");
+                        continue;
+                    }
+                }
+                
+                reportError(arg.get(), "Invalid argument type.");
+                continue; 
+            }
+
+            // Explicitly reject 'void' even though it is SCALAR
+            if (argT->name == "void") {
+                reportError(arg.get(), "Cannot use 'void' expression in constructor.");
+                continue;
+            }
+            
             // Allow constructing vectors from any Scalar or Vector type (implicit casting)
-            // e.g. vec2(ivec2) or vec2(int, float) is valid.
-            // We only check if valid types are passed (no structs/arrays).
             if (argT->kind != TypeKind::SCALAR && argT->kind != TypeKind::VECTOR) {
-                reportError(arg.get(), "Invalid argument for vector constructor.");
+                reportError(arg.get(), "Invalid argument for vector constructor. Expected Scalar or Vector.");
+                continue; 
             }
 
             // 2. Count Components
@@ -997,6 +1014,12 @@ void SemanticAnalyzer::validateConstructor(const FunctionCallNode* node, const s
         
         int provided = 0;
         for (const auto& arg : node->arguments) {
+
+            if (resolveType(arg.get()) == typeRegistry.getUnknownType() || resolveType(arg.get()) == typeRegistry.getType("void")) {
+                 reportError(arg.get(), "Invalid matrix constructor argument.");
+                 continue;
+            }
+
             TypePtr argT = resolveType(arg.get());
             if (argT->kind == TypeKind::SCALAR) provided += 1;
             else if (argT->kind == TypeKind::VECTOR) provided += argT->componentCount;
@@ -1243,13 +1266,21 @@ void SemanticAnalyzer::loadBuiltinsForFunction(const std::string& funcName)
 
 TypePtr gdshader_lsp::SemanticAnalyzer::resolveType(const ExpressionNode *node)
 {
-    if (!node) return typeRegistry.getType("void");
+    if (!node) return typeRegistry.getUnknownType();
 
     // 1. Literal?
     if (auto lit = dynamic_cast<const LiteralNode*>(node)) {
-        if (lit->type == TokenType::TOKEN_NUMBER) return (lit->value.find('.') != std::string::npos) ? typeRegistry.getType("float") : typeRegistry.getType("int");
-        if (lit->type == TokenType::KEYWORD_TRUE || lit->type == TokenType::KEYWORD_FALSE) return typeRegistry.getType("bool");
-        return typeRegistry.getType("void");
+        if (lit->type == TokenType::TOKEN_NUMBER) 
+            return (lit->value.find('.') != std::string::npos) ? typeRegistry.getType("float") : typeRegistry.getType("int");
+        
+        if (lit->type == TokenType::KEYWORD_TRUE || lit->type == TokenType::KEYWORD_FALSE) 
+            return typeRegistry.getType("bool");
+            
+        if (lit->type == TokenType::TOKEN_STRING) {
+            return typeRegistry.getUnknownType();
+        }
+        
+        return typeRegistry.getUnknownType();
     }
 
     // 2. Identifier? Lookup in Symbol Table

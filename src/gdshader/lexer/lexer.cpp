@@ -115,6 +115,14 @@ Token Lexer::parseString(int startLine, int startCol) {
     advance(); // Consume the starting double quote
 
     while (current_pos < source_len && current_char != '"') {
+       
+        if (current_char == '\\' && peek() == '"') {
+            str_val += '"';
+            advance(); // Skip \ 
+            advance(); // Skip "
+            continue;
+        }
+
         str_val += current_char;
         advance();
     }

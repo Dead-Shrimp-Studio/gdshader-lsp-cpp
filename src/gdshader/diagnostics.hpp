@@ -12,7 +12,8 @@ enum class DiagnosticLevel {
     Warning
 };
 
-struct Diagnostic {
+struct Diagnostic 
+{
     int line;
     int column;
     std::string message;
