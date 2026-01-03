@@ -67,6 +67,15 @@ bool SymbolTable::add(const Symbol& symbol)
     return true;
 }
 
+void gdshader_lsp::SymbolTable::addReference(const Symbol* sym, int line, int col)
+{
+    // Note: We cast away constness because 'lookup' returns const, 
+    // but we are in the analysis phase populating data.
+    if (sym) {
+        const_cast<Symbol*>(sym)->usages.push_back({line, col});
+    }
+}
+
 const Symbol* SymbolTable::lookup(const std::string& name) const {
     Scope* walker = current;
     while (walker) {
@@ -159,6 +168,35 @@ std::vector<Symbol> SymbolTable::getVisibleSymbolsAt(int line) const
         walker = walker->parent;
     }
     return results;
+}
+
+namespace {
+    // Helper to recursively collect symbols
+    void collectSymbolsRecursive(const Scope* scope, std::vector<Symbol>& results) 
+    {
+        if (!scope) return;
+
+        for (const auto& pair : scope->symbols) {
+            for (const auto& sym : pair.second) {
+                results.push_back(sym);
+            }
+        }
+
+        for (const auto& child : scope->children) {
+            collectSymbolsRecursive(child.get(), results);
+        }
+    }
+}
+
+const std::vector<Symbol> gdshader_lsp::SymbolTable::getAllSymbols()
+{
+    std::vector<Symbol> all_symbols;
+    
+    if (root) {
+        collectSymbolsRecursive(root.get(), all_symbols);
+    }
+    
+    return all_symbols;
 }
 
 }

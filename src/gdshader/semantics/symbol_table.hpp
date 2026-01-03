@@ -21,7 +21,8 @@ enum class SymbolType {
     Builtin
 };
 
-struct Symbol {
+struct Symbol 
+{
     std::string name;
     
     TypePtr type;
@@ -32,9 +33,18 @@ struct Symbol {
     int line;
     int column;
     std::string doc_string;
+
+    struct Usage {
+        int line;
+        int column;
+    };
+
+    std::vector<Usage> usages;
+
 };
 
-struct Scope {
+struct Scope 
+{
     Scope* parent = nullptr;
     std::vector<std::unique_ptr<Scope>> children;
     
@@ -45,10 +55,16 @@ struct Scope {
     int endLine = 0;
 
     Scope(Scope* p = nullptr) : parent(p) {}
+
+    bool has_children() {
+        return !children.empty();
+    }
 };
 
 class SymbolTable {
+
 public:
+
     SymbolTable();
 
     // Scope Management
@@ -56,6 +72,15 @@ public:
     void popScope(int endLine);
 
     bool add(const Symbol& symbol);
+
+    /**
+     * @brief Adds a usage notifiies to the appropiate symbol, in the current scope.
+     * 
+     * @param sym Pointer to the symbol 
+     * @param line Line
+     * @param col Column
+     */
+    void addReference(const Symbol* sym, int line, int col);
 
     /**
      * @brief With overloading, this is mainly used for local variable lookup, where we retrieve the first symbol matched.
@@ -70,7 +95,7 @@ public:
     const Symbol* lookupAt(const std::string& name, int line) const;
     
     /**
-     * @brief Assembles a vector of all visible symbols relatifve to the current scope. Traverses upwards.
+     * @brief Assembles a vector of all visible symbols relative to the current scope. Traverses upwards.
      * @param scope 
      * @return std::vector<Symbol> 
      */
@@ -80,13 +105,16 @@ public:
      * @brief Get the Global symbol map from the current ShaderUnit. this is for file linking.
      * @return const std::unordered_map<std::string, std::vector<Symbol>>& 
      */
-    const std::unordered_map<std::string, std::vector<Symbol>>& getGlobals() const {
+    const std::unordered_map<std::string, std::vector<Symbol>>& getGlobals() const 
+    {
         return root->symbols;
     }
 
+    const std::vector<Symbol> getAllSymbols();
+
 private:
    
-    std::unique_ptr<Scope> root;
+    std::unique_ptr<Scope> root = nullptr;
     Scope* current;
 
 };

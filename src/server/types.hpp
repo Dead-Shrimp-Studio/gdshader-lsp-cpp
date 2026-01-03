@@ -4,6 +4,7 @@
 
 #include "gdshader/ast/ast.h"
 #include "gdshader/diagnostics.hpp"
+#include "gdshader/semantics/types.hpp"
 #include "gdshader/semantics/type_registry.hpp"
 
 #include <string>
@@ -32,6 +33,7 @@ struct ShaderUnit {
     std::vector<std::string> importedBy;
 
     std::vector<Diagnostic> diagnostics;
+    std::vector<RawToken> tokens;
 };
 
 } // namespace gdshader_lsp

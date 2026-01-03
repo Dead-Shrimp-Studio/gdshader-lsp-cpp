@@ -82,6 +82,22 @@ struct Type
     }
 };
 
+struct RawToken {
+    int line;
+    int col;
+    int length;
+
+    uint32_t type;
+    uint32_t modifiers;
+    
+    // Helper for sorting
+    bool operator<(const RawToken& other) const {
+        if (line != other.line) return line < other.line;
+        return col < other.col;
+    }
+
+};
+
 } // namespace gdshader_lsp
 
 #endif

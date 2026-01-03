@@ -55,6 +55,25 @@ void GdShaderServer::registerHandlers() {
                     },
                     .completionProvider = lsp::CompletionOptions{
                         .triggerCharacters = std::vector<std::string>{".", ":"} 
+                    },
+                    .semanticTokensProvider = lsp::SemanticTokensOptions {
+                        .legend = lsp::SemanticTokensLegend {
+                            .tokenTypes = {
+                                "variable",     // 0
+                                "function",     // 1
+                                "struct",       // 2
+                                "macro",        // 3
+                                "type",         // 4
+                                "parameter",    // 5
+                                "property"      // 6 (members)
+                            },
+                            .tokenModifiers = {
+                                "declaration",  // 1
+                                "readonly",     // 2
+                                "static"        // 4
+                            }
+                        },
+                        .full = true
                     }
                 },
                 .serverInfo = lsp::InitializeResultServerInfo{
@@ -403,6 +422,7 @@ void GdShaderServer::registerHandlers() {
         }
     );
 
+    // --- FEATURE: DOCUMENT SYMBOL ---
     handler.add<lsp::requests::TextDocument_DocumentSymbol>(
         [this](lsp::requests::TextDocument_DocumentSymbol::Params&& params) -> lsp::requests::TextDocument_DocumentSymbol::Result
         {
@@ -418,6 +438,74 @@ void GdShaderServer::registerHandlers() {
             
             // Generate symbol tree from the AST
             return getDocumentSymbols(su->ast.get());
+        }
+    );
+
+    // --- FEATURE: SEMANTIC TOKENS ---
+    handler.add<lsp::requests::TextDocument_SemanticTokens_Full>(
+        [this](lsp::requests::TextDocument_SemanticTokens_Full::Params&& params) -> lsp::requests::TextDocument_SemanticTokens_Full::Result 
+        {
+            lsp::SemanticTokens result;
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+            if (su->tokens.empty()) return result;
+
+            result.data = encodeTokens(su->tokens); 
+            return result;
+        }
+    );
+
+    // --- FEATURE: DOCUMENT HIGHLIGHT ---
+    handler.add<lsp::requests::TextDocument_DocumentHighlight>(
+        [this](lsp::requests::TextDocument_DocumentHighlight::Params&& params) -> lsp::requests::TextDocument_DocumentHighlight::Result 
+        {
+            std::vector<lsp::DocumentHighlight> result;
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+            if (!su->symbols) return result;
+
+            int line = params.position.line;
+            int column = params.position.character;
+
+            std::string name = getWordAtPosition(su->source_code, line, column);
+            if (name.empty()) return result;
+
+            const Symbol* sym = su->symbols->lookupAt(name, line);
+
+            if (sym) {
+
+                if (sym->line >= 0) {
+                    result.push_back(lsp::DocumentHighlight{
+                        .range = lsp::Range{
+                            .start = { (unsigned)sym->line, (unsigned)sym->column },
+                            .end   = { (unsigned)sym->line, (unsigned)(sym->column + sym->name.length()) }
+                        },
+                        .kind = lsp::DocumentHighlightKind::Text
+                    });
+                }
+
+                for (const auto& usage : sym->usages) {
+                    result.push_back(lsp::DocumentHighlight{
+                        .range = lsp::Range{
+                            .start = { (unsigned)usage.line, (unsigned)usage.column },
+                            .end   = { (unsigned)usage.line, (unsigned)(usage.column + sym->name.length()) }
+                        },
+                        .kind = lsp::DocumentHighlightKind::Read
+                    });
+                }
+            }
+
+            return result;
         }
     );
 
@@ -453,14 +541,15 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
     if (ast) {
         auto result = analyzer.analyze(ast.get());
         
+        su->ast = std::move(ast);
         su->symbols = std::make_shared<SymbolTable>(std::move(result.symbols));
         su->types   = std::move(result.types);
+        su->tokens = result.tokens;
 
         auto semanticErrors = result.diagnostics;
         errors.insert(errors.end(), semanticErrors.begin(), semanticErrors.end());
     }
 
-    su->ast = std::move(ast);
     su->diagnostics = errors;
 
     // 3. Convert Diagnostics
@@ -494,8 +583,6 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
     params.diagnostics = lspDiagnostics;
 
     handler.sendNotification<lsp::notifications::TextDocument_PublishDiagnostics>(std::move(params));
-    
-    std::cout << "  Found " << errors.size() << " errors." << std::endl;
 }
 
 //////////////////////////////////////////////////
@@ -640,9 +727,6 @@ std::string gdshader_lsp::GdShaderServer::getLine(const std::string &source, int
     return line;
 }
 
-// gdshader_server.cpp
-
-// --- HELPER: Create Symbol ---
 lsp::DocumentSymbol GdShaderServer::createSymbol(const std::string& name, lsp::SymbolKind kind, int line, const std::string& detail, const std::vector<lsp::DocumentSymbol>& children) 
 {
     lsp::DocumentSymbol sym;
@@ -662,7 +746,31 @@ lsp::DocumentSymbol GdShaderServer::createSymbol(const std::string& name, lsp::S
     return sym;
 }
 
-// --- HELPER: Recursive AST Traversal ---
+std::vector<u_int> gdshader_lsp::GdShaderServer::encodeTokens(std::vector<RawToken> &raw)
+{
+    std::sort(raw.begin(), raw.end());
+
+    std::vector<u_int> encoded;
+    u_int prevLine = 0;
+    u_int prevCol = 0;
+
+    for (const auto& t : raw) {
+        u_int deltaLine = t.line - prevLine;
+        u_int deltaCol = (deltaLine == 0) ? (t.col - prevCol) : t.col;
+
+        encoded.push_back(deltaLine);
+        encoded.push_back(deltaCol);
+        encoded.push_back(t.length);
+        encoded.push_back(t.type);
+        encoded.push_back(t.modifiers);
+
+        prevLine = t.line;
+        prevCol = t.col;
+    }
+
+    return encoded;
+}
+
 std::vector<lsp::DocumentSymbol> GdShaderServer::getDocumentSymbols(const ASTNode* node) 
 {
     std::vector<lsp::DocumentSymbol> symbols;

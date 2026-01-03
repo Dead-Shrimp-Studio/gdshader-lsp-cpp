@@ -19,7 +19,7 @@ AnalysisResult SemanticAnalyzer::analyze(const ProgramNode* ast)
         visitProgram(ast);
     }
     
-    return { std::move(symbols), std::move(typeRegistry), diagnostics };
+    return { std::move(symbols), std::move(typeRegistry), diagnostics, tokens };
 }
 
 // -------------------------------------------------------------------------
@@ -42,7 +42,7 @@ void SemanticAnalyzer::visitShaderType(const ShaderTypeNode* node)
 void SemanticAnalyzer::visitUniform(const UniformNode* node) 
 {
     TypePtr type = typeRegistry.getType(node->type);
-    Symbol s{node->name, type, {type}, SymbolType::Uniform, node->line, node->column, node->hint};
+    Symbol s{node->name, type, {type}, SymbolType::Uniform, node->line, node->column, node->hint, {}};
 
     if (!symbols.add(s)) reportError(node, "Redefinition of uniform '" + s.name + "'");
     if (node->defaultValue) {
@@ -115,21 +115,25 @@ void SemanticAnalyzer::visitUniform(const UniformNode* node)
             reportError(node, "Hint '" + hintName + "' is not valid for uniform type '" + type->name + "'");
         }
     }
-
+    addToken(node, 0, (1 << 1) | (1 << 2));
 }
 
 void SemanticAnalyzer::visitVarying(const VaryingNode* node) 
 {
     TypePtr type = typeRegistry.getType(node->type);
-    Symbol s{node->name, type, {type}, SymbolType::Varying, node->line, node->column, ""};
+    Symbol s{node->name, type, {type}, SymbolType::Varying, node->line, node->column, "", {}};
     if (!symbols.add(s)) reportError(node, "Redefinition of varying '" + s.name + "'");
+    addToken(node, 0, (1 << 0));
 }
 
 void SemanticAnalyzer::visitConst(const ConstNode* node) 
 {
     TypePtr type = typeRegistry.getType(node->type);
-    Symbol s{node->name, type, {type}, SymbolType::Const, node->line, node->column, ""};
+    Symbol s{node->name, type, {type}, SymbolType::Const, node->line, node->column, "", {}};
     if (!symbols.add(s)) reportError(node, "Redefinition of const '" + s.name + "'");
+
+    addToken(node, 0, (1 << 1) | (1 << 0));
+
     if (node->value) {
         visit(node->value.get());
         TypePtr valType = resolveType(node->value.get());
@@ -141,6 +145,8 @@ void SemanticAnalyzer::visitConst(const ConstNode* node)
 
 void SemanticAnalyzer::visitStruct(const StructNode* node) 
 {
+    addToken(node, 2, 1);
+
     std::vector<std::pair<std::string, TypePtr>> members;
 
     for(const auto& m : node->members) {
@@ -157,13 +163,14 @@ void SemanticAnalyzer::visitStruct(const StructNode* node)
         }
 
         members.push_back({m.name, memberType});
+        addToken(node, 6, 1);
     }
 
     typeRegistry.registerStruct(node->name, members);
 
     // Register the Struct itself as a Symbol so it can be used later
     TypePtr structType = typeRegistry.getType(node->name);
-    Symbol s{node->name, structType, {structType}, SymbolType::Struct, node->line, node->column, ""};
+    Symbol s{node->name, structType, {structType}, SymbolType::Struct, node->line, node->column, "", {}};
     
     if (!symbols.add(s)) reportError(node, "Redefinition of struct '" + s.name + "'");
 }
@@ -176,7 +183,8 @@ void SemanticAnalyzer::visitFunction(const FunctionNode* node)
         paramTypes.push_back(typeRegistry.getType(arg.type));
     }
 
-    // 2. Create Symbol with signature
+    addToken(node, 1, 1);
+
     Symbol funcSym{
         node->name, 
         returnType, 
@@ -184,7 +192,8 @@ void SemanticAnalyzer::visitFunction(const FunctionNode* node)
         SymbolType::Function, 
         node->line, 
         node->column, 
-        ""
+        "",
+        {}
     };
 
     if (!symbols.add(funcSym)) {
@@ -219,8 +228,10 @@ void SemanticAnalyzer::visitFunction(const FunctionNode* node)
     for (size_t i = 0; i < node->arguments.size(); i++) {
         const auto& arg = node->arguments[i];
         TypePtr t = paramTypes[i];
-        Symbol argSym{arg.name, t, {t}, SymbolType::Variable, node->line, node->column, ""};
+        Symbol argSym{arg.name, t, {t}, SymbolType::Variable, node->line, node->column, "", {}};
         symbols.add(argSym);
+
+        addToken(node, 5, 1);
     }
 
     if (node->body) {
@@ -338,7 +349,7 @@ void gdshader_lsp::SemanticAnalyzer::visitDefine(const DefineNode *node)
         
         // Register as a Const Symbol
         // This allows it to be used in array sizes (float x[MAX_LIGHTS]) and math!
-        Symbol s{node->name, type, {type}, SymbolType::Const, node->line, 0, "Macro Definition"};
+        Symbol s{node->name, type, {type}, SymbolType::Const, node->line, 0, "Macro Definition", {}};
         
         if (!symbols.add(s)) {
             // Optional: Warn about macro redefinition?
@@ -349,9 +360,11 @@ void gdshader_lsp::SemanticAnalyzer::visitDefine(const DefineNode *node)
         // We register flags as boolean constants so they appear in autocomplete
         // but typically they aren't used in expressions (unless inside #ifdef).
         TypePtr type = typeRegistry.getType("bool");
-        Symbol s{node->name, type, {type}, SymbolType::Const, node->line, 0, "Preprocessor Flag"};
+        Symbol s{node->name, type, {type}, SymbolType::Const, node->line, 0, "Preprocessor Flag", {}};
         symbols.add(s);
     }
+
+    addToken(node, 3, 1);
 }
 
 // -------------------------------------------------------------------------
@@ -388,22 +401,25 @@ void SemanticAnalyzer::visitVarDecl(const VariableDeclNode* node)
 
     if (type->kind == TypeKind::UNKNOWN) reportError(node, "Unknown type '" + node->type + "'");
 
-    if (symbols.lookup(node->name)) {
+    if (symbols.lookup(node->name)) 
+    {
         // If it exists, but add() succeeds, it means it wasn't in the *current* immediate scope
         // (because add() checks strict redefinition). Therefore, it must be shadowing.
         // We defer the warning until we know add() succeeds.
         
-        Symbol s{node->name, type, {type}, SymbolType::Variable, node->line, node->column, ""};
+        Symbol s{node->name, type, {type}, SymbolType::Variable, node->line, node->column, "", {}};
         if (symbols.add(s)) {
             reportWarning(node, "Variable '" + node->name + "' shadows an existing declaration.");
         } else {
             reportError(node, "Redefinition of variable '" + node->name + "' in the same scope.");
         }
     } else {
-        Symbol s{node->name, type, {type}, SymbolType::Variable, node->line, node->column, ""};
+        Symbol s{node->name, type, {type}, SymbolType::Variable, node->line, node->column, "", {}};
         symbols.add(s);
     }
     
+    addToken(node, 0, 1);
+
     if (node->initializer) {
         visit(node->initializer.get());
         TypePtr initType = resolveType(node->initializer.get());
@@ -534,7 +550,30 @@ void SemanticAnalyzer::visitExpression(const ExpressionNode* node)
 void SemanticAnalyzer::visitIdentifier(const IdentifierNode* node) 
 {
     const Symbol* s = symbols.lookup(node->name);
-    if (!s) {
+    
+    if (s)
+    {
+        uint32_t type = 0;
+        uint32_t mod = 0;
+
+        if (s->category == SymbolType::Function || s->category == SymbolType::Builtin) {
+            type = 1; // Function
+        } 
+        else if (s->category == SymbolType::Struct) {
+            type = 2; // Struct
+        }
+        else if (s->category == SymbolType::Const) {
+            type = 0; 
+            mod |= (1 << 1); // ReadOnly
+        }
+        else if (s->category == SymbolType::Uniform) {
+            type = 0;
+            mod |= (1 << 1) | (1 << 2); // ReadOnly + Static
+        }
+
+        addToken(node, type, mod);
+        symbols.addReference(s, node->line, node->column);
+    } else {
         reportError(node, "Undefined identifier '" + node->name + "'");
     }
 }
@@ -714,13 +753,15 @@ void SemanticAnalyzer::visitFunctionCall(const FunctionCallNode* node)
     }
 
     std::string name = node->functionName;
-    
-    // 1. Constructor Check
+
     // (If the name matches a known type, it's a constructor)
     if (typeRegistry.getType(name)->kind != TypeKind::UNKNOWN) {
         validateConstructor(node, name);
+        addToken(node, 4, 0);
         return; 
     }
+
+    addToken(node, 1, 0);
 
     // 2. Function Lookup
     // This now finds BOTH User functions AND Built-ins (because of registerGlobalFunctions)
@@ -734,9 +775,9 @@ void SemanticAnalyzer::visitFunctionCall(const FunctionCallNode* node)
     const Symbol* bestMatch = findBestOverload(node, argTypes);
     
     if (!bestMatch) {
-        // IMPROVED ERROR REPORTING
         
-        // 1. Check if any candidate has the correct argument count
+        symbols.addReference(bestMatch, node->line, node->column);
+
         std::vector<const Symbol*> arityMatches;
         for (const auto* s : candidates) {
             if (s->parameterTypes.size() == argTypes.size()) {
@@ -798,6 +839,8 @@ void SemanticAnalyzer::visitMemberAccess(const MemberAccessNode* node)
     if (baseT->kind == TypeKind::ARRAY && node->member == "length") {
         return; // Valid
     }
+
+    addToken(node, 6, 0);
 
     TypePtr memberT = typeRegistry.getMemberType(baseT, node->member);
     if (memberT->kind == TypeKind::UNKNOWN) {
@@ -1132,8 +1175,7 @@ int SemanticAnalyzer::getNodeLength(const ASTNode* node) {
     }
     // 4. Types / Variables (e.g. "vec3")
     if (auto n = dynamic_cast<const VariableDeclNode*>(node)) {
-        // Usually points to the type start
-        return n->type.length(); 
+        return n->name.length(); 
     }
     // 5. Member Access (e.g. ".x") - Parser usually sets loc to the dot
     if (auto n = dynamic_cast<const MemberAccessNode*>(node)) {
@@ -1169,8 +1211,7 @@ void SemanticAnalyzer::loadBuiltinsForFunction(const std::string& funcName)
         const auto& builtins = get_builtins(currentShaderType, scope);
         for (const auto& b : builtins) {
             TypePtr t = typeRegistry.getType(b.type);
-            // Builtins have no specific line, so -1
-            symbols.add({b.name, t, {t}, SymbolType::Builtin, -1, 0, b.doc});
+            symbols.add({b.name, t, {t}, SymbolType::Builtin, -1, 0, b.doc, {}});
         }
     }
 }
@@ -1250,6 +1291,18 @@ TypePtr gdshader_lsp::SemanticAnalyzer::resolveType(const ExpressionNode *node)
     return typeRegistry.getUnknownType();
 }
 
+void gdshader_lsp::SemanticAnalyzer::addToken(const ASTNode *node, uint32_t type, uint32_t modifiers)
+{
+    if (!node) return;
+    int len = getNodeLength(node);
+    tokens.push_back({node->line, node->column, len, type, modifiers});
+}
+
+void gdshader_lsp::SemanticAnalyzer::addToken(int line, int col, int len, uint32_t type, uint32_t modifiers)
+{
+    tokens.push_back({line, col, len, type, modifiers});
+}
+
 void SemanticAnalyzer::reportError(const ASTNode* node, const std::string& msg) {
     if (node) {
         int len = getNodeLength(node);
@@ -1300,7 +1353,7 @@ void SemanticAnalyzer::registerGlobalFunctions()
         TypePtr returnType = typeRegistry.getType(ret);
         std::vector<TypePtr> argTypes;
         for (const auto& a : args) argTypes.push_back(typeRegistry.getType(a));
-        Symbol s{name, returnType, argTypes, SymbolType::Builtin, -1, 0, doc};
+        Symbol s{name, returnType, argTypes, SymbolType::Builtin, -1, 0, doc, {}};
         symbols.add(s);
     };
 

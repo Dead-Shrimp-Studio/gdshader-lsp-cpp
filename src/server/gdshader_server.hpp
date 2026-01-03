@@ -55,6 +55,8 @@ private:
     std::vector<lsp::DocumentSymbol> getDocumentSymbols(const ASTNode* node);
     lsp::DocumentSymbol createSymbol(const std::string& name, lsp::SymbolKind kind, int line, const std::string& detail, const std::vector<lsp::DocumentSymbol>& children);
 
+    std::vector<u_int> encodeTokens(std::vector<RawToken>& raw);
+
 public:
 
     GdShaderServer(lsp::io::Socket s);

@@ -14,6 +14,7 @@ struct AnalysisResult {
     SymbolTable symbols;
     TypeRegistry types;
     std::vector<Diagnostic> diagnostics;
+    std::vector<RawToken> tokens;
 };
 
 class SemanticAnalyzer {
@@ -24,6 +25,7 @@ private:
     TypeRegistry typeRegistry;
 
     std::vector<Diagnostic> diagnostics;
+    std::vector<RawToken> tokens;
 
     // State
     
@@ -93,6 +95,9 @@ private:
 
     void loadBuiltinsForFunction(const std::string& funcName);
     TypePtr resolveType(const ExpressionNode* node);
+
+    void addToken(const ASTNode* node, uint32_t type, uint32_t modifiers = 0);
+    void addToken(int line, int col, int len, uint32_t type, uint32_t modifiers = 0);
 
     void registerGlobalFunctions();
 
