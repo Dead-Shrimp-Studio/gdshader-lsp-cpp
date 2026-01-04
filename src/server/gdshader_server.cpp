@@ -32,7 +32,6 @@ void GdShaderServer::run()
 void GdShaderServer::registerHandlers() {
     
     // --- LIFECYCLE: INITIALIZE ---
-    // The client sending its capabilities and asking for yours.
     handler.add<lsp::requests::Initialize>(
         [this](lsp::requests::Initialize::Params&& params) {
             
@@ -57,6 +56,9 @@ void GdShaderServer::registerHandlers() {
                     .completionProvider = lsp::CompletionOptions{
                         .triggerCharacters = std::vector<std::string>{".", ":"} 
                     },
+                    .referencesProvider = true,
+                    .renameProvider = true,
+                    .foldingRangeProvider = true,
                     .semanticTokensProvider = lsp::SemanticTokensOptions {
                         .legend = lsp::SemanticTokensLegend {
                             .tokenTypes = {
@@ -510,6 +512,144 @@ void GdShaderServer::registerHandlers() {
         }
     );
 
+    // --- FEATURE: TEXTDOCUMENT_RENAME ---
+    handler.add<lsp::requests::TextDocument_Rename>(
+        [this](lsp::requests::TextDocument_Rename::Params&& params) -> lsp::requests::TextDocument_Rename::Result
+        {
+            lsp::WorkspaceEdit result;
+
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+            if (!su->symbols) return result;
+
+            int line = params.position.line; 
+            int col = params.position.character;
+
+            std::string name = getWordAtPosition(su->source_code, line, col);
+            if (name.empty()) return result;
+
+            const Symbol* sym = su->symbols->lookupAt(name, line);
+
+            if (sym) {
+                // Safety: Don't rename built-ins (like 'sin' or 'ALBEDO')
+                if (sym->category == SymbolType::Builtin) {
+                    std::cout << "Cannot rename builtin: " << sym->name << std::endl;
+                    return result;
+                }
+
+                std::vector<lsp::TextEdit> edits;
+
+                // 1. Rename the Definition (if in this file)
+                if (sym->line >= 0) {
+                    edits.push_back(lsp::TextEdit{
+                        .range = lsp::Range{
+                            .start = { (unsigned)sym->line, (unsigned)sym->column },
+                            .end   = { (unsigned)sym->line, (unsigned)(sym->column + sym->name.length()) }
+                        },
+                        .newText = params.newName
+                    });
+                }
+
+                // 2. Rename all Usages
+                for (const auto& usage : sym->usages) {
+                    edits.push_back(lsp::TextEdit{
+                        .range = lsp::Range{
+                            .start = { (unsigned)usage.line, (unsigned)usage.column },
+                            .end   = { (unsigned)usage.line, (unsigned)(usage.column + sym->name.length()) }
+                        },
+                        .newText = params.newName
+                    });
+                }
+
+                result.changes = {
+                    { params.textDocument.uri, edits }
+                };
+            }
+
+            return result;
+        }
+    );
+
+    // --- FEATURE: REFERENCES ---
+    handler.add<lsp::requests::TextDocument_References>(
+        [this](lsp::requests::TextDocument_References::Params&& params) -> lsp::requests::TextDocument_References::Result
+        {
+            std::vector<lsp::Location> result;
+            
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+            if (!su->symbols) return result;
+
+            int line = params.position.line;
+            int col = params.position.character;
+
+            std::string name = getWordAtPosition(su->source_code, line, col);
+            if (name.empty()) return result;
+
+            const Symbol* sym = su->symbols->lookupAt(name, line);
+
+            if (sym) {
+                // 1. Add Definition (if requested context includes it)
+                if (params.context.includeDeclaration && sym->line >= 0) {
+                    result.push_back(lsp::Location{
+                        .uri = params.textDocument.uri,
+                        .range = lsp::Range{
+                            .start = { (unsigned)sym->line, (unsigned)sym->column },
+                            .end   = { (unsigned)sym->line, (unsigned)(sym->column + sym->name.length()) }
+                        }
+                    });
+                }
+
+                // 2. Add Usages
+                for (const auto& usage : sym->usages) {
+                    result.push_back(lsp::Location{
+                        .uri = params.textDocument.uri, // Currently current-file only
+                        .range = lsp::Range{
+                            .start = { (unsigned)usage.line, (unsigned)usage.column },
+                            .end   = { (unsigned)usage.line, (unsigned)(usage.column + sym->name.length()) }
+                        }
+                    });
+                }
+            }
+
+            return result;
+        }
+    );
+
+    // --- FEATURE: FOLDING RANGES ---
+    handler.add<lsp::requests::TextDocument_FoldingRange>(
+        [this](lsp::requests::TextDocument_FoldingRange::Params&& params) 
+        -> lsp::requests::TextDocument_FoldingRange::Result 
+        {
+            std::vector<lsp::FoldingRange> result;
+
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            // Just walk the AST!
+            if (su->ast) {
+                collectFoldingRanges(su->ast.get(), result);
+            }
+
+            return result;
+        }
+    );
+
     // --- LIFECYCLE: SHUTDOWN/EXIT ---
     handler.add<lsp::requests::Shutdown>([]() { return nullptr; });
     handler.add<lsp::notifications::Exit>([]() { exit(0); });
@@ -589,6 +729,92 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
 //////////////////////////////////////////////////
 // Helper
 //////////////////////////////////////////////////
+
+void gdshader_lsp::GdShaderServer::collectFoldingRanges(const ASTNode* node, std::vector<lsp::FoldingRange>& ranges) 
+{
+    if (!node) return;
+
+    // 1. BlockNode
+    if (auto block = dynamic_cast<const BlockNode*>(node)) {
+        if (block->range.endLine > block->range.startLine) {
+            lsp::FoldingRange fr;
+            fr.startLine = block->range.startLine + 1;
+            fr.startCharacter = block->range.startCol;
+            fr.endLine = block->range.endLine + 1;
+            fr.endCharacter = block->range.endCol;
+            fr.kind = lsp::FoldingRangeKind::Region;
+            ranges.push_back(fr);
+        }
+        
+        for (const auto& stmt : block->statements) {
+            collectFoldingRanges(stmt.get(), ranges);
+        }
+    }
+    // 2. StructNode (struct MyStruct { ... };)
+    else if (auto str = dynamic_cast<const StructNode*>(node)) {
+        if (str->range.endLine > str->range.startLine) {
+            lsp::FoldingRange fr;
+            fr.startLine = str->range.startLine + 1;
+            fr.startCharacter = str->range.startCol;
+            fr.endLine = str->range.endLine + 1;
+            fr.endCharacter = str->range.endCol;
+            fr.kind = lsp::FoldingRangeKind::Region;
+            ranges.push_back(fr);
+        }
+        // Struct members are leaves, no recursion needed inside them
+    }
+    // 3. SwitchNode (switch (...) { ... })
+    //    Our AST stores cases directly, so we fold the switch statement itself.
+    else if (auto sw = dynamic_cast<const SwitchNode*>(node)) {
+        if (sw->range.endLine > sw->range.startLine) {
+            lsp::FoldingRange fr;
+            fr.startLine = sw->range.startLine + 1;
+            fr.startCharacter = sw->range.startCol;
+            fr.endLine = sw->range.endLine + 1;
+            fr.endCharacter = sw->range.endCol;
+            fr.kind = lsp::FoldingRangeKind::Region;
+            ranges.push_back(fr);
+        }
+        for (const auto& c : sw->cases) {
+            collectFoldingRanges(c.get(), ranges);
+        }
+    }
+    // 4. CaseNode (case X: ... break;)
+    else if (auto c = dynamic_cast<const CaseNode*>(node)) {
+        if (c->range.endLine > c->range.startLine) {
+            lsp::FoldingRange fr;
+            fr.startLine = c->range.startLine + 1;
+            fr.startCharacter = c->range.startCol;
+            fr.endLine = c->range.endLine + 1;
+            fr.endCharacter = c->range.endCol;
+            fr.kind = lsp::FoldingRangeKind::Region;
+            ranges.push_back(fr);
+        }
+        for (const auto& stmt : c->statements) {
+            collectFoldingRanges(stmt.get(), ranges);
+        }
+    }
+    // 5. Recursion Boilerplate (Traverse children to find nested blocks)
+    else if (auto prog = dynamic_cast<const ProgramNode*>(node)) {
+        for (const auto& n : prog->nodes) collectFoldingRanges(n.get(), ranges);
+    }
+    else if (auto func = dynamic_cast<const FunctionNode*>(node)) {
+        if (func->body) collectFoldingRanges(func->body.get(), ranges);
+    }
+    else if (auto ifNode = dynamic_cast<const IfNode*>(node)) {
+        if (ifNode->thenBranch) collectFoldingRanges(ifNode->thenBranch.get(), ranges);
+        if (ifNode->elseBranch) collectFoldingRanges(ifNode->elseBranch.get(), ranges);
+    }
+    else if (auto forNode = dynamic_cast<const ForNode*>(node)) {
+        if (forNode->body) collectFoldingRanges(forNode->body.get(), ranges);
+    }
+    else if (auto whileNode = dynamic_cast<const WhileNode*>(node)) {
+        if (whileNode->body) collectFoldingRanges(whileNode->body.get(), ranges);
+    }
+    else if (auto doNode = dynamic_cast<const DoWhileNode*>(node)) {
+        if (doNode->body) collectFoldingRanges(doNode->body.get(), ranges);
+    }
+}
 
 std::pair<std::string, int> gdshader_lsp::GdShaderServer::getFunctionCallContext(const std::string &source, int line, int col)
 {

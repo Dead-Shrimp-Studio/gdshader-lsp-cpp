@@ -42,7 +42,7 @@ void SemanticAnalyzer::visitShaderType(const ShaderTypeNode* node)
 void SemanticAnalyzer::visitUniform(const UniformNode* node) 
 {
     TypePtr type = resolveTypeFromNode(node->type.get());
-    Symbol s{node->name, type, {type}, SymbolType::Uniform, node->range.startLine, node->range.startCol, node->hint, {}};
+    Symbol s{node->name, type, {type}, SymbolType::Uniform, node->range.startLine, node->range.startCol, node->hint, {}, {}, {}};
 
     if (!symbols.add(s)) reportError(node, "Redefinition of uniform '" + s.name + "'");
     if (node->defaultValue) {
@@ -123,7 +123,7 @@ void SemanticAnalyzer::visitUniform(const UniformNode* node)
 void SemanticAnalyzer::visitVarying(const VaryingNode* node) 
 {
     TypePtr type = resolveTypeFromNode(node->type.get());
-    Symbol s{node->name, type, {type}, SymbolType::Varying, node->range.startLine, node->range.startCol, "", {}};
+    Symbol s{node->name, type, {type}, SymbolType::Varying, node->range.startLine, node->range.startCol, "", {}, {}, {}};
     if (!symbols.add(s)) reportError(node, "Redefinition of varying '" + s.name + "'");
     
     addToken(node->nameRange.startLine, node->nameRange.startCol, 
@@ -133,7 +133,7 @@ void SemanticAnalyzer::visitVarying(const VaryingNode* node)
 void SemanticAnalyzer::visitConst(const ConstNode* node) 
 {
     TypePtr type = resolveTypeFromNode(node->type.get());
-    Symbol s{node->name, type, {type}, SymbolType::Const, node->range.startLine, node->range.startCol, "", {}};
+    Symbol s{node->name, type, {type}, SymbolType::Const, node->range.startLine, node->range.startCol, "", {}, {}, {}};
     if (!symbols.add(s)) reportError(node, "Redefinition of const '" + s.name + "'");
 
     addToken(node->nameRange.startLine, node->nameRange.startCol, 
@@ -174,7 +174,7 @@ void SemanticAnalyzer::visitStruct(const StructNode* node)
 
     // Register the Struct itself as a Symbol so it can be used later
     TypePtr structType = typeRegistry.getType(node->name);
-    Symbol s{node->name, structType, {structType}, SymbolType::Struct, node->range.startLine, node->range.startCol, "", {}};
+    Symbol s{node->name, structType, {structType}, SymbolType::Struct, node->range.startLine, node->range.startCol, "", {}, {}, {}};
     
     if (!symbols.add(s)) reportError(node, "Redefinition of struct '" + s.name + "'");
 }
@@ -202,7 +202,7 @@ void SemanticAnalyzer::visitFunction(const FunctionNode* node)
         node->range.startLine, 
         node->range.startCol,
         "",
-        {}
+        {}, {}, {}
     };
 
     if (!symbols.add(funcSym)) {
@@ -251,7 +251,7 @@ void SemanticAnalyzer::visitFunction(const FunctionNode* node)
             param->range.startLine, 
             param->range.startCol, 
             "", 
-            {}
+            {}, {}, {}
         };
         symbols.add(argSym);
 
@@ -351,8 +351,11 @@ void gdshader_lsp::SemanticAnalyzer::visitInclude(const IncludeNode *node)
     
     for (const auto& [name, overloadList] : globals) {
         for (const auto& sym : overloadList) {
-            // Check for collisions in current file?
-            // Usually, includes act like copy-paste, so redefinition errors are valid.
+            
+            if (sym.category == SymbolType::Builtin) {
+                continue;
+            }
+
             if (!symbols.add(sym)) {
                 reportError(node, "Symbol '" + name + "' imported from " + node->path + " conflicts with existing symbol.");
             }
@@ -373,7 +376,7 @@ void gdshader_lsp::SemanticAnalyzer::visitDefine(const DefineNode *node)
         
         // Register as a Const Symbol
         // This allows it to be used in array sizes (float x[MAX_LIGHTS]) and math!
-        Symbol s{node->name, type, {type}, SymbolType::Const, node->range.startLine, 0, "Macro Definition", {}};
+        Symbol s{node->name, type, {type}, SymbolType::Const, node->range.startLine, 0, "Macro Definition", {}, {}, {}};
         
         if (!symbols.add(s)) {
             // Optional: Warn about macro redefinition?
@@ -384,7 +387,7 @@ void gdshader_lsp::SemanticAnalyzer::visitDefine(const DefineNode *node)
         // We register flags as boolean constants so they appear in autocomplete
         // but typically they aren't used in expressions (unless inside #ifdef).
         TypePtr type = typeRegistry.getType("bool");
-        Symbol s{node->name, type, {type}, SymbolType::Const, node->range.startLine, 0, "Preprocessor Flag", {}};
+        Symbol s{node->name, type, {type}, SymbolType::Const, node->range.startLine, 0, "Preprocessor Flag", {}, {}, {}};
         symbols.add(s);
     }
 
@@ -416,6 +419,28 @@ void SemanticAnalyzer::visitBlock(const BlockNode* node)
             unreachable = true;
         }
     }
+
+    // Post-Block Scan for Unused Variables
+    // We iterate the AST nodes of this block again. 
+    // Since we are still in the scope, looking up the name gives us the local symbol.
+    for (const auto& stmt : node->statements) {
+        if (auto varDecl = dynamic_cast<const VariableDeclNode*>(stmt.get())) {
+            
+            const Symbol* sym = symbols.lookup(varDecl->name);
+                        
+            if (sym->category == SymbolType::Uniform || sym->category == SymbolType::Varying) {
+                continue;
+            }
+            
+            if (sym && sym->category == SymbolType::Variable && sym->usages.empty()) {
+
+                // We use the 'varDecl' node for the range, so the whole "int x = 0;" is highlighted.
+                // This allows the Code Action to delete the entire line easily.
+                reportWarning(varDecl, "Unused variable '" + varDecl->name + "'");
+            }
+        }
+    }
+
     symbols.popScope(node->range.endLine);
 }
 
@@ -431,14 +456,14 @@ void SemanticAnalyzer::visitVarDecl(const VariableDeclNode* node)
         // (because add() checks strict redefinition). Therefore, it must be shadowing.
         // We defer the warning until we know add() succeeds.
         
-        Symbol s{node->name, type, {type}, SymbolType::Variable, node->range.startLine, node->range.startCol, "", {}};
+        Symbol s{node->name, type, {type}, SymbolType::Variable, node->range.startLine, node->range.startCol, "", {}, {}, {}};
         if (symbols.add(s)) {
             reportWarning(node, "Variable '" + node->name + "' shadows an existing declaration.");
         } else {
             reportError(node, "Redefinition of variable '" + node->name + "' in the same scope.");
         }
     } else {
-        Symbol s{node->name, type, {type}, SymbolType::Variable, node->range.startLine, node->range.startCol, "", {}};
+        Symbol s{node->name, type, {type}, SymbolType::Variable, node->range.startLine, node->range.startCol, "", {}, {}, {}};
         symbols.add(s);
     }
     
@@ -1259,7 +1284,7 @@ void SemanticAnalyzer::loadBuiltinsForFunction(const std::string& funcName)
         const auto& builtins = get_builtins(currentShaderType, scope);
         for (const auto& b : builtins) {
             TypePtr t = typeRegistry.getType(b.type);
-            symbols.add({b.name, t, {t}, SymbolType::Builtin, -1, 0, b.doc, {}});
+            symbols.add({b.name, t, {t}, SymbolType::Builtin, -1, 0, b.doc, {}, {}, {}});
         }
     }
 }
@@ -1365,7 +1390,6 @@ TypePtr gdshader_lsp::SemanticAnalyzer::resolveTypeFromNode(const TypeNode *node
 void gdshader_lsp::SemanticAnalyzer::addToken(const ASTNode *node, uint32_t type, uint32_t modifiers)
 {
     if (!node) return;
-    int len = getNodeLength(node);
     tokens.push_back({node->range.startLine, node->range.startCol, node->range.endCol - node->range.startCol, type, modifiers});
 }
 
@@ -1424,7 +1448,7 @@ void SemanticAnalyzer::registerGlobalFunctions()
         TypePtr returnType = typeRegistry.getType(ret);
         std::vector<TypePtr> argTypes;
         for (const auto& a : args) argTypes.push_back(typeRegistry.getType(a));
-        Symbol s{name, returnType, argTypes, SymbolType::Builtin, -1, 0, doc, {}};
+        Symbol s{name, returnType, argTypes, SymbolType::Builtin, -1, 0, doc, {}, {}, {}};
         symbols.add(s);
     };
 
