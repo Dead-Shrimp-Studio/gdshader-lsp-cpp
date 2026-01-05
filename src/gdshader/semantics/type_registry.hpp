@@ -8,6 +8,7 @@
 
 #include "gdshader/semantics/types.hpp"
 #include "gdshader/builtins.hpp"
+#include "utils/logger.hpp"
 
 namespace gdshader_lsp {
 
@@ -36,10 +37,18 @@ private:
             else if ((idx = rgba.find(c)) != std::string::npos) currentSet = 1;
             else if ((idx = stpq.find(c)) != std::string::npos) currentSet = 2;
 
-            if (currentSet == -1) return false; // Invalid char
-            if (setIdx != -1 && setIdx != currentSet) return false; // Mixing sets (e.g. .xg) 
-            if (idx >= (size_t)vectorSize) return false; // Accessing .z on vec2
-
+            if (currentSet == -1) {
+                SPDLOG_TRACE("[TypeReg] Invalid swizzle char: '{}'", c);
+                return false; 
+            }
+            if (setIdx != -1 && setIdx != currentSet) {
+                SPDLOG_TRACE("[TypeReg] Mixed swizzle sets in '{}'", swizzle);
+                return false; 
+            }
+            if (idx >= (size_t)vectorSize) {
+                SPDLOG_TRACE("[TypeReg] Swizzle component out of bounds: '{}' on size {}", c, vectorSize);
+                return false; 
+            }
             setIdx = currentSet;
         }
         return true;
@@ -47,6 +56,8 @@ private:
 
     void registerBuiltins() 
     {
+        SPDLOG_TRACE("[TypeReg] Registering Built-in types...");
+
         unknownType = std::make_shared<Type>();
         unknownType->kind = TypeKind::UNKNOWN;
         unknownType->name = "unknown";
@@ -129,10 +140,11 @@ public:
                 TypePtr base = getType(baseName); // Recursively get base (e.g. "vec3")
                 
                 if (base->kind != TypeKind::UNKNOWN) {
+                    SPDLOG_TRACE("[TypeReg] Resolving Array Type: {}[{}]", baseName, size);
                     return getArrayType(base, size); // This caches and returns the array type
                 }
             } catch (...) {
-                // Invalid size integer
+                SPDLOG_WARN("[TypeReg] Invalid array size parsing: {}", sizeStr);
             }
         }
 
@@ -157,7 +169,10 @@ public:
         return t;
     }
 
-    void registerStruct(const std::string& name, const std::vector<std::pair<std::string, TypePtr>>& members) {
+    void registerStruct(const std::string& name, const std::vector<std::pair<std::string, TypePtr>>& members) 
+    {
+        SPDLOG_INFO("[TypeReg] Registering Struct: {}", name);
+
         auto t = std::make_shared<Type>();
         t->kind = TypeKind::STRUCT;
         t->name = name;
@@ -171,6 +186,7 @@ public:
             for (const auto& m : base->members) {
                 if (m.first == member) return m.second;
             }
+            SPDLOG_TRACE("[TypeReg] Member '{}' not found in struct '{}'", member, base->name);
             return unknownType;
         }
 
@@ -188,6 +204,8 @@ public:
                 if (len >= 2 && len <= 4) {
                     return getType(prefix + "vec" + std::to_string(len));
                 }
+            } else {
+                SPDLOG_TRACE("[TypeReg] Invalid Swizzle on {}: .{}", base->name, member);
             }
         }
         return unknownType;

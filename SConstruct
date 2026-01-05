@@ -25,7 +25,8 @@ if os.path.exists(os.path.join(lsp_lib_path, target_platform)):
 env.Append(CPPPATH=[
     'src',
     'extern/lsp-framework',
-    lsp_lib_path
+    lsp_lib_path,
+    'extern/spdlog/include'
 ])
 
 env.Append(LIBPATH=[lsp_lib_path]) 
@@ -39,8 +40,10 @@ env.Append(CXXFLAGS=['-std=c++20', '-Wall', '-Wextra'])
 
 if build_target == 'release':
     env.Append(CXXFLAGS=['-O2'])
+    env.Append(CPPDEFINES={'SPDLOG_ACTIVE_LEVEL': 'SPDLOG_LEVEL_INFO'})
 else:
     env.Append(CXXFLAGS=['-g', '-O0'])
+    env.Append(CPPDEFINES={'SPDLOG_ACTIVE_LEVEL': 'SPDLOG_LEVEL_TRACE'})
 
 # Platform Specific Settings
 if target_platform == 'windows':
@@ -115,7 +118,10 @@ for root, dirs, files in os.walk('src'):
 # -------------------------------------------------------------------------
 # BUILD TARGET
 # -------------------------------------------------------------------------
-# Output the executable inside 'build/'
-output_bin = os.path.join('bin', target_platform, 'gdshader-lsp')
+
+if build_target == 'release':
+    output_bin = os.path.join('bin', target_platform, 'release', 'gdshader_lsp_release')
+else:
+    output_bin = os.path.join('bin', target_platform, 'debug', 'gdshader_lsp_debug')
 
 env.Program(target=output_bin, source=sources)

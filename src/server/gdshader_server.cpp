@@ -4,6 +4,7 @@
 #include "gdshader/semantics/semantic_analyzer.hpp"
 #include "server/project_manager.hpp"
 #include "gdshader/ast/ast.h"
+#include "utils/logger.hpp"
 
 #include <unordered_set>
 
@@ -25,7 +26,7 @@ void GdShaderServer::run()
             handler.processIncomingMessages();
         }
     } catch (const std::exception& e) {
-        std::cerr << "Session ended: " << e.what() << std::endl;
+        SPDLOG_INFO("Session ended: ", e.what());
     }
 }
 
@@ -44,7 +45,7 @@ void GdShaderServer::registerHandlers() {
                 #endif
 
                 ProjectManager::get_singleton()->setRootPath(root);
-                std::cout << "Project Root set to: " << root << std::endl;
+                SPDLOG_INFO("Project Root set to: ", root);
             }
 
             return lsp::requests::Initialize::Result{
@@ -326,8 +327,8 @@ void GdShaderServer::registerHandlers() {
             if (sym && sym->line >= 0) {
                 loc.uri = params.textDocument.uri;
                 
-                loc.range.start = lsp::Position{(unsigned)sym->line, (unsigned)sym->column};
-                loc.range.end   = lsp::Position{(unsigned)sym->line, (unsigned)sym->column + (unsigned)sym->name.length()};
+                loc.range.start = lsp::Position{(unsigned)sym->line + 1, (unsigned)sym->column};
+                loc.range.end   = lsp::Position{(unsigned)sym->line + 1, (unsigned)sym->column + (unsigned)sym->name.length()};
                 
                 return loc;
             }

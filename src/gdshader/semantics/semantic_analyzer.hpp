@@ -28,7 +28,7 @@ private:
     std::vector<RawToken> tokens;
 
     // State
-    
+    std::unordered_set<std::string> processedFiles;
     std::string currentFilePath;
 
     ShaderType currentShaderType = ShaderType::Spatial; // Default

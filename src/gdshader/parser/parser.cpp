@@ -1,7 +1,7 @@
 
 #include "gdshader/parser/parser.hpp"
-
 #include "server/project_manager.hpp"
+#include "utils/logger.hpp"
 
 #include <iostream>
 
@@ -56,26 +56,35 @@ bool Parser::match(TokenType type) {
     return false;
 }
 
-bool Parser::check(TokenType type) {
+bool Parser::check(TokenType type) 
+{
     return current_token.type == type;
 }
 
-void Parser::reportError(const std::string& message) {
+void Parser::reportError(const std::string& message) 
+{
     reportErrorAt(current_token, message);
 }
 
-void Parser::reportErrorAt(const Token& token, const std::string& message) {
+void Parser::reportErrorAt(const Token& token, const std::string& message) 
+{
     if (panicMode) return; // Suppress cascade errors
     panicMode = true;
     
     diagnostics.push_back({token.line, token.column, message});
-    std::cerr << "[Parser] Error at line " << token.line << ": " << message << std::endl;
+    spdlog::dump_backtrace();
 }
 
-void Parser::synchronize() {
+void Parser::synchronize() 
+{
+    SPDLOG_WARN("[Parser] Entering Panic Mode. Synchronizing...");
+
     panicMode = false;
     while (current_token.type != TokenType::TOKEN_EOF) {
-        if (previous_token.type == TokenType::TOKEN_SEMI) return;
+        if (previous_token.type == TokenType::TOKEN_SEMI) {
+            SPDLOG_INFO("[Parser] Recovered at semicolon.");
+            return;
+        }
         
         switch (current_token.type) {
             case TokenType::KEYWORD_SHADER_TYPE:
@@ -371,6 +380,8 @@ std::unique_ptr<ASTNode> Parser::parseRenderMode()
 
 std::unique_ptr<ASTNode> Parser::parseUniform() 
 {
+    SPDLOG_TRACE("[Parser] Parsing Uniform decl");
+
     Token start = current_token;
     auto node = std::make_unique<UniformNode>();
 
@@ -469,6 +480,8 @@ std::unique_ptr<ASTNode> Parser::parseConst()
 
 std::unique_ptr<ASTNode> Parser::parseStruct() 
 {
+    SPDLOG_TRACE("[Parser] Parsing Struct decl");
+
     Token start = current_token;
     auto node = std::make_unique<StructNode>();
 
@@ -567,6 +580,8 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl()
 
 std::unique_ptr<FunctionNode> Parser::parseFunction(std::unique_ptr<TypeNode> returnType, const std::string& name) 
 {
+    SPDLOG_TRACE("[Parser] Parsing Function definition: '{}'", name);
+
     auto node = std::make_unique<FunctionNode>();
     node->returnType = std::move(returnType);
     node->name = name;
@@ -609,9 +624,9 @@ std::unique_ptr<FunctionNode> Parser::parseFunction(std::unique_ptr<TypeNode> re
 
     consume(TokenType::TOKEN_RPAREN, "Expected ')'");
 
-    // Block
     if (check(TokenType::TOKEN_LBRACE)) {
         node->body = parseBlock();
+        node->is_definition = true;
     } else {
         consume(TokenType::TOKEN_SEMI, "Expected body or ';'");
     }
@@ -1204,8 +1219,8 @@ std::unique_ptr<ExpressionNode> Parser::parsePrimary()
 
     reportError("Expected expression.");
 
-    std::cout << "ParsePrimary failed on token: " << tokenTypeToString(current_token.type) 
-              << " Value: " << current_token.value << std::endl;
+    SPDLOG_ERROR("[Parser] ParsePrimary failed. Token: {} (Value: '{}')", tokenTypeToString(current_token.type), current_token.value);
+    spdlog::dump_backtrace();
 
     return nullptr;
 }

@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "utils/logger.hpp"
 #include "server/gdshader_server.hpp"
 
 // -------------------------------------------------------------------------
@@ -11,7 +12,8 @@
 // -------------------------------------------------------------------------
 int main(int argc, char* argv[]) 
 {
-    // Standard LSP port is often arbitrarily chosen, e.g., 6005
+    gdshader_lsp::Logger::init();
+
     int port = 6005;
     
     // Simple argument parsing for port
@@ -19,7 +21,7 @@ int main(int argc, char* argv[])
         port = std::stoi(std::string(argv[1]).substr(7));
     }
 
-    std::cout << "Starting Godot Shader LSP on port " << port << "..." << std::endl;
+    SPDLOG_INFO("Starting gdshader lsp on port {}.", port);
 
     try {
         auto listener = lsp::io::SocketListener(port);
@@ -30,7 +32,7 @@ int main(int argc, char* argv[])
             
             if (!socket.isOpen()) break;
 
-            std::cout << "Client connected!" << std::endl;
+            SPDLOG_INFO("Client connected!");
 
             // Spawn a thread to handle this connection independently
             std::thread([socket = std::move(socket)]() mutable {
@@ -39,9 +41,10 @@ int main(int argc, char* argv[])
             }).detach();
         }
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
+        SPDLOG_ERROR("Fatal error: ", e.what());
         return 1;
     }
 
+    gdshader_lsp::Logger::shutdown();
     return 0;
 }

@@ -1,3 +1,6 @@
 [submodule "extern/lsp-framework"]
 	path = extern/lsp-framework
 	url = https://github.com/leon-bckl/lsp-framework.git
+[submodule "extern/spdlog"]
+	path = extern/spdlog
+	url = https://github.com/gabime/spdlog.git
