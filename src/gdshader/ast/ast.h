@@ -247,6 +247,7 @@ struct FunctionNode : public ASTNode {
     std::vector<std::unique_ptr<ParameterNode>> parameters;
 
     std::unique_ptr<BlockNode> body;
+    bool is_definition = false;
 };
 
 // -------------------------------------------------------------------------

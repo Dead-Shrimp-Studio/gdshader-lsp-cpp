@@ -1,5 +1,6 @@
 
 #include "gdshader/lexer/lexer.h"
+#include "utils/logger.hpp"
 
 #include <cctype>
 #include <unordered_map>
@@ -9,7 +10,7 @@ using namespace gdshader_lsp;
 Lexer::Lexer(const std::string &source_code) 
     : source(source_code), current_pos(0) 
 {
-    
+    SPDLOG_TRACE("Lexer initialized. Source length: {}", source_code.length());
     if (!source.empty()) {
         source_len = source.length();
         current_char = source.at(current_pos);
@@ -101,7 +102,7 @@ Token Lexer::parseNumber(int startLine, int startCol) {
         number_str = "0";
     }
 
-    return {TokenType::TOKEN_NUMBER, number_str, startLine, startCol};
+    return {TokenType::TOKEN_NUMBER, number_str, startLine, startCol, (int)number_str.length()};
 
 }
 
@@ -118,8 +119,8 @@ Token Lexer::parseString(int startLine, int startCol) {
        
         if (current_char == '\\' && peek() == '"') {
             str_val += '"';
-            advance(); // Skip \ 
-            advance(); // Skip "
+            advance();
+            advance();
             continue;
         }
 
@@ -127,7 +128,7 @@ Token Lexer::parseString(int startLine, int startCol) {
         advance();
     }
     advance(); // Consume the ending double quote
-    return {TokenType::TOKEN_STRING, str_val, startLine, startCol};
+    return {TokenType::TOKEN_STRING, str_val, startLine, startCol, (int)str_val.length()};
 }
 
 /**
@@ -198,11 +199,11 @@ Token Lexer::parseIdentifier(int startLine, int startCol) {
 
     auto it = keywords.find(result);
     TokenType type = (it != keywords.end()) ? it->second : TokenType::TOKEN_IDENTIFIER;
-    return {type, result, startLine, startCol};
+    return {type, result, startLine, startCol, (int)result.length()};
 }
 
-Token Lexer::createToken() {
-    
+Token Lexer::createToken() 
+{    
     skipWhitespace();
 
     bool commentFound = true;
@@ -221,132 +222,128 @@ Token Lexer::createToken() {
 
     int startLine = line;
     int startCol = column;
-    // int len = current_pos - startPos;
+    
+    auto traceToken = [&](TokenType type, std::string text, std::string category = "Op") {
+        // This only compiles into the binary if SPDLOG_ACTIVE_LEVEL <= TRACE
+        SPDLOG_TRACE("Token: [{}] '{}' ({}:{})", category, text, startLine, startCol);
+        return Token{type, text, startLine, startCol, (int)text.length()};
+    };
 
     if (current_pos >= source_len) {
-        return {TokenType::TOKEN_EOF, "", startLine, startCol};
+        SPDLOG_TRACE("Lexer hit EOF.");
+        return {TokenType::TOKEN_EOF, "", startLine, startCol, {}};
     }
 
     char current = current_char;
 
-    // Handle Preprocessor (#include, #define)
-    // For LSP, we might just treat the whole line as a preprocessor token
-    // or just the '#' so the parser handles the rest.
+    // --- PREPROCESSOR ---
     if (current == '#') {
         advance();
-        return {TokenType::TOKEN_PREPROCESSOR, "#", startLine, startCol};
+        return traceToken(TokenType::TOKEN_PREPROCESSOR, "#", "Preprocessor");
     }
 
-    // Handle Dot (.) access (e.g. vec.x)
+    // --- DOT ACCESS ---
     if (current == '.') {
         advance();
-        return {TokenType::TOKEN_DOT, ".", startLine, startCol};
+        return traceToken(TokenType::TOKEN_DOT, ".", "Symbol");
     }
 
+    // --- NUMBERS ---
     if (isdigit(current)) {
-        return parseNumber(startLine, startCol);
+        Token t = parseNumber(startLine, startCol);
+        SPDLOG_TRACE("Token: [Number] '{}' ({}:{})", t.value, startLine, startCol);
+        return t;
     }
+
+    // --- IDENTIFIERS / KEYWORDS ---
     if (isalpha(current) || current == '_') {
-        return parseIdentifier(startLine, startCol);
+        Token t = parseIdentifier(startLine, startCol);
+        // Note: You might want to distinguish Keywords vs IDs in the log if you like
+        SPDLOG_TRACE("Token: [ID/Key] '{}' ({}:{})", t.value, startLine, startCol);
+        return t;
     }
     
+    // --- STRINGS ---
     if (current == '"') {
-        return parseString(startLine, startCol);
+        Token t = parseString(startLine, startCol);
+        SPDLOG_TRACE("Token: [String] '{}' ({}:{})", t.value, startLine, startCol);
+        return t;
     }
 
+    // --- OPERATORS (Compound vs Single) ---
+    
     if (current == '+') { 
-        if (peek() == '=') { advance(); advance(); return {TokenType::TOKEN_PLUS_EQUAL, "+=", startLine, startCol}; }
-        advance(); return {TokenType::TOKEN_PLUS, "+", startLine, startCol}; 
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_PLUS_EQUAL, "+="); }
+        advance(); return traceToken(TokenType::TOKEN_PLUS, "+"); 
     }
     if (current == '-') { 
-        if (peek() == '=') { advance(); advance(); return {TokenType::TOKEN_MINUS_EQUAL, "-=", startLine, startCol}; }
-        advance(); return {TokenType::TOKEN_MINUS, "-", startLine, startCol}; 
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_MINUS_EQUAL, "-="); }
+        advance(); return traceToken(TokenType::TOKEN_MINUS, "-"); 
     }
     if (current == '*') { 
-        if (peek() == '=') { advance(); advance(); return {TokenType::TOKEN_STAR_EQUAL, "*=", startLine, startCol}; }
-        advance(); return {TokenType::TOKEN_STAR, "*", startLine, startCol}; 
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_STAR_EQUAL, "*="); }
+        advance(); return traceToken(TokenType::TOKEN_STAR, "*"); 
     }
     if (current == '/') { 
-        if (peek() == '=') { advance(); advance(); return {TokenType::TOKEN_SLASH_EQUAL, "/=", startLine, startCol}; }
-        advance(); return {TokenType::TOKEN_SLASH, "/", startLine, startCol}; 
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_SLASH_EQUAL, "/="); }
+        advance(); return traceToken(TokenType::TOKEN_SLASH, "/"); 
     }
     if (current == '%') { 
-        if (peek() == '=') { advance(); advance(); return {TokenType::TOKEN_PERCENT_EQUAL, "%=", startLine, startCol}; }
-        advance(); return {TokenType::TOKEN_PERCENT, "%", startLine, startCol}; 
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_PERCENT_EQUAL, "%="); }
+        advance(); return traceToken(TokenType::TOKEN_PERCENT, "%"); 
     }
 
     if (current == '&') { 
-        if (peek() == '&') { 
-            advance(); advance(); 
-            return {TokenType::TOKEN_AND, "&&", startLine, startCol}; 
-        }
-        advance(); 
-        return {TokenType::TOKEN_AMPERSAND, "&", startLine, startCol}; 
+        if (peek() == '&') { advance(); advance(); return traceToken(TokenType::TOKEN_AND, "&&"); }
+        advance(); return traceToken(TokenType::TOKEN_AMPERSAND, "&"); 
     }
 
     if (current == '|') { 
-        if (peek() == '|') { 
-            advance(); advance(); 
-            return {TokenType::TOKEN_OR, "||", startLine, startCol}; 
-        }
-        advance(); 
-        return {TokenType::TOKEN_PIPE, "|", startLine, startCol}; 
+        if (peek() == '|') { advance(); advance(); return traceToken(TokenType::TOKEN_OR, "||"); }
+        advance(); return traceToken(TokenType::TOKEN_PIPE, "|"); 
     }
 
     if (current == '<') {
-        if (peek() == '=') {
-            advance(); advance();
-            return {TokenType::TOKEN_LESS_EQ, "<=", startLine, startCol};
-        }
-        advance();
-        return {TokenType::TOKEN_LESS, "<", startLine, startCol};
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_LESS_EQ, "<="); }
+        advance(); return traceToken(TokenType::TOKEN_LESS, "<");
     }
 
-    // Handle Greater Than (>) and Greater Equal (>=)
     if (current == '>') {
-        if (peek() == '=') {
-            advance(); advance();
-            return {TokenType::TOKEN_GREATER_EQ, ">=", startLine, startCol};
-        }
-        advance();
-        return {TokenType::TOKEN_GREATER, ">", startLine, startCol};
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_GREATER_EQ, ">="); }
+        advance(); return traceToken(TokenType::TOKEN_GREATER, ">");
     }
 
-    // Handle Equal (=) and Equal Equal (==)
     if (current == '=') {
-        if (peek() == '=') {
-            advance(); advance();
-            return {TokenType::TOKEN_EQ_EQ, "==", startLine, startCol};
-        }
-        advance();
-        return {TokenType::TOKEN_EQUAL, "=", startLine, startCol};
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_EQ_EQ, "=="); }
+        advance(); return traceToken(TokenType::TOKEN_EQUAL, "=");
     }
 
-    // Handle Not (!) and Not Equal (!=)
     if (current == '!') {
-        if (peek() == '=') {
-            advance(); advance();
-            return {TokenType::TOKEN_NOT_EQ, "!=", startLine, startCol};
-        }
-        advance();
-        return {TokenType::TOKEN_EXCL, "!", startLine, startCol};
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_NOT_EQ, "!="); }
+        advance(); return traceToken(TokenType::TOKEN_EXCL, "!");
     }
 
-    // Handle single-character tokens.
-    if (current == ':') { advance(); return {TokenType::TOKEN_COLON, ":", startLine, startCol}; }
-    if (current == ';') { advance(); return {TokenType::TOKEN_SEMI, ";", startLine, startCol}; }
-    if (current == '(') { advance(); return {TokenType::TOKEN_LPAREN, "(", startLine, startCol}; }
-    if (current == ')') { advance(); return {TokenType::TOKEN_RPAREN, ")", startLine, startCol}; }
-    if (current == '{') { advance(); return {TokenType::TOKEN_LBRACE, "{", startLine, startCol}; }
-    if (current == '}') { advance(); return {TokenType::TOKEN_RBRACE, "}", startLine, startCol}; }
-    if (current == '[') { advance(); return {TokenType::TOKEN_LBRACKET, "[", startLine, startCol}; }
-    if (current == ']') { advance(); return {TokenType::TOKEN_RBRACKET, "]", startLine, startCol}; }
-    if (current == ',') { advance(); return {TokenType::TOKEN_COMMA, ",", startLine, startCol}; }
-    if (current == '?') { advance(); return {TokenType::TOKEN_QUESTION, "?", startLine, startCol}; }
+    // --- SINGLE CHARACTERS ---
+    // Using the lambda makes this section much cleaner than copy-pasting lines
+    
+    if (current == ':') { advance(); return traceToken(TokenType::TOKEN_COLON, ":", "Symbol"); }
+    if (current == ';') { advance(); return traceToken(TokenType::TOKEN_SEMI, ";", "Symbol"); }
+    if (current == '(') { advance(); return traceToken(TokenType::TOKEN_LPAREN, "(", "Symbol"); }
+    if (current == ')') { advance(); return traceToken(TokenType::TOKEN_RPAREN, ")", "Symbol"); }
+    if (current == '{') { advance(); return traceToken(TokenType::TOKEN_LBRACE, "{", "Symbol"); }
+    if (current == '}') { advance(); return traceToken(TokenType::TOKEN_RBRACE, "}", "Symbol"); }
+    if (current == '[') { advance(); return traceToken(TokenType::TOKEN_LBRACKET, "[", "Symbol"); }
+    if (current == ']') { advance(); return traceToken(TokenType::TOKEN_RBRACKET, "]", "Symbol"); }
+    if (current == ',') { advance(); return traceToken(TokenType::TOKEN_COMMA, ",", "Symbol"); }
+    if (current == '?') { advance(); return traceToken(TokenType::TOKEN_QUESTION, "?", "Symbol"); }
 
     // Fallback
     advance();
-    return {TokenType::TOKEN_ERROR, std::string(1, current), startLine, startCol};
+
+    SPDLOG_ERROR("Lexer Error: Unexpected character '{}' (0x{:x}) at {}:{}", current, (int)current, startLine, startCol);
+    spdlog::dump_backtrace();
+
+    return {TokenType::TOKEN_ERROR, std::string(1, current), startLine, startCol, {}};
 }
 
 /**

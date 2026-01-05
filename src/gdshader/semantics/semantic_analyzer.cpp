@@ -202,7 +202,7 @@ void SemanticAnalyzer::visitFunction(const FunctionNode* node)
         node->range.startLine, 
         node->range.startCol,
         "",
-        {}, {}, {}
+        {}, {}, {}, node->is_definition
     };
 
     if (!symbols.add(funcSym)) {
@@ -339,7 +339,12 @@ void gdshader_lsp::SemanticAnalyzer::visitInclude(const IncludeNode *node)
     auto pm = ProjectManager::get_singleton();
     std::string absPath = pm->resolvePath(currentFilePath, node->path);
 
-    // 2. Ask PM for exports (this triggers recursion if needed)
+    if (processedFiles.count(absPath)) {
+        SPDLOG_TRACE("Skipping already processed include: {}", absPath);
+        return;
+    }
+    processedFiles.insert(absPath);
+
     auto exportedSymbols = pm->getExports(absPath);
 
     if (!exportedSymbols) {

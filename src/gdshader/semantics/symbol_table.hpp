@@ -43,6 +43,8 @@ struct Symbol
     };
 
     mutable std::vector<Usage> usages;
+
+    bool is_definition = false;
 };
 
 struct Scope 
