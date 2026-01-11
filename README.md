@@ -54,7 +54,7 @@ This project uses **SCons** as its build system.
 To build the standalone LSP executable:
 
 ```bash
-scons platform=<platform>
+scons platform=<platform> target=<debug/release>
 
 ```
 
@@ -72,7 +72,7 @@ To use this with VSCode, you can use a generic LSP client extension (like *glsl-
 
 ```json
 {
-    "godot_shader_lsp.serverPath": "/path/to/bin/gdshader-lsp",
+    "godot_shader_lsp.serverPath": "/path/to/bin/gdshader-lsp-release",
     "godot_shader_lsp.trace.server": "verbose"
 }
 

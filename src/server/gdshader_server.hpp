@@ -2,6 +2,10 @@
 #ifndef GDSHADER_SERVER_HPP 
 #define GDSHADER_SERVER_HPP
 
+#include "gdshader/parser/parser.hpp" // parser includes ast.h and lexer.h
+#include "gdshader/semantics/symbol_table.hpp"
+#include "gdshader/semantics/type_registry.hpp"
+
 #include <iostream>
 #include <thread>
 #include <memory>
@@ -14,10 +18,6 @@
 #include <lsp/messagehandler.h>
 #include <lsp/messages.h>
 #include <lsp/types.h>
-
-#include "gdshader/parser/parser.hpp" // parser includes ast.h and lexer.h
-#include "gdshader/semantics/symbol_table.hpp"
-#include "gdshader/semantics/type_registry.hpp"
 
 namespace gdshader_lsp {
 
@@ -56,7 +56,7 @@ private:
     std::vector<lsp::DocumentSymbol> getDocumentSymbols(const ASTNode* node);
     lsp::DocumentSymbol createSymbol(const std::string& name, lsp::SymbolKind kind, int line, const std::string& detail, const std::vector<lsp::DocumentSymbol>& children);
 
-    std::vector<u_int> encodeTokens(std::vector<RawToken>& raw);
+    std::vector<unsigned int> encodeTokens(std::vector<RawToken>& raw);
 
 public:
 
