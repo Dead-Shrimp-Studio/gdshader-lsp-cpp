@@ -7,6 +7,7 @@
 #include "utils/logger.hpp"
 
 #include <unordered_set>
+#include <vector>
 
 using namespace gdshader_lsp;
 
@@ -48,38 +49,37 @@ void GdShaderServer::registerHandlers() {
                 SPDLOG_INFO("Project Root set to: ", root);
             }
 
+            // 1. Construct Capabilities Explicitly
+            lsp::ServerCapabilities caps;
+
+            // Text Document Sync
+            lsp::TextDocumentSyncOptions syncOps;
+            syncOps.openClose = true;
+            syncOps.change = lsp::TextDocumentSyncKind::Full;
+            caps.textDocumentSync = syncOps; // Sets the variant/optional
+
+            // Completion
+            lsp::CompletionOptions compOps;
+            compOps.triggerCharacters = std::vector<std::string>{".", ":"};
+            caps.completionProvider = compOps;
+
+            // Semantic Tokens
+            lsp::SemanticTokensOptions semOps;
+            semOps.legend = lsp::SemanticTokensLegend{
+                .tokenTypes = { "variable", "function", "struct", "macro", "type", "parameter", "property" },
+                .tokenModifiers = { "declaration", "readonly", "static" }
+            };
+            semOps.full = true;
+            caps.semanticTokensProvider = semOps;
+
+            // Others
+            caps.referencesProvider = true;
+            caps.renameProvider = true;
+            caps.foldingRangeProvider = true;
+
+            // 2. Return Result
             return lsp::requests::Initialize::Result{
-                .capabilities = {
-                    .textDocumentSync = lsp::TextDocumentSyncOptions{
-                        .openClose = true,
-                        .change = lsp::TextDocumentSyncKind::Full 
-                    },
-                    .completionProvider = lsp::CompletionOptions{
-                        .triggerCharacters = std::vector<std::string>{".", ":"} 
-                    },
-                    .referencesProvider = true,
-                    .renameProvider = true,
-                    .foldingRangeProvider = true,
-                    .semanticTokensProvider = lsp::SemanticTokensOptions {
-                        .legend = lsp::SemanticTokensLegend {
-                            .tokenTypes = {
-                                "variable",     // 0
-                                "function",     // 1
-                                "struct",       // 2
-                                "macro",        // 3
-                                "type",         // 4
-                                "parameter",    // 5
-                                "property"      // 6 (members)
-                            },
-                            .tokenModifiers = {
-                                "declaration",  // 1
-                                "readonly",     // 2
-                                "static"        // 4
-                            }
-                        },
-                        .full = true
-                    }
-                },
+                .capabilities = caps,
                 .serverInfo = lsp::InitializeResultServerInfo{
                     .name = "gdshader-lsp",
                     .version = "0.1.0"
@@ -141,22 +141,35 @@ void GdShaderServer::registerHandlers() {
             std::string word = getWordAtPosition(su->source_code, line, col);
             if (word.empty()) return hover;
 
-            bool isMember = (col > 0 && getWordBeforeDot(su->source_code, col) != ""); 
+            std::string lineText = getLine(su->source_code, line);
+    
+            // Calculate where the word starts so we can look BEFORE it
+            // (Simple heuristic: move back from cursor until we hit non-identifier)
+            int wordStart = col;
+            while (wordStart > 0 && (isalnum(lineText[wordStart - 1]) || lineText[wordStart - 1] == '_')) {
+                wordStart--;
+            }
+
+            // 3. Check if this is a member access (preceded by '.')
+            bool isMember = (wordStart > 0 && lineText[wordStart - 1] == '.');
 
             if (isMember) {
-                // 1. Find the base variable (e.g. "my_instance" from "my_instance.test")
-                std::string baseName = getWordBeforeDot(su->source_code, col); // You need to implement/expose this helper
-                // 2. Look up base
+                // We found a dot at 'wordStart - 1'. 
+                // We want the word before that dot.
+                std::string baseName = getWordBeforeDot(lineText, wordStart - 1); 
+
+                // Look up base (e.g. "my_instance")
                 const Symbol* baseSym = su->symbols->lookupAt(baseName, line);
                 if (baseSym && baseSym->type) {
-                    // 3. Look up member in the base type
+                    // Look up member in the base type
                     TypePtr memberT = su->types.getMemberType(baseSym->type, word);
-                    if (memberT->kind != TypeKind::UNKNOWN) {
-                        std::string content = "**" + baseSym->name + "**\n\n";
-                        content += "Type: `" + baseSym->type->toString() + "`\n";
-                        if (!baseSym->doc_string.empty()) {
-                            content += "\n" + baseSym->doc_string;
-                        }
+                    
+                    // Validate the member actually exists
+                    if (memberT && memberT->kind != TypeKind::UNKNOWN) {
+                        std::string content = "**" + word + "** (Member of " + baseSym->name + ")\n\n";
+                        content += "Type: `" + memberT->toString() + "`\n";
+                        
+                        // Optional: If you track docstrings for struct members, add them here
                         
                         hover.contents = {
                             lsp::MarkupContent {
@@ -167,7 +180,7 @@ void GdShaderServer::registerHandlers() {
                     }
                 }
             } else {
-
+                // Standard Lookup (Global/Local variable or Function)
                 const Symbol* sym = su->symbols->lookupAt(word, line);
 
                 if (sym) {
@@ -974,17 +987,17 @@ lsp::DocumentSymbol GdShaderServer::createSymbol(const std::string& name, lsp::S
     return sym;
 }
 
-std::vector<u_int> gdshader_lsp::GdShaderServer::encodeTokens(std::vector<RawToken> &raw)
+std::vector<unsigned int> gdshader_lsp::GdShaderServer::encodeTokens(std::vector<RawToken> &raw)
 {
     std::sort(raw.begin(), raw.end());
 
-    std::vector<u_int> encoded;
-    u_int prevLine = 0;
-    u_int prevCol = 0;
+    std::vector<unsigned int> encoded;
+    unsigned int prevLine = 0;
+    unsigned int prevCol = 0;
 
     for (const auto& t : raw) {
-        u_int deltaLine = t.line - prevLine;
-        u_int deltaCol = (deltaLine == 0) ? (t.col - prevCol) : t.col;
+        unsigned int deltaLine = t.line - prevLine;
+        unsigned int deltaCol = (deltaLine == 0) ? (t.col - prevCol) : t.col;
 
         encoded.push_back(deltaLine);
         encoded.push_back(deltaCol);

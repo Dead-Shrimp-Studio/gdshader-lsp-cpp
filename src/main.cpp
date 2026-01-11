@@ -7,9 +7,6 @@
 #include "utils/logger.hpp"
 #include "server/gdshader_server.hpp"
 
-// -------------------------------------------------------------------------
-// MAIN ENTRY POINT
-// -------------------------------------------------------------------------
 int main(int argc, char* argv[]) 
 {
     gdshader_lsp::Logger::init();
@@ -26,10 +23,9 @@ int main(int argc, char* argv[])
     try {
         auto listener = lsp::io::SocketListener(port);
 
-        while (listener.isReady()) {
-            // Block until a client (IDE) connects
+        while (listener.isReady()) 
+        {
             auto socket = listener.listen();
-            
             if (!socket.isOpen()) break;
 
             SPDLOG_INFO("Client connected!");
@@ -40,8 +36,10 @@ int main(int argc, char* argv[])
                 server.run();
             }).detach();
         }
+
     } catch (const std::exception& e) {
-        SPDLOG_ERROR("Fatal error: ", e.what());
+        SPDLOG_ERROR("Fatal error: {}.", e.what());
+        gdshader_lsp::Logger::shutdown();
         return 1;
     }
 

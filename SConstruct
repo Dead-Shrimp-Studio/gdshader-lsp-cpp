@@ -17,10 +17,16 @@ print(f"Building for platform: {target_platform} ({build_target})")
 # We assume you have a folder structure like: extern/lsp-framework/build/linux, /windows, etc.
 # If you only have one flat 'build' folder, you will need to recompile the lib every time you switch platform.
 
-lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build')
-# Optional: Try to find a platform specific subdir if you organize it that way
-if os.path.exists(os.path.join(lsp_lib_path, target_platform)):
-    lsp_lib_path = os.path.join(lsp_lib_path, target_platform)
+lsp_lib_path = ''
+if target_platform == 'windows':
+    lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build_windows')
+    env.Append(CPPPATH=[os.path.join(lsp_lib_path, 'generated')])
+
+elif target_platform == 'macos':
+    lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build', 'macos')
+
+elif target_platform == 'linux':
+    lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build')
 
 env.Append(CPPPATH=[
     'src',
@@ -60,9 +66,7 @@ if target_platform == 'windows':
 
 elif target_platform == 'macos':
     
-    vars.Add('macos_arch', 'Target architecture (x86_64, arm64)', 'x86_64')
-    env = Environment(variables=vars, ENV=os.environ)
-    macos_arch = env.get('macos_arch', 'x86_64')
+    macos_arch = ARGUMENTS.get('macos_arch', 'x86_64')
 
     print(f"Targeting macOS Architecture: {macos_arch}")
 
