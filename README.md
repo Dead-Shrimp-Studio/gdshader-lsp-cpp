@@ -42,6 +42,21 @@ GDShader LSP is built for speed and low latency.
 * **Performance Metrics:** Internal stress tests on 5,000+ line shader files with deep include hierarchies demonstrate a full analysis pipeline (Client → Server → Client) latency of **< 25ms**.
 * **Memory Management:** The architecture utilizes standard C++ allocators efficiently. Given that shader translation units are typically small, this approach provides the optimal balance between code maintainability and runtime performance without the overhead of complex arena allocators.
 
+## Compatibility & Versioning
+
+The GDShader language evolves with every Godot Engine release (adding new built-ins, changing keywords, etc.). To ensure strict semantic accuracy, **GDShader LSP** releases are pinned to specific Godot versions.
+
+We follow a **"Main is Latest"** strategy:
+* The `main` branch always tracks the **latest stable** version of Godot.
+* Previous Godot versions are supported via long-lived `support/` branches.
+
+| LSP Version | Godot Version | Git Branch |
+| :--- | :--- | :--- |
+| **v0.3.x** *(Upcoming)* | **Godot 4.6** | `main` |
+| **v0.2.x** *(Current)* | **Godot 4.5** | `support/4.5` |
+
+*Note: If you are building from source, ensure you checkout the branch matching your project's Godot version.*
+
 ## Building from Source
 
 This project uses **SCons** as its build system.
