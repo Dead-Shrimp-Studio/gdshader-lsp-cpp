@@ -59,10 +59,10 @@ if target_platform == 'windows' and is_native_build:
     env.Append(CXXFLAGS=['/std:c++20', '/W3', '/EHsc', '/nologo', '/utf-8', '/wd4267'])
     
     if build_target == 'release':
-        env.Append(CXXFLAGS=['/O2'])
+        env.Append(CXXFLAGS=['/O2', '/MD'])
         env.Append(CPPDEFINES={'SPDLOG_ACTIVE_LEVEL': 'SPDLOG_LEVEL_INFO'})
     else:
-        env.Append(CXXFLAGS=['/Zi', '/Od']) # Debug info, no optimization
+        env.Append(CXXFLAGS=['/Zi', '/Od', '/MDd'])
         env.Append(CPPDEFINES={'SPDLOG_ACTIVE_LEVEL': 'SPDLOG_LEVEL_TRACE'})
 
 else:
