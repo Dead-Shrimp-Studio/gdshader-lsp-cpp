@@ -31,7 +31,7 @@ struct Document {
 // -------------------------------------------------------------------------
 // SERVER SESSION
 // Each client connection spawns an instance of this class.
-// This is where your compiler state lives.
+// This is where compiler state lives.
 // -------------------------------------------------------------------------
 
 class GdShaderServer {

@@ -107,7 +107,6 @@ std::shared_ptr<SymbolTable> ProjectManager::getExports(const std::string& path)
         unit->types = std::move(result.types);
 
     } else {
-        // Create empty table if parsing failed
         unit->symbols = std::make_shared<SymbolTable>();
     }
 

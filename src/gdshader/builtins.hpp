@@ -554,11 +554,11 @@ static const BuiltinFuncList GLOBAL_FUNCTIONS = {
     {"bitfieldReverse", "vec_int_type", {"vec_int_type"}, "Reverse bits (int)."},
     {"bitfieldReverse", "vec_uint_type", {"vec_uint_type"}, "Reverse bits (uint)."},
     {"bitCount", "vec_int_type", {"vec_int_type"}, "Count bits (int)."},
-    {"bitCount", "vec_int_type", {"vec_uint_type"}, "Count bits (uint)."}, // Returns int type
+    {"bitCount", "vec_int_type", {"vec_uint_type"}, "Count bits (uint)."},
     {"findLSB", "vec_int_type", {"vec_int_type"}, "Find LSB (int)."},
-    {"findLSB", "vec_int_type", {"vec_uint_type"}, "Find LSB (uint)."}, // Returns int type
+    {"findLSB", "vec_int_type", {"vec_uint_type"}, "Find LSB (uint)."},
     {"findMSB", "vec_int_type", {"vec_int_type"}, "Find MSB (int)."},
-    {"findMSB", "vec_int_type", {"vec_uint_type"}, "Find MSB (uint)."}, // Returns int type
+    {"findMSB", "vec_int_type", {"vec_uint_type"}, "Find MSB (uint)."},
 
     {"packHalf2x16", "uint", {"vec2"}, "Pack half 2x16."},
     {"unpackHalf2x16", "vec2", {"uint"}, "Unpack half 2x16."},
