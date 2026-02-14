@@ -137,10 +137,9 @@ for root, dirs, files in os.walk('src'):
             rel_path = os.path.relpath(os.path.join(root, file), 'src')
             sources.append(os.path.join('src', rel_path))
 
-
 if target_platform == 'macos':
-    output_bin = os.path.join('bin', target_platform, 'release', f'gdshader_lsp_{build_target}_{target_platform}_{macos_arch}')
+    output_bin = os.path.join('bin', target_platform, f'{build_target}', f'gdshader_lsp_{build_target}_{target_platform}_{macos_arch}')
 else:
-    output_bin = os.path.join('bin', target_platform, 'release', f'gdshader_lsp_{build_target}_{target_platform}')
+    output_bin = os.path.join('bin', target_platform, f'{build_target}', f'gdshader_lsp_{build_target}_{target_platform}')
 
 env.Program(target=output_bin, source=sources)
