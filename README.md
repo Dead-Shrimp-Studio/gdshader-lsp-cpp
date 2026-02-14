@@ -50,6 +50,26 @@ This project uses **SCons** as its build system.
 
 * **C++ Compiler**: GCC, Clang, or MSVC supporting **C++20**.
 * **SCons**: Install via Python (`pip install scons`).
+* **LSP build**: You need to build the LSP Framework library for your platform.
+
+### Building LSP Framework
+
+This project expects the **LSP Framework** to be located at `extern/lsp-framework`. You must compile the framework for your target platform and ensure the build artifacts are located in the specific directories expected by the `SConstruct` script:
+
+* **Linux**: `extern/lsp-framework/build` 
+* **Windows**: `extern/lsp-framework/build_windows` 
+* **macOS**: `extern/lsp-framework/build/macos` 
+
+Ensure your directory structure looks like this before compiling the main project:
+
+```text
+extern/
+└── lsp-framework/
+    ├── build/          # Linux artifacts here
+    │   └── macos/      # macOS artifacts here
+    └── build_windows/  # Windows artifacts here
+
+```
 
 ### Compilation
 
