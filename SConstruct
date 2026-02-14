@@ -14,19 +14,9 @@ print(f"Building for platform: {target_platform} ({build_target})")
 # DEPENDENCIES (LSP LIBRARY)
 # -------------------------------------------------------------------------
 # NOTE: You must have compiled the 'lsp' library for the target platform as well!
-# We assume you have a folder structure like: extern/lsp-framework/build/linux, /windows, etc.
-# If you only have one flat 'build' folder, you will need to recompile the lib every time you switch platform.
+# Structure: extern/lsp-framework/build_linux, /build_windows, /build_macos
 
-lsp_lib_path = ''
-if target_platform == 'windows':
-    lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build_windows')
-    env.Append(CPPPATH=[os.path.join(lsp_lib_path, 'generated')])
-
-elif target_platform == 'macos':
-    lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build', 'macos')
-
-elif target_platform == 'linux':
-    lsp_lib_path = os.path.join('extern', 'lsp-framework', 'build')
+lsp_lib_path = os.path.join('extern', 'lsp-framework', f'build_{target_platform}')
 
 env.Append(CPPPATH=[
     'src',
@@ -34,6 +24,9 @@ env.Append(CPPPATH=[
     lsp_lib_path,
     'extern/spdlog/include'
 ])
+
+if target_platform == 'windows':
+    env.Append(CPPPATH=[os.path.join(lsp_lib_path, 'generated')])
 
 env.Append(LIBPATH=[lsp_lib_path]) 
 env.Append(LIBS=['lsp'])
@@ -53,14 +46,13 @@ else:
 
 # Platform Specific Settings
 if target_platform == 'windows':
-    # Requires: sudo apt install mingw-w64
+
     env.Replace(CXX='x86_64-w64-mingw32-g++')
     env.Replace(AR='x86_64-w64-mingw32-gcc-ar')
     env.Replace(RANLIB='x86_64-w64-mingw32-gcc-ranlib')
     
     env['PROGSUFFIX'] = '.exe'
     
-    # Windows Sockets and static linking to avoid dependency hell
     env.Append(LIBS=['ws2_32', 'shlwapi']) 
     env.Append(LINKFLAGS=['-static', '-static-libgcc', '-static-libstdc++'])
 
@@ -70,7 +62,7 @@ elif target_platform == 'macos':
 
     print(f"Targeting macOS Architecture: {macos_arch}")
 
-    # Use the explicit compiler versions we verified working (Darwin 23.5 / macOS 14)
+    # (Darwin 23.5 / macOS 14)
     if macos_arch == 'x86_64':
         env.Replace(CXX='x86_64-apple-darwin23.5-clang++')
         env.Replace(AR='x86_64-apple-darwin23.5-ar')
@@ -81,13 +73,11 @@ elif target_platform == 'macos':
         env.Replace(AR='aarch64-apple-darwin23.5-ar')
         env.Append(CXXFLAGS=['-arch', 'arm64'])
         env.Append(LINKFLAGS=['-arch', 'arm64'])
-    
-    # Force C++20 and newer macOS target (matches what we did in CMake)
+
     env.Append(CXXFLAGS=['-std=c++20', '-mmacosx-version-min=12.0'])
     env.Append(LINKFLAGS=['-mmacosx-version-min=12.0'])
 
 elif target_platform == 'linux':
-    # Default GCC/Clang on host
     env.Append(LIBS=['pthread'])
 
 
@@ -108,15 +98,11 @@ if target_platform == 'linux':
 # SOURCE DISCOVERY
 # -------------------------------------------------------------------------
 sources = []
-# Walk the actual 'src' directory to find files
+
 for root, dirs, files in os.walk('src'):
     for file in files:
         if file.endswith('.cpp'):
-            # Get path relative to 'src' (e.g., "server/gdshader_server.cpp")
             rel_path = os.path.relpath(os.path.join(root, file), 'src')
-            
-            # Tell SCons to compile the 'build' version of this file
-            # (e.g., "build/server/gdshader_server.cpp")
             sources.append(os.path.join('src', rel_path))
 
 # -------------------------------------------------------------------------

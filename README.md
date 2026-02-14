@@ -65,11 +65,46 @@ Ensure your directory structure looks like this before compiling the main projec
 ```text
 extern/
 └── lsp-framework/
-    ├── build/          # Linux artifacts here
-    │   └── macos/      # macOS artifacts here
-    └── build_windows/  # Windows artifacts here
+    ├── build_linux/    # Contains liblsp.a for Linux
+    ├── build_windows/  # Contains lsp.lib for Windows
+    └── build_macos/    # Contains liblsp.a (Universal Binary) for macOS
 
 ```
+
+#### Linux
+
+```bash
+cd extern/lsp-framework
+cmake -B build_linux -DCMAKE_BUILD_TYPE=Release
+cmake --build build_linux
+```
+
+#### Windows
+
+Use this if you are compiling with MinGW (as expected by the SConstruct configuration).
+```bash
+cd extern/lsp-framework
+cmake -B build_windows -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build build_windows
+```
+
+#### Macos
+
+To support both Intel and Apple Silicon Macs, build a universal binary using the architectural flags.
+
+```bash
+cd extern/lsp-framework
+
+cmake -B build_macos \
+    -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build build_macos
+```
+
+### Notes for Cross-Compilation
+
+
 
 ### Compilation
 

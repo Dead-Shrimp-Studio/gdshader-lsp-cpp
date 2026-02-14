@@ -3,7 +3,8 @@ gdshader-lsp
 compile_commands.json
 
 *.o
+*.sh
 
 .vscode
-build
+build_*
 bin
