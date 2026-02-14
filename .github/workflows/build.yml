@@ -1,0 +1,74 @@
+name: Build All Platforms
+
+on:
+  push:
+    branches: [ "main", "support/4.5" ]
+  pull_request:
+    branches: [ "main", "support/4.5" ]
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            scons_target: linux
+          - os: windows-latest
+            platform: windows
+            scons_target: windows
+          - os: macos-latest
+            platform: macos
+            scons_target: macos
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # --- SETUP DEPENDENCIES ---
+    - name: Install SCons & Python
+      run: pip install scons
+
+    # Linux-specific dependencies
+    - name: Install Linux Deps
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake
+
+    # --- BUILD LSP FRAMEWORK ---
+    
+    # Linux: Build into build_linux
+    - name: Build Framework (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        cd extern/lsp-framework
+        cmake -B build_linux -DCMAKE_BUILD_TYPE=Release
+        cmake --build build_linux
+
+    # macOS: Build into build_macos
+    - name: Build Framework (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        cd extern/lsp-framework
+        cmake -B build_macos -DCMAKE_BUILD_TYPE=Release
+        cmake --build build_macos
+
+    # Windows: Build into build_windows (Using MinGW/MSVC generator)
+    - name: Build Framework (Windows)
+      if: matrix.platform == 'windows'
+      shell: bash
+      run: |
+        cd extern/lsp-framework
+        cmake -B build_windows -DCMAKE_BUILD_TYPE=Release
+        cmake --build build_windows --config Release
+
+    # --- BUILD PROJECT ---
+    - name: Build GDShader LSP
+      run: |
+        scons platform=${{ matrix.scons_target }} target=release
