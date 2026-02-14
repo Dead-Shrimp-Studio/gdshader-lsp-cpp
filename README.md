@@ -1,5 +1,8 @@
 # GDShader LSP
 
+![Build Status](https://github.com/scump1/gdshader-lsp-cpp/actions/workflows/build.yml/badge.svg)
+![Test Status](https://github.com/scump1/gdshader-lsp-cpp/actions/workflows/tests.yml/badge.svg)
+
 A high-performance, standalone **Language Server Protocol (LSP)** implementation for the Godot Shading Language (`.gdshader`), developed in C++20.
 
 **GDShader LSP** provides enterprise-grade code intelligence, strict semantic analysis, and real-time diagnostics for Godot shaders. It is designed to be editor-agnostic, integrating seamlessly into VSCode, Neovim, Emacs, or directly into the Godot Engine via GDExtension.

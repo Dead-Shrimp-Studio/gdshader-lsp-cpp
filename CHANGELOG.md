@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Dedicated test environment using Github Actions
+
 - Description on how to build the LSP framework to correctly compile the Server using the scons
 - Detailed documentation for some builtin functions (not all yet)
 - Missing group_uniforms support (including nested structures)
