@@ -4,6 +4,7 @@ compile_commands.json
 
 *.o
 *.sh
+*.txt
 
 .venv
 __pycache__
