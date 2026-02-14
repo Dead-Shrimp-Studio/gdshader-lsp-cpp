@@ -26,12 +26,16 @@ is_native_build = (target_platform == host_os)
 print(f"Building for: {target_platform} ({build_target}) | Host: {host_os} | Native: {is_native_build}")
 
 # -------------------------------------------------------------------------
-# DEPENDENCIES (LSP LIBRARY)
+# DEPENDENCIES
 # -------------------------------------------------------------------------
 # NOTE: You must have compiled the 'lsp' library for the target platform as well!
 # Structure: extern/lsp-framework/build_linux, /build_windows, /build_macos
 
 lsp_lib_path = os.path.join('extern', 'lsp-framework', f'build_{target_platform}')
+
+if target_platform == 'windows' and is_native_build:
+    config_dir = 'Release' if build_target == 'release' else 'Debug'
+    lsp_lib_path = os.path.join(lsp_lib_path, config_dir)
 
 env.Append(CPPPATH=[
     'src',
@@ -40,9 +44,6 @@ env.Append(CPPPATH=[
     os.path.join(lsp_lib_path, 'generated'),
     'extern/spdlog/include'
 ])
-
-if target_platform == 'windows':
-    env.Append(CPPPATH=[os.path.join(lsp_lib_path, 'generated')])
 
 env.Append(LIBPATH=[lsp_lib_path]) 
 env.Append(LIBS=['lsp'])
