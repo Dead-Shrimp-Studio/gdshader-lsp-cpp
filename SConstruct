@@ -52,7 +52,7 @@ env.Append(LIBS=['lsp'])
 # COMPILER CONFIGURATION
 # -------------------------------------------------------------------------
 if target_platform == 'windows' and is_native_build:
-    env.Append(CXXFLAGS=['/std:c++20', '/W3', '/EHsc', '/nologo'])
+    env.Append(CXXFLAGS=['/std:c++20', '/W3', '/EHsc', '/nologo', '/utf-8'])
     
     if build_target == 'release':
         env.Append(CXXFLAGS=['/O2'])
@@ -85,7 +85,7 @@ if target_platform == 'windows':
 
 elif target_platform == 'macos':
     
-    macos_arch = ARGUMENTS.get('macos_arch', 'x86_64')
+    macos_arch = ARGUMENTS.get('macos_arch', 'arm64')
     
     if is_native_build:
         print(f"Native macOS Build - Using system compiler")
@@ -93,12 +93,13 @@ elif target_platform == 'macos':
         env.Append(LINKFLAGS=['-arch', macos_arch])
     else:
         
-        print(f"Targeting macOS Architecture: {macos_arch} (Cross-Compile)")
+        print(f"Targeting macOS Architecture: {macos_arch}")
         if macos_arch == 'x86_64':
             env.Replace(CXX='x86_64-apple-darwin23.5-clang++')
             env.Replace(AR='x86_64-apple-darwin23.5-ar')
             env.Append(CXXFLAGS=['-arch', 'x86_64'])
             env.Append(LINKFLAGS=['-arch', 'x86_64'])
+
         elif macos_arch == 'arm64':
             env.Replace(CXX='aarch64-apple-darwin23.5-clang++')
             env.Replace(AR='aarch64-apple-darwin23.5-ar')
