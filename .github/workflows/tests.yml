@@ -28,7 +28,7 @@ jobs:
     - name: Build LSP Framework
       run: |
         cd extern/lsp-framework
-        cmake -B build_linux -DCMAKE_BUILD_TYPE=Debug -DCMAKE_DEBUG_POSTFIX=""
+        cmake -B build_linux -DCMAKE_BUILD_TYPE=Debug
         cmake --build build_linux
 
     - name: Build Debug Binary
