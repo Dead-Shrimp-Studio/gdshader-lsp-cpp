@@ -77,7 +77,7 @@ private:
     
     // --- Statement Parsing ---
     std::unique_ptr<StatementNode> parseStatement();
-    std::unique_ptr<StatementNode> parseVarDecl(); // int x = 5;
+    std::unique_ptr<StatementNode> parseVarDecl();
     std::unique_ptr<StatementNode> parseIf();
     std::unique_ptr<StatementNode> parseFor();
     std::unique_ptr<StatementNode> parseWhile();

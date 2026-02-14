@@ -19,7 +19,8 @@ private:
     std::unordered_map<std::string, TypePtr> types;
     TypePtr unknownType;
 
-    bool isValidSwizzle(const std::string& swizzle, int vectorSize) const {
+    bool isValidSwizzle(const std::string& swizzle, int vectorSize) const 
+    {
         if (swizzle.length() > 4) return false;
         
         const std::string xyzw = "xyzw";
@@ -130,7 +131,8 @@ public:
         size_t bracketStart = name.find('[');
         size_t bracketEnd = name.rfind(']');
         
-        if (bracketStart != std::string::npos && bracketEnd != std::string::npos && bracketEnd > bracketStart) {
+        if (bracketStart != std::string::npos && bracketEnd != std::string::npos && bracketEnd > bracketStart) 
+        {
             
             std::string baseName = name.substr(0, bracketStart);
             std::string sizeStr = name.substr(bracketStart + 1, bracketEnd - bracketStart - 1);
@@ -180,7 +182,8 @@ public:
         types[name] = t;
     }
 
-    TypePtr getMemberType(TypePtr base, const std::string& member) {
+    TypePtr getMemberType(TypePtr base, const std::string& member) 
+    {
         
         if (base->kind == TypeKind::STRUCT) {
             for (const auto& m : base->members) {

@@ -1245,7 +1245,6 @@ std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
     if (match(TokenType::KEYWORD_HIGH_PRECISION)) {
         node->precision = previous_token.value;
     } 
-    // Add mediump/lowp checks here if you added those tokens
 
     // 2. Base Type Name
     if (isTypeStart()) {
@@ -1269,7 +1268,7 @@ std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
                 int size = std::stoi(previous_token.value);
                 node->arraySizes.push_back(size);
             } catch (...) {
-                reportError("Array dimension specifier must be a integer value,");
+                reportError("Array dimension specifier must be a integer value.");
                 node->arraySizes.push_back(0); // Error fallback
             }
         } else {
@@ -1341,7 +1340,6 @@ bool Parser::isTypeStart() {
             Token next = lexer.peekToken(0); // Peek next (offset 0 usually means next in queue?)
 
             if (next.type == TokenType::TOKEN_IDENTIFIER) {
-                // "MyType varName" -> It's a declaration
                 return true;
             }
             

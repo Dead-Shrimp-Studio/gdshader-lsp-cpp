@@ -46,7 +46,7 @@ void GdShaderServer::registerHandlers() {
                 #endif
 
                 ProjectManager::get_singleton()->setRootPath(root);
-                SPDLOG_INFO("Project Root set to: ", root);
+                SPDLOG_INFO("Project Root set to: {} from recevied path {}.", root, params.rootUri->path());
             }
 
             // 1. Construct Capabilities Explicitly
@@ -77,12 +77,11 @@ void GdShaderServer::registerHandlers() {
             caps.renameProvider = true;
             caps.foldingRangeProvider = true;
 
-            // 2. Return Result
             return lsp::requests::Initialize::Result{
                 .capabilities = caps,
                 .serverInfo = lsp::InitializeResultServerInfo{
                     .name = "gdshader-lsp",
-                    .version = "0.1.0"
+                    .version = "0.4.2"
                 }
             };
         }
