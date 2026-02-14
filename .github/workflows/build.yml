@@ -18,20 +18,17 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             scons_target: linux
-            # Fix: Add the 'generated' folder to CPPPATH so lsp/messages.h can be found
-            scons_args: "CPPPATH=['src', 'extern/lsp-framework', 'extern/lsp-framework/build_linux', 'extern/lsp-framework/build_linux/generated', 'extern/spdlog/include']"
+            scons_args: ""
           
           - os: windows-latest
             platform: windows
             scons_target: windows
-            # Fix: Force MSVC toolchain (matches the /Fo flags seen in logs) and ensure includes are explicit
-            scons_args: "tools=msvc CPPPATH=['src', 'extern/lsp-framework', 'extern/lsp-framework/build_windows', 'extern/lsp-framework/build_windows/generated', 'extern/spdlog/include']"
+            scons_args: "tools=msvc"
           
           - os: macos-latest
             platform: macos
             scons_target: macos
-            # Fix: Override the hardcoded cross-compiler with the system default clang
-            scons_args: "CXX=clang++ CC=clang"
+            scons_args: "CXX=clang++ CC=clang macos_arch=arm64"
 
     steps:
     - name: Checkout Code
