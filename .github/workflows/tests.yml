@@ -40,4 +40,4 @@ jobs:
         LSP_BINARY_PATH: ./bin/linux/debug/gdshader_lsp_debug_linux
       run: |
         chmod +x $LSP_BINARY_PATH
-        pytest -v tests/
+        pytest -s tests/

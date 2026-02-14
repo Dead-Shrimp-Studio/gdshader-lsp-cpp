@@ -4,9 +4,12 @@ compile_commands.json
 
 *.o
 *.sh
+
 .venv
 __pycache__
+.pytest_cache
 
 .vscode
+build
 build_*
 bin

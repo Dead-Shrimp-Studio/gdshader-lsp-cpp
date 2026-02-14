@@ -9,6 +9,8 @@ env = Environment(variables=vars, ENV=os.environ) # type: ignore
 target_platform = env['platform']
 build_target = env['target']
 
+macos_arch = ARGUMENTS.get('macos_arch', 'arm64') # type: ignore
+    
 # -------------------------------------------------------------------------
 # NATIVE VS CROSS-COMPILE DETECTION
 # -------------------------------------------------------------------------
@@ -92,8 +94,6 @@ if target_platform == 'windows':
 
 elif target_platform == 'macos':
     
-    macos_arch = ARGUMENTS.get('macos_arch', 'arm64') # type: ignore
-    
     if is_native_build:
         print(f"Native macOS Build - Using system compiler")
         env.Append(CXXFLAGS=['-arch', macos_arch])
@@ -142,4 +142,7 @@ if build_target == 'release':
 else:
     output_bin = os.path.join('bin', target_platform, 'debug', f'gdshader_lsp_debug_{target_platform}')
 
+if target_platform == 'macos':
+    output_bin = os.path.join('bin', target_platform, 'release', f'gdshader_lsp_release_{target_platform}_{macos_arch}')
+    
 env.Program(target=output_bin, source=sources)

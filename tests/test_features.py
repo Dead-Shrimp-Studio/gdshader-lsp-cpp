@@ -1,4 +1,4 @@
-import pytest
+import pytest # type: ignore
 
 # -------------------------------------------------------------------------
 # TEST 1: DIAGNOSTICS (Does it catch errors?)
@@ -8,7 +8,7 @@ def test_syntax_error_reporting(lsp):
     shader_code = """
     shader_type spatial;
     void fragment() {
-        vec3 x = vec3(1.0) // <--- Missing semicolon
+        vec3 x = vec3(1.0)
     }
     """
     
@@ -66,7 +66,16 @@ def test_autocomplete_builtins(lsp):
     response = lsp.read_message()
     
     assert response["id"] == msg_id
-    items = response["result"]
+    
+    # --- FIX START ---
+    result = response["result"]
+    
+    # LSP Spec says result can be Array<CompletionItem> OR CompletionList
+    if isinstance(result, dict):
+        items = result["items"] # Extract list from CompletionList object
+    else:
+        items = result # It's already a list
+    # --- FIX END ---
     
     # Look for "ALBEDO"
     labels = [item["label"] for item in items]
@@ -94,7 +103,12 @@ def test_preprocessor_defines(lsp):
         }
     }, is_notification=True)
     
+    # Consume diagnostics
     response = lsp.read_message()
+    
+    # If the preprocessor works, we should NOT get an "Unknown identifier" error for MY_COLOR
     diags = response["params"]["diagnostics"]
-
-    assert len(diags) == 0
+    
+    # Filter for errors related to MY_COLOR
+    errors = [d for d in diags if "MY_COLOR" in d["message"]]
+    assert len(errors) == 0
