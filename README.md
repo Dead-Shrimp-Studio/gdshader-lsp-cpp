@@ -4,6 +4,8 @@ A high-performance, standalone **Language Server Protocol (LSP)** implementation
 
 **GDShader LSP** provides enterprise-grade code intelligence, strict semantic analysis, and real-time diagnostics for Godot shaders. It is designed to be editor-agnostic, integrating seamlessly into VSCode, Neovim, Emacs, or directly into the Godot Engine via GDExtension.
 
+For information on changes per version, see **CHANGELOG.md**.
+
 ## Key Features
 
 ### Advanced Static Analysis & Type Checking

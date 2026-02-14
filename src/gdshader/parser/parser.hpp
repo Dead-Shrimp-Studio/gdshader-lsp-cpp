@@ -63,6 +63,7 @@ private:
     std::unique_ptr<ASTNode> parseTopLevelDecl();
     std::unique_ptr<ASTNode> parseShaderType();
     std::unique_ptr<ASTNode> parseRenderMode();
+    std::unique_ptr<ASTNode> parseGroupUniform();
     std::unique_ptr<ASTNode> parseUniform();
     std::unique_ptr<ASTNode> parseVarying();
     std::unique_ptr<ASTNode> parseConst();

@@ -206,6 +206,11 @@ struct RenderModeNode : public ASTNode {
     std::vector<std::string> modes;
 };
 
+// An insepctor instruction
+struct GroupUniformsNode : public ASTNode {
+    std::string name;
+};
+
 // uniform float height : hint_range(0, 10) = 5.0;
 struct UniformNode : public ASTNode {
     std::unique_ptr<TypeNode> type;
