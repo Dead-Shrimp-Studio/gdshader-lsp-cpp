@@ -28,7 +28,7 @@ jobs:
     - name: Build LSP Framework
       run: |
         cd extern/lsp-framework
-        cmake -B build_linux -DCMAKE_BUILD_TYPE=Debug
+        cmake -B build_linux -DCMAKE_BUILD_TYPE=Debug -DCMAKE_DEBUG_POSTFIX=""
         cmake --build build_linux
 
     - name: Build Debug Binary
@@ -39,4 +39,5 @@ jobs:
       env:
         LSP_BINARY_PATH: ./bin/linux/debug/gdshader_lsp_debug_linux
       run: |
+        chmod +x $LSP_BINARY_PATH
         pytest -v tests/
