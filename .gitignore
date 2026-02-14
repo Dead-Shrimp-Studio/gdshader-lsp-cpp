@@ -4,6 +4,8 @@ compile_commands.json
 
 *.o
 *.sh
+.venv
+__pycache__
 
 .vscode
 build_*
