@@ -334,7 +334,11 @@ void GdShaderServer::registerHandlers() {
             // If found and it's not a built-in (line -1)
             if (sym && sym->line >= 0) {
                 loc.uri = params.textDocument.uri;
+
+                int lspLine = (sym->line > 0) ? sym->line - 1 : 0;
                 
+                loc.range.start.line = lspLine;
+                loc.range.start.character = 0; // TODO: Store column in Symbol
                 loc.range.start = lsp::Position{(unsigned)sym->line + 1, (unsigned)sym->column};
                 loc.range.end   = lsp::Position{(unsigned)sym->line + 1, (unsigned)sym->column + (unsigned)sym->name.length()};
                 
@@ -676,10 +680,6 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
 
     auto su = pm->getUnit(path);
 
-    SemanticAnalyzer analyzer;
-    analyzer.setFilePath(path);
-
-    // 1. Run Lexer & Parser
     Lexer lexer(code);
     Parser parser(lexer, path);
     
@@ -687,6 +687,9 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
     auto errors = parser.getDiagnostics();
 
     su->defines = parser.getDefines();
+
+    SemanticAnalyzer analyzer;
+    analyzer.setFilePath(path);
 
     if (ast) {
         auto result = analyzer.analyze(ast.get());
@@ -970,13 +973,13 @@ lsp::DocumentSymbol GdShaderServer::createSymbol(const std::string& name, lsp::S
     sym.kind = kind;
     sym.detail = detail;
 
-    // Range: For now, we select the whole line. 
-    // Ideally, you'd add 'endLine' to your ASTNodes for precise block ranges.
+    int lspLine = (line > 0) ? line - 1 : 0;
+
     sym.range = lsp::Range{
-        .start = lsp::Position{(unsigned)line, 0},
-        .end = lsp::Position{(unsigned)line, 0}
+        .start = lsp::Position{(unsigned)lspLine, 0},
+        .end = lsp::Position{(unsigned)lspLine, 0}
     };
-    sym.selectionRange = sym.range; // The text to highlight when clicked
+    sym.selectionRange = sym.range;
     
     sym.children = children;
     return sym;
