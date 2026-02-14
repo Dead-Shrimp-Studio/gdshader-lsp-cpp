@@ -58,7 +58,7 @@ This project expects the **LSP Framework** to be located at `extern/lsp-framewor
 
 * **Linux**: `extern/lsp-framework/build` 
 * **Windows**: `extern/lsp-framework/build_windows` 
-* **macOS**: `extern/lsp-framework/build/macos` 
+* **macOS**: `extern/lsp-framework/build_macos` 
 
 Ensure your directory structure looks like this before compiling the main project:
 
@@ -101,10 +101,6 @@ cmake -B build_macos \
 
 cmake --build build_macos
 ```
-
-### Notes for Cross-Compilation
-
-
 
 ### Compilation
 
