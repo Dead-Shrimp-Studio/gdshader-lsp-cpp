@@ -49,14 +49,13 @@ void GdShaderServer::registerHandlers() {
                 SPDLOG_INFO("Project Root set to: {} from recevied path {}.", root, params.rootUri->path());
             }
 
-            // 1. Construct Capabilities Explicitly
             lsp::ServerCapabilities caps;
 
             // Text Document Sync
             lsp::TextDocumentSyncOptions syncOps;
             syncOps.openClose = true;
             syncOps.change = lsp::TextDocumentSyncKind::Full;
-            caps.textDocumentSync = syncOps; // Sets the variant/optional
+            caps.textDocumentSync = syncOps;
 
             // Completion
             lsp::CompletionOptions compOps;
@@ -167,8 +166,6 @@ void GdShaderServer::registerHandlers() {
                         std::string content = "**" + word + "** (Member of " + baseSym->name + ")\n\n";
                         content += "Type: `" + memberT->toString() + "`\n";
                         
-                        // Optional: If you track docstrings for struct members, add them here
-                        
                         hover.contents = {
                             lsp::MarkupContent {
                                 .kind = lsp::MarkupKind::Markdown,
@@ -178,7 +175,7 @@ void GdShaderServer::registerHandlers() {
                     }
                 }
             } else {
-                // Standard Lookup (Global/Local variable or Function)
+
                 const Symbol* sym = su->symbols->lookupAt(word, line);
 
                 if (sym) {
@@ -550,7 +547,7 @@ void GdShaderServer::registerHandlers() {
             if (sym) {
                 // Safety: Don't rename built-ins (like 'sin' or 'ALBEDO')
                 if (sym->category == SymbolType::Builtin) {
-                    std::cout << "Cannot rename builtin: " << sym->name << std::endl;
+                    SPDLOG_WARN("Cannot rename builtins!");
                     return result;
                 }
 
