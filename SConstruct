@@ -31,17 +31,20 @@ print(f"Building for: {target_platform} ({build_target}) | Host: {host_os} | Nat
 # NOTE: You must have compiled the 'lsp' library for the target platform as well!
 # Structure: extern/lsp-framework/build_linux, /build_windows, /build_macos
 
-lsp_lib_path = os.path.join('extern', 'lsp-framework', f'build_{target_platform}')
+lsp_lib_path = ""
+lsp_build_root = os.path.join('extern', 'lsp-framework', f'build_{target_platform}')
 
 if target_platform == 'windows' and is_native_build:
     config_dir = 'Release' if build_target == 'release' else 'Debug'
-    lsp_lib_path = os.path.join(lsp_lib_path, config_dir)
+    lsp_lib_path = os.path.join(lsp_build_root, config_dir)
+else:
+    lsp_lib_path = lsp_build_root
 
 env.Append(CPPPATH=[
     'src',
     'extern/lsp-framework',
-    lsp_lib_path,
-    os.path.join(lsp_lib_path, 'generated'),
+    lsp_build_root,
+    os.path.join(lsp_build_root, 'generated'),
     'extern/spdlog/include'
 ])
 
@@ -53,7 +56,7 @@ env.Append(LIBS=['lsp'])
 # COMPILER CONFIGURATION
 # -------------------------------------------------------------------------
 if target_platform == 'windows' and is_native_build:
-    env.Append(CXXFLAGS=['/std:c++20', '/W3', '/EHsc', '/nologo', '/utf-8'])
+    env.Append(CXXFLAGS=['/std:c++20', '/W3', '/EHsc', '/nologo', '/utf-8', '/wd4267'])
     
     if build_target == 'release':
         env.Append(CXXFLAGS=['/O2'])
@@ -120,27 +123,16 @@ elif target_platform == 'linux':
 build_dir = os.path.join('build', target_platform)
 env.VariantDir(build_dir, 'src', duplicate=0)
 
-# -------------------------------------------------------------------------
-# COMPILATION DATABASE
-# -------------------------------------------------------------------------
 if target_platform == 'linux':
     env.Tool('compilation_db')
     env.CompilationDatabase('compile_commands.json')
 
-# -------------------------------------------------------------------------
-# SOURCE DISCOVERY
-# -------------------------------------------------------------------------
 sources = []
-
 for root, dirs, files in os.walk('src'):
     for file in files:
         if file.endswith('.cpp'):
             rel_path = os.path.relpath(os.path.join(root, file), 'src')
             sources.append(os.path.join('src', rel_path))
-
-# -------------------------------------------------------------------------
-# BUILD TARGET
-# -------------------------------------------------------------------------
 
 if build_target == 'release':
     output_bin = os.path.join('bin', target_platform, 'release', f'gdshader_lsp_release_{target_platform}')
