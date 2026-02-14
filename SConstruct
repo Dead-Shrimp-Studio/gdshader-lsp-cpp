@@ -49,8 +49,11 @@ env.Append(CPPPATH=[
 ])
 
 env.Append(LIBPATH=[lsp_lib_path]) 
-env.Append(LIBS=['lsp'])
 
+if build_target == 'release':
+    env.Append(LIBS=['lsp'])
+else:
+    env.Append(LIBS=['lspd'])
 
 # -------------------------------------------------------------------------
 # COMPILER CONFIGURATION
@@ -89,7 +92,7 @@ if target_platform == 'windows':
 
 elif target_platform == 'macos':
     
-    macos_arch = ARGUMENTS.get('macos_arch', 'arm64')
+    macos_arch = ARGUMENTS.get('macos_arch', 'arm64') # type: ignore
     
     if is_native_build:
         print(f"Native macOS Build - Using system compiler")
