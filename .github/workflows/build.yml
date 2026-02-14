@@ -81,4 +81,4 @@ jobs:
     # --- BUILD PROJECT ---
     - name: Build GDShader LSP
       run: |
-        scons platform=${{ matrix.scons_target }} target=release ${{ matrix.scons_args }}
+        scons platform=${{ matrix.platform }} target=release
