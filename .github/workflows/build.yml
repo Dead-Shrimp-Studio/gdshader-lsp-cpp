@@ -31,6 +31,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 0
 
     # --- SETUP DEPENDENCIES ---
     - name: Install SCons & Python
