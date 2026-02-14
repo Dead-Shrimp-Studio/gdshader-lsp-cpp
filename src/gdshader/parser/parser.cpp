@@ -35,7 +35,6 @@ void Parser::advance() {
     while (true) {
         current_token = lexer.getNextToken();
         if (current_token.type != TokenType::TOKEN_ERROR) break;
-        
         reportErrorAt(current_token, "Lexical error: " + current_token.value);
     }
 }
@@ -71,8 +70,8 @@ void Parser::reportErrorAt(const Token& token, const std::string& message)
     if (panicMode) return; // Suppress cascade errors
     panicMode = true;
     
+    SPDLOG_ERROR("Parse Error at {}:{}: {}", token.line, token.column, message);
     diagnostics.push_back({token.line, token.column, message});
-    spdlog::dump_backtrace();
 }
 
 void Parser::synchronize() 
@@ -88,6 +87,7 @@ void Parser::synchronize()
         
         switch (current_token.type) {
             case TokenType::KEYWORD_SHADER_TYPE:
+            case TokenType::KEYWORD_GROUP_UNIFORMS:
             case TokenType::KEYWORD_UNIFORM:
             case TokenType::KEYWORD_VARYING:
             case TokenType::KEYWORD_CONST:
@@ -319,13 +319,14 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
 {
     try {
 
-        if (match(TokenType::TOKEN_PREPROCESSOR))  return parsePreprocessor();
-        if (match(TokenType::KEYWORD_SHADER_TYPE)) return parseShaderType();
-        if (match(TokenType::KEYWORD_RENDER_MODE)) return parseRenderMode();
-        if (match(TokenType::KEYWORD_UNIFORM))     return parseUniform();
-        if (match(TokenType::KEYWORD_VARYING))     return parseVarying();
-        if (match(TokenType::KEYWORD_CONST))       return parseConst();
-        if (match(TokenType::KEYWORD_STRUCT))      return parseStruct();
+        if (match(TokenType::TOKEN_PREPROCESSOR))       return parsePreprocessor();
+        if (match(TokenType::KEYWORD_SHADER_TYPE))      return parseShaderType();
+        if (match(TokenType::KEYWORD_RENDER_MODE))      return parseRenderMode();
+        if (match(TokenType::KEYWORD_GROUP_UNIFORMS))   return parseGroupUniform();
+        if (match(TokenType::KEYWORD_UNIFORM))          return parseUniform();
+        if (match(TokenType::KEYWORD_VARYING))          return parseVarying();
+        if (match(TokenType::KEYWORD_CONST))            return parseConst();
+        if (match(TokenType::KEYWORD_STRUCT))           return parseStruct();
         
         if (isTypeStart()) {
             return parseTypeIdentifierDecl();
@@ -375,6 +376,33 @@ std::unique_ptr<ASTNode> Parser::parseRenderMode()
     consume(TokenType::TOKEN_SEMI, "Expected ';' after render_mode");
 
     setRange(node.get(), start, previous_token);
+    return node;
+}
+
+std::unique_ptr<ASTNode> gdshader_lsp::Parser::parseGroupUniform()
+{
+    Token start = previous_token; // We already consumed KEYWORD_GROUP_UNIFORMS
+    auto node = std::make_unique<GroupUniformsNode>();
+
+    if (check(TokenType::TOKEN_IDENTIFIER)) {
+        node->name = current_token.value;
+        advance();
+
+        // Handle subgroups: MyGroup.SubGroup.Another
+        while (match(TokenType::TOKEN_DOT)) {
+            node->name += ".";
+            if (check(TokenType::TOKEN_IDENTIFIER)) {
+                node->name += current_token.value;
+                advance();
+            } else {
+                reportError("Expected identifier after '.' in group name");
+            }
+        }
+    } 
+
+    consume(TokenType::TOKEN_SEMI, "Expected ';' after group_uniforms");
+    setRange(node.get(), start, previous_token);
+    
     return node;
 }
 

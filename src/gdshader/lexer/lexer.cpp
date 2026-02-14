@@ -343,7 +343,7 @@ Token Lexer::createToken()
     SPDLOG_ERROR("Lexer Error: Unexpected character '{}' (0x{:x}) at {}:{}", current, (int)current, startLine, startCol);
     spdlog::dump_backtrace();
 
-    return {TokenType::TOKEN_ERROR, std::string(1, current), startLine, startCol, {}};
+    return {TokenType::TOKEN_ERROR, std::string(1, current), startLine, startCol, 1};
 }
 
 /**

@@ -341,28 +341,70 @@ static const BuiltinList PARTICLES_PROCESS = {
 
 // SKY
 static const BuiltinList SKY_PROCESS = {
+    // Global
+    {"TIME", "float", "Global time in seconds."},
+    {"PI", "float", "PI constant (3.141592)."},
+    {"TAU", "float", "TAU constant (6.283185)."},
+    {"E", "float", "E constant (2.718281)."},
+    {"POSITION", "vec3", "Camera position in world space."},
+    {"RADIANCE", "samplerCube", "Radiance cubemap (read-only, background pass only)."},
+    
+    // Render Pass Flags
+    {"AT_HALF_RES_PASS", "bool", "True when rendering to the half resolution pass."},
+    {"AT_QUARTER_RES_PASS", "bool", "True when rendering to the quarter resolution pass."},
+    {"AT_CUBEMAP_PASS", "bool", "True when rendering to the radiance cubemap."},
+
+    {"LIGHT0_ENABLED", "bool", "True if LIGHT0 is visible and in the scene."},
+    {"LIGHT0_ENERGY", "float", "Energy multiplier for LIGHT0."},
+    {"LIGHT0_DIRECTION", "vec3", "Direction that LIGHT0 is facing."},
+    {"LIGHT0_COLOR", "vec3", "Color of LIGHT0."},
+    {"LIGHT0_SIZE", "float", "Angular diameter of LIGHT0 in the sky (radians)."},
+
+    {"LIGHT1_ENABLED", "bool", "True if LIGHT1 is visible and in the scene."},
+    {"LIGHT1_ENERGY", "float", "Energy multiplier for LIGHT1."},
+    {"LIGHT1_DIRECTION", "vec3", "Direction that LIGHT1 is facing."},
+    {"LIGHT1_COLOR", "vec3", "Color of LIGHT1."},
+    {"LIGHT1_SIZE", "float", "Angular diameter of LIGHT1 in the sky (radians)."},
+
+    {"LIGHT2_ENABLED", "bool", "True if LIGHT2 is visible and in the scene."},
+    {"LIGHT2_ENERGY", "float", "Energy multiplier for LIGHT2."},
+    {"LIGHT2_DIRECTION", "vec3", "Direction that LIGHT2 is facing."},
+    {"LIGHT2_COLOR", "vec3", "Color of LIGHT2."},
+    {"LIGHT2_SIZE", "float", "Angular diameter of LIGHT2 in the sky (radians)."},
+
+    {"LIGHT3_ENABLED", "bool", "True if LIGHT3 is visible and in the scene."},
+    {"LIGHT3_ENERGY", "float", "Energy multiplier for LIGHT3."},
+    {"LIGHT3_DIRECTION", "vec3", "Direction that LIGHT3 is facing."},
+    {"LIGHT3_COLOR", "vec3", "Color of LIGHT3."},
+    {"LIGHT3_SIZE", "float", "Angular diameter of LIGHT3 in the sky (radians)."},
+
+    {"EYEDIR", "vec3", "Normalized direction of the current pixel."},
+    {"SCREEN_UV", "vec2", "Screen UV coordinate for the current pixel."},
+    {"SKY_COORDS", "vec2", "Sphere UV. Used to map a panorama texture to the sky."},
+    {"HALF_RES_COLOR", "vec4", "Color value from the half resolution pass."},
+    {"QUARTER_RES_COLOR", "vec4", "Color value from the quarter resolution pass."},
     {"COLOR", "vec3", "Output color."},
-    {"ALPHA", "float", "Output alpha."},
-    {"EYEDIR", "vec3", "Eye direction."},
-    {"SKY_COORDS", "vec2", "Sky spherical coordinates."},
-    {"SCREEN_UV", "vec2", "Screen UV."},
-    {"TIME", "float", "Global time."},
-    {"PI", "float", "Const PI."},
-    {"TAU", "float", "Const TAU."},
-    {"E", "float", "Const E."}
+    {"ALPHA", "float", "Output alpha value (subpasses only)."},
+    {"FOG", "vec4", "Output fog."}
 };
 
 // FOG
 static const BuiltinList FOG_PROCESS = {
-    {"DENSITY", "float", "Output fog density."},
-    {"ALBEDO", "vec3", "Output fog color."},
-    {"EMISSION", "vec3", "Output emission."},
-    {"WORLD_POSITION", "vec3", "World position of the cell."},
-    {"OBJECT_POSITION", "vec3", "Object position."},
-    {"SDF", "vec3", "Signed Distance Field value."},
-    {"UVW", "vec3", "3D Texture UVW."},
-    {"SIZE", "vec3", "Size of fog volume."},
-    {"TIME", "float", "Global time."}
+
+    {"TIME", "float", "Global time in seconds."},
+    {"PI", "float", "PI constant (3.141592)."},
+    {"TAU", "float", "TAU constant (6.283185)."},
+    {"E", "float", "E constant (2.718281)."},
+
+    {"WORLD_POSITION", "vec3", "Position of current froxel cell in world space."},
+    {"OBJECT_POSITION", "vec3", "Position of the center of the current FogVolume in world space."},
+    {"UVW", "vec3", "3-dimensional UV, used to map a 3D texture to the current FogVolume."},
+    {"SIZE", "vec3", "Size of the current FogVolume when its shape has a size."},
+    {"SDF", "vec3", "Signed distance field to the surface of the FogVolume. Negative if inside volume, positive otherwise."},
+    {"ALBEDO", "vec3", "Output base color value, interacts with light to produce final color. Only written to fog volume if used."},
+    {"DENSITY", "float", "Output density value. Can be negative to allow subtracting one volume from another. Density must be used for fog shader to write anything at all."},
+    {"EMISSION", "vec3", "Output emission color value, added to color during light pass to produce final color. Only written to fog volume if used."}
+
 };
 
 // -------------------------------------------------------------------------
@@ -429,18 +471,18 @@ static const BuiltinFuncList GLOBAL_FUNCTIONS = {
     {"max", "vec_int_type", {"vec_int_type", "int"}, "Max (int scalar)."},
     {"max", "vec_uint_type", {"vec_uint_type", "vec_uint_type"}, "Max (uint)."},
     {"max", "vec_uint_type", {"vec_uint_type", "uint"}, "Max (uint scalar)."},
-    {"clamp", "vec_type", {"vec_type", "vec_type", "vec_type"}, "Clamp (float)."},
-    {"clamp", "vec_type", {"vec_type", "float", "float"}, "Clamp (float scalar)."},
-    {"clamp", "vec_int_type", {"vec_int_type", "vec_int_type", "vec_int_type"}, "Clamp (int)."},
-    {"clamp", "vec_int_type", {"vec_int_type", "int", "int"}, "Clamp (int scalar)."},
-    {"clamp", "vec_uint_type", {"vec_uint_type", "vec_uint_type", "vec_uint_type"}, "Clamp (uint)."},
-    {"clamp", "vec_uint_type", {"vec_uint_type", "uint", "uint"}, "Clamp (uint scalar)."},
-    {"mix", "vec_type", {"vec_type", "vec_type", "vec_type"}, "Linear interpolate."},
-    {"mix", "vec_type", {"vec_type", "vec_type", "float"}, "Linear interpolate (scalar)."},
-    {"mix", "vec_type", {"vec_type", "vec_type", "vec_bool_type"}, "Select based on bool."},
-    {"fma", "vec_type", {"vec_type", "vec_type", "vec_type"}, "Fused multiply-add."},
-    {"step", "vec_type", {"vec_type", "vec_type"}, "Step."},
-    {"step", "vec_type", {"float", "vec_type"}, "Step (scalar edge)."},
+    {"clamp", "vec_type", {"vec_type", "vec_type", "vec_type"}, "Returns the value of x constrained to the range minVal to maxVal."},
+    {"clamp", "vec_type", {"vec_type", "float", "float"}, "Returns the value of x constrained to the range minVal to maxVal."},
+    {"clamp", "vec_int_type", {"vec_int_type", "vec_int_type", "vec_int_type"}, "Returns the value of x constrained to the range minVal to maxVal."},
+    {"clamp", "vec_int_type", {"vec_int_type", "int", "int"}, "Returns the value of x constrained to the range minVal to maxVal."},
+    {"clamp", "vec_uint_type", {"vec_uint_type", "vec_uint_type", "vec_uint_type"}, "Returns the value of x constrained to the range minVal to maxVal."},
+    {"clamp", "vec_uint_type", {"vec_uint_type", "uint", "uint"}, "Returns the value of x constrained to the range minVal to maxVal."},
+    {"mix", "vec_type", {"vec_type", "vec_type", "vec_type"}, "Performs a linear interpolation between a and b using c to weight between them."},
+    {"mix", "vec_type", {"vec_type", "vec_type", "float"}, "Performs a linear interpolation between a and b using c to weight between them."},
+    {"mix", "vec_type", {"vec_type", "vec_type", "vec_bool_type"}, "Selects either value a or value b based on the value of c. For a component of c that is false, the corresponding component of a is returned. For a component of c that is true, the corresponding component of b is returned. Components of a and b that are not selected are allowed to be invalid floating-point values and will have no effect on the results."},
+    {"fma", "vec_type", {"vec_type", "vec_type", "vec_type"}, "Performs, where possible, a fused multiply-add operation, returning a * b + c."},
+    {"step", "vec_type", {"vec_type", "vec_type"}, "Generates a step function by comparing b to a. Equivalent to if (b < a) { return 0.0; } else { return 1.0; }. For element i of the return value, 0.0 is returned if b[i] < a[i], and 1.0 is returned otherwise."},
+    {"step", "vec_type", {"float", "vec_type"}, "Generates a step function by comparing b to a. Equivalent to if (b < a) { return 0.0; } else { return 1.0; }. For element i of the return value, 0.0 is returned if b[i] < a[i], and 1.0 is returned otherwise."},
     {"smoothstep", "vec_type", {"vec_type", "vec_type", "vec_type"}, "Smoothstep."},
     {"smoothstep", "vec_type", {"float", "float", "vec_type"}, "Smoothstep (scalar edges)."},
     {"isnan", "vec_bool_type", {"vec_type"}, "Is NaN."},

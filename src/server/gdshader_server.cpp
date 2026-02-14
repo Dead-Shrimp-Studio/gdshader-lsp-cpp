@@ -90,7 +90,6 @@ void GdShaderServer::registerHandlers() {
     // --- SYNCHRONIZATION: DID OPEN ---
     handler.add<lsp::notifications::TextDocument_DidOpen>(
         [this](lsp::notifications::TextDocument_DidOpen::Params&& params) {
-            std::cout << "Opened document " << std::string(params.textDocument.uri.path()) << "..." << std::endl;
             compileAndPublish(params.textDocument.uri, params.textDocument.text);
         }
     );

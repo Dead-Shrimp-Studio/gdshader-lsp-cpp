@@ -293,6 +293,7 @@ void SemanticAnalyzer::visit(const ASTNode* node)
 
     if (auto p = dynamic_cast<const ProgramNode*>(node)) visitProgram(p);
     else if (auto s = dynamic_cast<const ShaderTypeNode*>(node)) visitShaderType(s);
+    else if (auto gu = dynamic_cast<const GroupUniformsNode*>(node)) addToken(gu, 3, 0);
     else if (auto u = dynamic_cast<const UniformNode*>(node)) visitUniform(u);
     else if (auto v = dynamic_cast<const VaryingNode*>(node)) visitVarying(v);
     else if (auto c = dynamic_cast<const ConstNode*>(node)) visitConst(c);
@@ -1284,7 +1285,8 @@ void SemanticAnalyzer::loadBuiltinsForFunction(const std::string& funcName)
     else if (funcName == "light") scope = ShaderStage::Light;
     else if (funcName == "start") scope = ShaderStage::Start;
     else if (funcName == "process") scope = ShaderStage::Process;
-    
+    else if (funcName == "sky") scope = ShaderStage::Sky;
+
     if (scope != ShaderStage::Global) {
         const auto& builtins = get_builtins(currentShaderType, scope);
         for (const auto& b : builtins) {
