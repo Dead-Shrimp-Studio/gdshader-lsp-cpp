@@ -1,6 +1,8 @@
 name: Build All Platforms
 
 on:
+  workflow_dispatch:
+    
   push:
     branches: [ "main", "support/4.5" ]
   pull_request:
