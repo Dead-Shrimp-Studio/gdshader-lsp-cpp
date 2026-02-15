@@ -13,11 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Description on how to build the LSP framework to correctly compile the Server using the scons
 - Detailed documentation for some builtin functions (not all yet)
-- Missing group_uniforms support (including nested structures)
+
+- Sematics
+  - Missing group_uniforms support (including nested structures)
+  - Detection for recursion calls and appropiate errors
 
 ### Changed
 
-- In code documentation
+- Symbol Table
+  - Symbol lookups have a scope depth paremeter now
+  - Added functionality to lookup all symbols across all scopes
+  - Symbols now seperate symbol type and mutability. This caused a lo tof problems with tracking builtins and godots "in" or "out" parameters
 
 ### Fixed
 
@@ -30,7 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Const declarations in parseStatement are correctly detected now
 
 - Semantic Analyzer
+  - Const evaluation of builtins and user declared symbols
   - Binary operations with bools now correctly report an error
+  - Scalar constructor checks are not skippe anymoren through logic error
+  - Segfaulting on RootSymbol acces for swizzles and array due to unchecked nullptr return
 
 ## [0.2.1] - 2025-12-01
 

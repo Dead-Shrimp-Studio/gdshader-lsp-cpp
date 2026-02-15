@@ -35,6 +35,7 @@ private:
     ShaderStage currentProcessorFunction = ShaderStage::Global;
     
     TypePtr currentExpectedReturnType = std::shared_ptr<Type>();
+    std::string currentFunctionName = "";
     bool currentFunctionHasReturn = false;
 
     void visit(const ASTNode* node);
