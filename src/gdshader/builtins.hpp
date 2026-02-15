@@ -12,7 +12,8 @@ namespace gdshader_lsp {
 // ENUMS
 // -------------------------------------------------------------------------
 
-enum class ShaderType {
+enum class ShaderType 
+{
     Spatial,
     CanvasItem,
     Particles,
@@ -21,7 +22,8 @@ enum class ShaderType {
     Unknown
 };
 
-enum class ShaderStage {
+enum class ShaderStage 
+{
     Global,
     Vertex,
     Fragment,
@@ -38,8 +40,9 @@ enum class ShaderStage {
 
 struct BuiltinVariable {
     std::string name;
-    std::string type; // e.g., "vec3", "float"
+    std::string type;
     std::string doc;
+    std::string qualifier = "in";
 };
 
 struct BuiltinFunction {
@@ -62,6 +65,7 @@ using BuiltinFuncList = std::vector<BuiltinFunction>;
 static const BuiltinList SPATIAL_VERTEX = {
 
     // Global
+
     {"TIME", "float", "Global time in seconds."},
     {"PI", "float", "PI constant (3.141592)."},
     {"TAU", "float", "TAU constant (6.283185)."},
@@ -90,33 +94,35 @@ static const BuiltinList SPATIAL_VERTEX = {
 
     {"VERTEX", "vec3", "Vertex position in model space (or world if using world_vertex_coords)."},
     {"VERTEX_ID", "int", "Index of the current vertex."},
-    {"NORMAL", "vec3", "Normal in model space."},
-    {"TANGENT", "vec3", "Tangent in model space."},
-    {"BINORMAL", "vec3", "Binormal in model space."},
-    {"POSITION", "vec4", "Override final vertex position in clip space."},
-    {"UV", "vec2", "UV main channel."},
-    {"UV2", "vec2", "UV secondary channel."},
-    {"COLOR", "vec4", "Vertex color."},
+    {"NORMAL", "vec3", "Normal in model space.", "inout"},
+    {"TANGENT", "vec3", "Tangent in model space.", "inout"},
+    {"BINORMAL", "vec3", "Binormal in model space.", "inout"},
+    {"POSITION", "vec4", "Override final vertex position in clip space.", "out"},
+    {"UV", "vec2", "UV main channel.", "inout"},
+    {"UV2", "vec2", "UV secondary channel.", "inout"},
+    {"COLOR", "vec4", "Vertex color.", "inout"},
     {"ROUGHNESS", "float", "Roughness for vertex lighting."},
-    {"POINT_SIZE", "float", "Point size for point rendering."},
+    {"POINT_SIZE", "float", "Point size for point rendering.", "inout"},
 
-    {"MODELVIEW_MATRIX", "mat4", "Model space to view space transform."},
-    {"MODELVIEW_NORMAL_MATRIX", "mat3", "Model space to view space normal transform."},
+    {"MODELVIEW_MATRIX", "mat4", "Model space to view space transform.", "inout"},
+    {"MODELVIEW_NORMAL_MATRIX", "mat3", "Model space to view space normal transform.", "inout"},
     {"MODEL_MATRIX", "mat4", "Model space to world space transform."},
     {"MODEL_NORMAL_MATRIX", "mat3", "Model space to world space normal transform."},
-    {"PROJECTION_MATRIX", "mat4", "View space to clip space transform."},
+    {"PROJECTION_MATRIX", "mat4", "View space to clip space transform.", "inout"},
 
     {"BONE_INDICES", "uvec4", "Bone indices."},
     {"BONE_WEIGHTS", "vec4", "Bone weights."},
     {"CUSTOM0", "vec4", "Custom value 0 (UV3/UV4)."},
     {"CUSTOM1", "vec4", "Custom value 1 (UV5/UV6)."},
     {"CUSTOM2", "vec4", "Custom value 2 (UV7/UV8)."},
-    {"CUSTOM3", "vec4", "Custom value 3."}
+    {"CUSTOM3", "vec4", "Custom value 3."},
+    {"Z_CLIP_SCALE", "float", "If written to, scales the vertex towards the camera to avoid clipping into things like walls. Lighting and shadows will continue to work correctly when this is written to, but screen-space effects like SSAO and SSR may break with lower scales. Try to keep this value as close to 1.0 as possible.", "out"}
 };
 
 static const BuiltinList SPATIAL_FRAGMENT = {
 
     // Global
+    
     {"TIME", "float", "Global time in seconds."},
     {"PI", "float", "PI constant (3.141592)."},
     {"TAU", "float", "TAU constant (6.283185)."},
@@ -148,46 +154,46 @@ static const BuiltinList SPATIAL_FRAGMENT = {
     {"CAMERA_VISIBLE_LAYERS", "uint", "Camera cull layers."},
 
     {"VERTEX", "vec3", "Fragment position in view space."},
-    {"LIGHT_VERTEX", "vec3", "Writable VERTEX for lighting calculations (does not move pixel)."},
+    {"LIGHT_VERTEX", "vec3", "Writable VERTEX for lighting calculations (does not move pixel).", "inout"},
     {"VIEW_INDEX", "int", "View index."},
     {"VIEW_MONO_LEFT", "int", "Constant 0."},
     {"VIEW_RIGHT", "int", "Constant 1."},
     {"EYE_OFFSET", "vec3", "Eye offset."},
     {"SCREEN_UV", "vec2", "Screen UV coordinates."},
 
-    {"DEPTH", "float", "Custom depth value."},
-    {"NORMAL", "vec3", "Normal in view space."},
-    {"TANGENT", "vec3", "Tangent in view space."},
-    {"BINORMAL", "vec3", "Binormal in view space."},
-    {"NORMAL_MAP", "vec3", "Normal map value."},
-    {"NORMAL_MAP_DEPTH", "float", "Normal map depth (default 1.0)."},
-    {"ALBEDO", "vec3", "Base color."},
-    {"ALPHA", "float", "Opacity."},
-    {"ALPHA_SCISSOR_THRESHOLD", "float", "Discard threshold."},
-    {"ALPHA_HASH_SCALE", "float", "Alpha hash scale."},
-    {"ALPHA_ANTIALIASING_EDGE", "float", "Alpha AA edge."},
-    {"ALPHA_TEXTURE_COORDINATE", "vec2", "Texture coord for Alpha AA."},
-    {"PREMUL_ALPHA_FACTOR", "float", "Premultiplied alpha factor."},
-    {"METALLIC", "float", "Metallic (0.0 - 1.0)."},
-    {"SPECULAR", "float", "Specular (0.0 - 1.0)."},
-    {"ROUGHNESS", "float", "Roughness (0.0 - 1.0)."},
-    {"RIM", "float", "Rim lighting."},
-    {"RIM_TINT", "float", "Rim tint."},
-    {"CLEARCOAT", "float", "Clearcoat intensity."},
-    {"CLEARCOAT_GLOSS", "float", "Clearcoat gloss."},
-    {"ANISOTROPY", "float", "Anisotropy strength."},
-    {"ANISOTROPY_FLOW", "vec2", "Anisotropy direction."},
-    {"SSS_STRENGTH", "float", "Subsurface scattering strength."},
-    {"SSS_TRANSMITTANCE_COLOR", "vec4", "SSS Transmittance color."},
-    {"SSS_TRANSMITTANCE_DEPTH", "float", "SSS Transmittance depth."},
-    {"SSS_TRANSMITTANCE_BOOST", "float", "SSS Transmittance boost."},
-    {"BACKLIGHT", "vec3", "Backlight color."},
-    {"AO", "float", "Ambient occlusion."},
-    {"AO_LIGHT_AFFECT", "float", "AO light affect."},
-    {"EMISSION", "vec3", "Emission color."},
-    {"FOG", "vec4", "Fog blend."},
-    {"RADIANCE", "vec4", "Radiance blend."},
-    {"IRRADIANCE", "vec4", "Irradiance blend."}
+    {"DEPTH", "float", "Custom depth value.", "out"},
+    {"NORMAL", "vec3", "Normal in view space.", "inout"},
+    {"TANGENT", "vec3", "Tangent in view space.", "inout"},
+    {"BINORMAL", "vec3", "Binormal in view space.", "inout"},
+    {"NORMAL_MAP", "vec3", "Normal map value.", "out"},
+    {"NORMAL_MAP_DEPTH", "float", "Normal map depth (default 1.0).", "out"},
+    {"ALBEDO", "vec3", "Base color.", "out"},
+    {"ALPHA", "float", "Opacity.", "out"},
+    {"ALPHA_SCISSOR_THRESHOLD", "float", "Discard threshold.", "out"},
+    {"ALPHA_HASH_SCALE", "float", "Alpha hash scale.", "out"},
+    {"ALPHA_ANTIALIASING_EDGE", "float", "Alpha AA edge.", "out"},
+    {"ALPHA_TEXTURE_COORDINATE", "vec2", "Texture coord for Alpha AA.", "out"},
+    {"PREMUL_ALPHA_FACTOR", "float", "Premultiplied alpha factor.", "out"},
+    {"METALLIC", "float", "Metallic (0.0 - 1.0).", "out"},
+    {"SPECULAR", "float", "Specular (0.0 - 1.0).", "out"},
+    {"ROUGHNESS", "float", "Roughness (0.0 - 1.0).", "out"},
+    {"RIM", "float", "Rim lighting.", "out"},
+    {"RIM_TINT", "float", "Rim tint.", "out"},
+    {"CLEARCOAT", "float", "Clearcoat intensity.", "out"},
+    {"CLEARCOAT_GLOSS", "float", "Clearcoat gloss.", "out"},
+    {"ANISOTROPY", "float", "Anisotropy strength.", "out"},
+    {"ANISOTROPY_FLOW", "vec2", "Anisotropy direction.", "out"},
+    {"SSS_STRENGTH", "float", "Subsurface scattering strength.", "out"},
+    {"SSS_TRANSMITTANCE_COLOR", "vec4", "SSS Transmittance color.", "out"},
+    {"SSS_TRANSMITTANCE_DEPTH", "float", "SSS Transmittance depth.", "out"},
+    {"SSS_TRANSMITTANCE_BOOST", "float", "SSS Transmittance boost.", "out"},
+    {"BACKLIGHT", "vec3", "Backlight color.", "inout"},
+    {"AO", "float", "Ambient occlusion.", "out"},
+    {"AO_LIGHT_AFFECT", "float", "AO light affect.", "out"},
+    {"EMISSION", "vec3", "Emission color.", "out"},
+    {"FOG", "vec4", "Fog blend.", "out"},
+    {"RADIANCE", "vec4", "Radiance blend.", "out"},
+    {"IRRADIANCE", "vec4", "Irradiance blend.", "out"}
 };
 
 static const BuiltinList SPATIAL_LIGHT = {

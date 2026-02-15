@@ -725,9 +725,8 @@ std::unique_ptr<StatementNode> Parser::parseStatement()
     if (check(TokenType::TOKEN_LBRACE)) {
         return parseBlock(); 
     }
-    
-    // Variable Declaration? "int x = 5;"
-    if (isTypeStart()) {
+
+    if (check(TokenType::KEYWORD_CONST) || isTypeStart()) {
         return parseVarDecl();
     }
 
@@ -738,8 +737,12 @@ std::unique_ptr<StatementNode> Parser::parseVarDecl()
 {
     Token start = current_token;
     auto node = std::make_unique<VariableDeclNode>();
-    node->type = parseType();
     
+    if (match(TokenType::KEYWORD_CONST)) {
+        node->isConst = true;
+    }
+
+    node->type = parseType();
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         node->name = current_token.value;
 
@@ -1272,7 +1275,7 @@ std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
     // 1. Optional Precision (highp/lowp) - mostly ignored in Godot but valid syntax
     if (match(TokenType::KEYWORD_HIGH_PRECISION)) {
         node->precision = previous_token.value;
-    } 
+    }
 
     // 2. Base Type Name
     if (isTypeStart()) {
@@ -1332,6 +1335,8 @@ void gdshader_lsp::Parser::setRange(ASTNode *node, const Token &start, const Tok
 }
 
 bool Parser::isTypeStart() {
+
+    SPDLOG_TRACE("Checking is type start for token {}", current_token.toString());
     switch (current_token.type) {
 
         case TokenType::KEYWORD_VOID:
@@ -1365,8 +1370,7 @@ bool Parser::isTypeStart() {
 
         case TokenType::TOKEN_IDENTIFIER: {
             
-            Token next = lexer.peekToken(0); // Peek next (offset 0 usually means next in queue?)
-
+            Token next = lexer.peekToken(0);
             if (next.type == TokenType::TOKEN_IDENTIFIER) {
                 return true;
             }
