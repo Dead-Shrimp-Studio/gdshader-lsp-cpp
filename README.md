@@ -74,7 +74,7 @@ This project uses **SCons** as its build system.
 
 This project expects the **LSP Framework** to be located at `extern/lsp-framework`. You must compile the framework for your target platform and ensure the build artifacts are located in the specific directories expected by the `SConstruct` script:
 
-* **Linux**: `extern/lsp-framework/build` 
+* **Linux**: `extern/lsp-framework/build_linux` 
 * **Windows**: `extern/lsp-framework/build_windows` 
 * **macOS**: `extern/lsp-framework/build_macos` 
 

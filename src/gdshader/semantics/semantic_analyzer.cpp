@@ -6,11 +6,11 @@ namespace gdshader_lsp {
 
 AnalysisResult SemanticAnalyzer::analyze(const ProgramNode* ast) 
 {
-    symbols = SymbolTable(); // Clear
+    symbols = SymbolTable();
     diagnostics.clear();
     typeRegistry = TypeRegistry();
 
-    currentShaderType = ShaderType::Spatial; // Reset default
+    currentShaderType = ShaderType::Unknown;
     currentProcessorFunction = ShaderStage::Global;
 
     registerGlobalFunctions();
@@ -34,15 +34,14 @@ void SemanticAnalyzer::visitShaderType(const ShaderTypeNode* node)
     else if (node->shaderType == "fog") currentShaderType = ShaderType::Fog;
     else if (node->shaderType == "spatial") currentShaderType = ShaderType::Spatial;
     else {
-        reportError(node, "Unknown shader type. Must be on of: canvas_item, particles, sky, fog, or spatial.");
-        currentShaderType = ShaderType::Spatial;
+        currentShaderType = ShaderType::Unknown;
     }
 }
 
 void SemanticAnalyzer::visitUniform(const UniformNode* node) 
 {
     TypePtr type = resolveTypeFromNode(node->type.get());
-    Symbol s{node->name, type, {type}, SymbolType::Uniform, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, node->hint, {}, {}, {}};
+    Symbol s{node->name, type, {type}, SymbolType::Uniform, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, node->hint, {}, {}, {}, {}, Mutability::ReadOnly};
 
     if (!symbols.add(s)) reportError(node, "Redefinition of uniform '" + s.name + "'");
     if (node->defaultValue) {
@@ -123,7 +122,7 @@ void SemanticAnalyzer::visitUniform(const UniformNode* node)
 void SemanticAnalyzer::visitVarying(const VaryingNode* node) 
 {
     TypePtr type = resolveTypeFromNode(node->type.get());
-    Symbol s{node->name, type, {type}, SymbolType::Varying, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, "", {}, {}, {}};
+    Symbol s{node->name, type, {type}, SymbolType::Varying, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, "", {}, {}, {}, {}, Mutability::ReadOnly};
     if (!symbols.add(s)) reportError(node, "Redefinition of varying '" + s.name + "'");
     
     addToken(node->nameRange.startLine, node->nameRange.startCol, 
@@ -132,8 +131,9 @@ void SemanticAnalyzer::visitVarying(const VaryingNode* node)
 
 void SemanticAnalyzer::visitConst(const ConstNode* node) 
 {
+    SPDLOG_DEBUG("[visitConst]: Visiting a constant expression {}", node->name);
     TypePtr type = resolveTypeFromNode(node->type.get());
-    Symbol s{node->name, type, {type}, SymbolType::Const, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, "", {}, {}, {}};
+    Symbol s{node->name, type, {type}, SymbolType::Variable, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, "", {}, {}, {}, {}, Mutability::ReadOnly};
     if (!symbols.add(s)) reportError(node, "Redefinition of const '" + s.name + "'");
 
     addToken(node->nameRange.startLine, node->nameRange.startCol, 
@@ -217,6 +217,9 @@ void SemanticAnalyzer::visitFunction(const FunctionNode* node)
     bool previousReturnFlag = currentFunctionHasReturn;
     TypePtr previousExpected = currentExpectedReturnType;
 
+    std::string previousFunctionName = currentFunctionName;
+    currentFunctionName = node->name;
+
     if (node->name == "vertex") currentProcessorFunction = ShaderStage::Vertex;
     else if (node->name == "fragment") currentProcessorFunction = ShaderStage::Fragment;
     else if (node->name == "light") currentProcessorFunction = ShaderStage::Light;
@@ -275,6 +278,8 @@ void SemanticAnalyzer::visitFunction(const FunctionNode* node)
     currentFunctionHasReturn = previousReturnFlag;
     currentExpectedReturnType = previousExpected;
 
+    currentFunctionName = previousFunctionName;
+
     // Pop Scope
     int endLine = node->range.endLine; 
     if (node->body) endLine = node->body->range.endLine;
@@ -292,7 +297,6 @@ void SemanticAnalyzer::visit(const ASTNode* node)
     if (!node) return;
 
     if (auto p = dynamic_cast<const ProgramNode*>(node)) visitProgram(p);
-    else if (auto s = dynamic_cast<const ShaderTypeNode*>(node)) visitShaderType(s);
     else if (auto gu = dynamic_cast<const GroupUniformsNode*>(node)) addToken(gu, 3, 0);
     else if (auto u = dynamic_cast<const UniformNode*>(node)) visitUniform(u);
     else if (auto v = dynamic_cast<const VaryingNode*>(node)) visitVarying(v);
@@ -319,17 +323,19 @@ void SemanticAnalyzer::visit(const ASTNode* node)
 
 void SemanticAnalyzer::visitProgram(const ProgramNode* node) 
 {
-    // First pass: Find shader_type (it affects everything else)
     for (const auto& child : node->nodes) {
         if (auto s = dynamic_cast<const ShaderTypeNode*>(child.get())) {
             visitShaderType(s);
-            break; 
+            break;
         }
     }
 
-    // Second pass: Visit everything
+    if (currentShaderType == ShaderType::Unknown) {
+        reportError(node, "Unknown shader type. Must be on of: canvas_item, particles, sky, fog, or spatial.");
+        return;
+    }
+
     for (const auto& child : node->nodes) {
-        // Skip ShaderType as we already handled it
         if (dynamic_cast<const ShaderTypeNode*>(child.get())) continue;
         visit(child.get());
     }
@@ -381,11 +387,12 @@ void gdshader_lsp::SemanticAnalyzer::visitDefine(const DefineNode *node)
         TypePtr type = resolveType(node->value.get());
         
         // Register as a Const Symbol
-        // This allows it to be used in array sizes (float x[MAX_LIGHTS]) and math!
-        Symbol s{node->name, type, {type}, SymbolType::Const, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, 0, "Macro Definition", {}, {}, {}};
+        // This allows it to be used in array sizes (float x[MAX_LIGHTS]) and math
+        Symbol s{node->name, type, {type}, SymbolType::Variable, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, 0, "Macro Definition", {}, {}, {}, {}, Mutability::ReadOnly};
         
         if (!symbols.add(s)) {
             // Optional: Warn about macro redefinition?
+            reportWarning(node, "Macro redefinition");
         }
     } 
     // Case 2: #define USE_FOG (Flag only)
@@ -393,10 +400,9 @@ void gdshader_lsp::SemanticAnalyzer::visitDefine(const DefineNode *node)
         // We register flags as boolean constants so they appear in autocomplete
         // but typically they aren't used in expressions (unless inside #ifdef).
         TypePtr type = typeRegistry.getType("bool");
-        Symbol s{node->name, type, {type}, SymbolType::Const, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, 0, "Preprocessor Flag", {}, {}, {}};
+        Symbol s{node->name, type, {type}, SymbolType::Variable, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, 0, "Preprocessor Flag", {}, {}, {}, {}, Mutability::ReadOnly};
         symbols.add(s);
     }
-
     addToken(node, 3, 1);
 }
 
@@ -439,9 +445,6 @@ void SemanticAnalyzer::visitBlock(const BlockNode* node)
             }
             
             if (sym && sym->category == SymbolType::Variable && sym->usages.empty()) {
-
-                // We use the 'varDecl' node for the range, so the whole "int x = 0;" is highlighted.
-                // This allows the Code Action to delete the entire line easily.
                 reportWarning(varDecl, "Unused variable '" + varDecl->name + "'");
             }
         }
@@ -456,20 +459,25 @@ void SemanticAnalyzer::visitVarDecl(const VariableDeclNode* node)
 
     if (type->kind == TypeKind::UNKNOWN) reportError(node, "Unknown type '" + node->type->toString() + "'");
 
-    if (symbols.lookup(node->name)) 
+    const Symbol* s = symbols.lookup(node->name);
+    if (s) 
     {
         // If it exists, but add() succeeds, it means it wasn't in the *current* immediate scope
         // (because add() checks strict redefinition). Therefore, it must be shadowing.
         // We defer the warning until we know add() succeeds.
-        
-        Symbol s{node->name, type, {type}, SymbolType::Variable, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, "", {}, {}, {}};
+        Symbol s{node->name, type, {type}, SymbolType::Variable, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, "", {}, {}, {}, {}, (node->isConst ? Mutability::ReadOnly : Mutability::Mutable)};
         if (symbols.add(s)) {
-            reportWarning(node, "Variable '" + node->name + "' shadows an existing declaration.");
+
+            const std::vector<Symbol*> all_symbols = symbols.lookup_all(node->name);
+            for (const Symbol* sym : all_symbols) {
+                if (sym->category == SymbolType::Builtin) reportError(node, "Variable '" + node->name + "' shadows an existing builtin declaration.");
+            }           
+            reportWarning(node, "Variable '" + node->name + "' shadows " + std::to_string(all_symbols.size() - 1) + " existing declaration(s)."); 
         } else {
             reportError(node, "Redefinition of variable '" + node->name + "' in the same scope.");
         }
     } else {
-        Symbol s{node->name, type, {type}, SymbolType::Variable, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, "", {}, {}, {}};
+        Symbol s{node->name, type, {type}, SymbolType::Variable, (node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, "", {}, {}, {}, {}, (node->isConst ? Mutability::ReadOnly : Mutability::Mutable)};
         symbols.add(s);
     }
     
@@ -478,8 +486,7 @@ void SemanticAnalyzer::visitVarDecl(const VariableDeclNode* node)
     if (node->initializer) {
         visit(node->initializer.get());
         TypePtr initType = resolveType(node->initializer.get());
-        
-        // Smart Comparison using TypePtr
+
         if (initType->kind != TypeKind::UNKNOWN && *initType != *type) {
             reportTypeMismatch(node, type->toString(), initType->toString());
         }
@@ -617,8 +624,8 @@ void SemanticAnalyzer::visitIdentifier(const IdentifierNode* node)
         else if (s->category == SymbolType::Struct) {
             type = 2; // Struct
         }
-        else if (s->category == SymbolType::Const) {
-            type = 0; 
+        else if (s->mutability == Mutability::ReadOnly) {
+            type = 0;
             mod |= (1 << 1); // ReadOnly
         }
         else if (s->category == SymbolType::Uniform) {
@@ -643,6 +650,7 @@ void SemanticAnalyzer::visitBinaryOp(const BinaryOpNode* node)
 
     if (isAssignment)
     {
+        SPDLOG_DEBUG("[BinaryOp]: Is assignment.");
         visitAssignment(node);
         return;
     }
@@ -653,11 +661,17 @@ void SemanticAnalyzer::visitBinaryOp(const BinaryOpNode* node)
     TypePtr l = resolveType(node->left.get());
     TypePtr r = resolveType(node->right.get());
 
+    SPDLOG_DEBUG("[BinaryOo]: Left hand type is {}, right hand type is {}", l->toString(), r->toString());
+
     // If children are already "unknown", an error was likely already reported 
     // (e.g., "Undefined identifier"). Stop here to prevent error cascading.
-    if (l->kind == TypeKind::UNKNOWN || r->kind == TypeKind::UNKNOWN) return;
+    if (l->kind == TypeKind::UNKNOWN || r->kind == TypeKind::UNKNOWN) {
+        SPDLOG_TRACE("Unknown type kind in binary op not reported.");
+        return;
+    }
 
     TypePtr result = getBinaryOpResultType(l, r, node->op);
+    SPDLOG_DEBUG("[BinaryOp]: Result type is {}", result->toString());
     if (result->kind == TypeKind::UNKNOWN) {
         reportError(node, "Invalid binary operation '" + l->toString() + "' and '" + r->toString() + "'");
     }
@@ -665,44 +679,68 @@ void SemanticAnalyzer::visitBinaryOp(const BinaryOpNode* node)
 
 void SemanticAnalyzer::visitAssignment(const BinaryOpNode* node) 
 {
-    if (node->right) visit(node->right.get());
+    if (node->right) {
+        SPDLOG_DEBUG("[Assignment]: Is left side, visiting right side.");
+        visit(node->right.get());
+    }
 
     const Symbol* s = getRootSymbol(node->left.get(), symbols);
     TypePtr lType = typeRegistry.getUnknownType();
 
+    if (s) {
+        SPDLOG_DEBUG("[Assignment]: Root symbol is {} (builtin {}) of type {} (mutable {})", 
+            s->name, s->category == SymbolType::Builtin, s->type->toString(), s->mutability == Mutability::Mutable);
+    } else {
+        SPDLOG_DEBUG("[Assignment]: Root symbol not found (Temporary expression or Undefined).");
+    }
+
     if (auto id = dynamic_cast<const IdentifierNode*>(node->left.get())) {
-        s = symbols.lookup(id->name);
+        SPDLOG_DEBUG("[Assignment]: Left side node is IdentifierNode");
         if (s) lType = s->type;
         else reportError(node, "Undefined '" + id->name + "'");
     } else if (dynamic_cast<const MemberAccessNode*>(node->left.get())) {
+        SPDLOG_DEBUG("[Assignment]: Left side node is MemberAccessNode");
         visit(node->left.get());
         lType = resolveType(node->left.get());
+    } else {
+        reportError(node->left.get(), "Expression is not assignable.");
+        return;
     }
 
-    // 3. Permission Checks (Const, Uniform, Varying)
     if (s) {
-        if (s->category == SymbolType::Const) {
-            reportError(node->left.get(), "Cannot assign to constant '" + s->name + "'");
-        } 
-        else if (s->category == SymbolType::Uniform) {
-            reportError(node->left.get(), "Cannot assign to uniform '" + s->name + "'");
+        SPDLOG_DEBUG("[Assignment]: Checking symbol {} for access right", s->name);
+        
+        if (s->mutability == Mutability::ReadOnly) {
+            
+            std::string reason = "read-only variable";
+            if (s->category == SymbolType::Variable && s->mutability == Mutability::ReadOnly) reason = "constant";
+            else if (s->category == SymbolType::Uniform) reason = "uniform";
+            else if (s->category == SymbolType::Builtin) reason = "built-in input";
+            else if (s->category == SymbolType::Varying) reason = "varying";
+
+            reportError(node->left.get(), "Cannot assign to " + reason + " '" + s->name + "'");
         }
+
         else if (s->category == SymbolType::Varying && currentProcessorFunction != ShaderStage::Vertex) {
             reportError(node->left.get(), "Varyings are read-only in the fragment processor.");
         }
     }
 
     TypePtr rType = resolveType(node->right.get());
-    if (lType->kind == TypeKind::UNKNOWN || rType->kind == TypeKind::UNKNOWN) return;
+
+    SPDLOG_DEBUG("[Assignment]: Left hand type is {}, right hand type is {}", lType->toString(), rType->toString());
+
+    if (lType->kind == TypeKind::UNKNOWN || rType->kind == TypeKind::UNKNOWN) {
+        SPDLOG_TRACE("[Assignment]: Left hand or right hand type is unknown, already reported.");
+        return;
+    }
 
     // 3. Logic for Assignment vs Compound Assignment
     if (node->op == TokenType::TOKEN_EQUAL) {
-        // Simple Assignment (=)
-        // Strict match or safe implicit conversion (e.g. float = int)
         int cost = getConversionCost(rType, lType);
         if (cost == -1) {
-             reportError(node, "Type mismatch: Cannot assign '" + rType->toString() + 
-                         "' to '" + lType->toString() + "'");
+            reportError(node, "Type mismatch: Cannot assign '" + rType->toString() + 
+                        "' to '" + lType->toString() + "'");
         }
     }
     else {
@@ -768,8 +806,6 @@ void SemanticAnalyzer::visitAssignment(const BinaryOpNode* node)
             }
         }
     }
-
-    
 }
 
 void gdshader_lsp::SemanticAnalyzer::visitArrayAccess(const ArrayAccessNode *node)
@@ -802,13 +838,16 @@ void SemanticAnalyzer::visitUnaryOp(const UnaryOpNode* node) {
  */
 void SemanticAnalyzer::visitFunctionCall(const FunctionCallNode* node) 
 {
+    std::string name = node->functionName;
+    if (name == currentFunctionName) {
+        reportError(node, "Recursion is not allowed in shaders (function '" + node->functionName + "' calls itself).");
+    }
+
     std::vector<TypePtr> argTypes;
     for (const auto& arg : node->arguments) {
         visit(arg.get());
         argTypes.push_back(resolveType(arg.get()));
     }
-
-    std::string name = node->functionName;
 
     // (If the name matches a known type, it's a constructor)
     if (typeRegistry.getType(name)->kind != TypeKind::UNKNOWN) {
@@ -890,10 +929,8 @@ void SemanticAnalyzer::visitMemberAccess(const MemberAccessNode* node)
     TypePtr baseT = resolveType(node->base.get());
 
     if (baseT->kind == TypeKind::UNKNOWN) return;
-
-    // FIX: Allow .length() on arrays
     if (baseT->kind == TypeKind::ARRAY && node->member == "length") {
-        return; // Valid
+        return;
     }
 
     addToken(node, 6, 0);
@@ -1065,6 +1102,32 @@ void SemanticAnalyzer::validateConstructor(const FunctionCallNode* node, const s
         }
     }
 
+    if (target->kind == TypeKind::SCALAR) {
+
+        if (typeName == "void") {
+            reportError(node, "Cannot construct 'void'.");
+            return;
+        }
+
+        bool isBasic = (typeName == "float" || typeName == "int" || typeName == "uint" || typeName == "bool");
+        if (!isBasic) {
+            reportError(node, "Cannot construct opaque type '" + typeName + "'.");
+            return;
+        }
+
+        if (node->arguments.size() != 1) {
+            reportError(node, "Scalar constructor expects exactly 1 argument.");
+        }
+
+        if (!node->arguments.empty()) {
+            TypePtr argT = resolveType(node->arguments[0].get());
+             if (argT->kind == TypeKind::UNKNOWN) {
+                reportError(node->arguments[0].get(), "Invalid argument.");
+            }
+        }
+        return;
+    }
+    reportError(node, "Cannot construct type '" + typeName + "'.");
 }
 
 bool gdshader_lsp::SemanticAnalyzer::isProcessorFunction(const std::string &name)
@@ -1116,12 +1179,15 @@ TypePtr gdshader_lsp::SemanticAnalyzer::getBinaryOpResultType(TypePtr l, TypePtr
         return typeRegistry.getType("bool"); 
     }
 
-    // --- 2. Arithmetic Exact Match (int+int, vec3+vec3, mat4*mat4) ---
+    if (l == typeRegistry.getType("bool") || r == typeRegistry.getType("bool")) {
+        SPDLOG_DEBUG("[BinaryOp]: Binary operation using bools detected.");
+        return typeRegistry.getUnknownType();
+    }
+
     if (*l == *r) {
         return l; 
     }
 
-    // --- 3. Vector-Scalar Mixing (vec3 * 2.0) ---
     bool lVec = (l->kind == TypeKind::VECTOR);
     bool rVec = (r->kind == TypeKind::VECTOR);
     bool lScalar = (l->kind == TypeKind::SCALAR);
@@ -1141,10 +1207,10 @@ TypePtr gdshader_lsp::SemanticAnalyzer::getBinaryOpResultType(TypePtr l, TypePtr
 
     // Matrix * Scalar (Component-wise)
     if ((lMat && rScalar) || (rMat && lScalar)) {
-         // Assuming float scalar for matrices
-         if ((lScalar && l->name == "float") || (rScalar && r->name == "float")) {
-             return lMat ? l : r;
-         }
+        // Assuming float scalar for matrices
+        if ((lScalar && l->name == "float") || (rScalar && r->name == "float")) {
+            return lMat ? l : r;
+        }
     }
 
     // Matrix * Vector (Linear Algebra: Transform)
@@ -1234,6 +1300,15 @@ const Symbol *gdshader_lsp::SemanticAnalyzer::getRootSymbol(const ExpressionNode
     if (auto id = dynamic_cast<const IdentifierNode*>(node)) {
         return symbols.lookup(id->name);
     }
+    
+    if (auto mem = dynamic_cast<const MemberAccessNode*>(node)) {
+        return getRootSymbol(mem->base.get(), symbols);
+    }
+
+    if (auto arr = dynamic_cast<const ArrayAccessNode*>(node)) {
+        return getRootSymbol(arr->base.get(), symbols);
+    }
+
     return nullptr;
 }
 
@@ -1291,7 +1366,12 @@ void SemanticAnalyzer::loadBuiltinsForFunction(const std::string& funcName)
         const auto& builtins = get_builtins(currentShaderType, scope);
         for (const auto& b : builtins) {
             TypePtr t = typeRegistry.getType(b.type);
-            symbols.add({b.name, t, {t}, SymbolType::Builtin, -1, 0, b.doc, {}, {}, {}});
+
+            Mutability m = Mutability::Mutable;
+            if (b.qualifier == "in" || b.qualifier == "const") {
+                m = Mutability::ReadOnly;
+            }
+            symbols.add({b.name, t, {t}, SymbolType::Builtin, -1, 0, b.doc, {}, {}, {}, {}, m});
         }
     }
 }
@@ -1409,6 +1489,7 @@ void SemanticAnalyzer::reportError(const ASTNode* node, const std::string& msg) 
     if (node) {
         int len = getNodeLength(node);
         diagnostics.push_back({(node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, msg, DiagnosticLevel::Error, len});
+        SPDLOG_DEBUG("Reporting error: {}", msg);
     }
 }
 
@@ -1416,6 +1497,7 @@ void SemanticAnalyzer::reportWarning(const ASTNode* node, const std::string& msg
     if (node) {
         int len = getNodeLength(node);
         diagnostics.push_back({(node->range.startLine > 0) ? node->range.startLine - 1 : 0, node->range.startCol, msg, DiagnosticLevel::Warning, len});
+        SPDLOG_DEBUG("Reporting warning: {}", msg);
     }
 }
 

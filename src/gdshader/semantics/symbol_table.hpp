@@ -11,14 +11,20 @@
 
 namespace gdshader_lsp {
 
-enum class SymbolType {
+enum class SymbolType 
+{
     Variable,
     Uniform,
     Varying,
-    Const,
     Function,
     Struct,
     Builtin
+};
+
+enum class Mutability {
+    Mutable,
+    ReadOnly,
+    WriteOnly
 };
 
 struct Symbol 
@@ -43,8 +49,8 @@ struct Symbol
     };
 
     mutable std::vector<Usage> usages;
-
     bool is_definition = false;
+    Mutability mutability = Mutability::Mutable;
 };
 
 struct Scope 
@@ -88,11 +94,18 @@ public:
 
     /**
      * @brief With overloading, this is mainly used for local variable lookup, where we retrieve the first symbol matched.
-     * 
      * @param name 
      * @return const Symbol* 
      */
-    const Symbol* lookup(const std::string& name) const;
+    const Symbol* lookup(const std::string& name, const int depth = 0) const;
+
+    /**
+     * @brief Returns all symbols that match the symbol name across ALL scopes.
+     * @param name 
+     * @return const std::vector<Symbol*> 
+     */
+    const std::vector<Symbol*> lookup_all(const std::string& name) const;
+
     std::vector<const Symbol*> lookupFunctions(const std::string& name) const;
 
     const Scope* findScopeAt(int line) const;
