@@ -31,7 +31,7 @@ private:
     std::unordered_set<std::string> processedFiles;
     std::string currentFilePath;
 
-    ShaderType currentShaderType = ShaderType::Spatial; // Default
+    ShaderType currentShaderType = ShaderType::Unknown; // Default
     ShaderStage currentProcessorFunction = ShaderStage::Global;
     
     TypePtr currentExpectedReturnType = std::shared_ptr<Type>();
