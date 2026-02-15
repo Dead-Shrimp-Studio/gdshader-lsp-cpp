@@ -123,23 +123,37 @@ void gdshader_lsp::SymbolTable::addReference(const Symbol* sym, int line, int co
     }
 }
 
-const Symbol* SymbolTable::lookup(const std::string& name) const 
+const Symbol* SymbolTable::lookup(const std::string& name, const int depth) const 
 {
     Scope* walker = current;
-    int depth = 0;
+    int rdepth = 0;
     while (walker) {
         auto it = walker->symbols.find(name);
         if (it != walker->symbols.end() && !it->second.empty()) {
-            // Return the first one found.
-            // For variables, this is the only one. 
-            // For functions, this returns one of the overloads (usually the first defined).
             return &it->second[0];
         }
+        
+        rdepth++;
+        if (depth > 0 && rdepth >= depth) break;
+        
         walker = walker->parent;
-        depth++;
     }
-    SPDLOG_TRACE("[SymTable] Lookup Failed: '{}' (checked {} scopes)", name, depth);
+    SPDLOG_DEBUG("Lookup Failed: '{}' with depth {} (checked {} scopes)", name, depth, rdepth);
     return nullptr;
+}
+
+const std::vector<Symbol*> gdshader_lsp::SymbolTable::lookup_all(const std::string &name) const
+{
+    std::vector<Symbol*> symbols;
+    Scope* walker = current;
+    while (walker) {
+        auto it = walker->symbols.find(name);
+        if (it != walker->symbols.end() && !it->second.empty()) {
+            symbols.push_back(&it->second[0]);
+        }
+        walker = walker->parent;
+    }
+    return symbols;
 }
 
 std::vector<const Symbol*> SymbolTable::lookupFunctions(const std::string& name) const 
