@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Symbol Table
   - Symbol lookups have a scope depth paremeter now
   - Added functionality to lookup all symbols across all scopes
-  - Symbols now seperate symbol type and mutability. This caused a lo tof problems with tracking builtins and godots "in" or "out" parameters
+  - Symbols now seperate symbol type and mutability. This resolves a lot of problems with tracking builtins and godots "in" or "out" parameters
 
 ### Fixed
 
