@@ -12,7 +12,8 @@ namespace gdshader_lsp {
 // ENUMS
 // -------------------------------------------------------------------------
 
-enum class ShaderType {
+enum class ShaderType 
+{
     Spatial,
     CanvasItem,
     Particles,
@@ -21,7 +22,8 @@ enum class ShaderType {
     Unknown
 };
 
-enum class ShaderStage {
+enum class ShaderStage 
+{
     Global,
     Vertex,
     Fragment,
@@ -62,6 +64,7 @@ using BuiltinFuncList = std::vector<BuiltinFunction>;
 static const BuiltinList SPATIAL_VERTEX = {
 
     // Global
+
     {"TIME", "float", "Global time in seconds."},
     {"PI", "float", "PI constant (3.141592)."},
     {"TAU", "float", "TAU constant (6.283185)."},
