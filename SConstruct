@@ -10,7 +10,17 @@ target_platform = env['platform']
 build_target = env['target']
 
 macos_arch = ARGUMENTS.get('macos_arch', 'arm64') # type: ignore
-    
+
+# -------------------------------------------------------------------------
+# GENERATE BUILT-IN (FUNCTIONS AND VARIABLES)
+# -------------------------------------------------------------------------
+generated_nodes = env.Command(
+    target=['src/generated/builtins_data.hpp', 'src/generated/builtins_data.cpp'],
+    source=Glob('src/gdshader/data/*.json'),
+    # SCons automatically replaces $SOURCES and $TARGETS with the file paths
+    action=f'{sys.executable} scripts/generate_builtin_functions.py $SOURCES $TARGETS'
+)
+
 # -------------------------------------------------------------------------
 # NATIVE VS CROSS-COMPILE DETECTION
 # -------------------------------------------------------------------------
@@ -119,7 +129,6 @@ elif target_platform == 'macos':
 elif target_platform == 'linux':
     env.Append(LIBS=['pthread'])
 
-
 # -------------------------------------------------------------------------
 # BUILD DIRECTORY SETUP
 # -------------------------------------------------------------------------
@@ -136,6 +145,8 @@ for root, dirs, files in os.walk('src'):
         if file.endswith('.cpp'):
             rel_path = os.path.relpath(os.path.join(root, file), 'src')
             sources.append(os.path.join('src', rel_path))
+
+sources.append(generated_nodes[1])
 
 if target_platform == 'macos':
     output_bin = os.path.join('bin', target_platform, f'{build_target}', f'gdshader_lsp_{build_target}_{target_platform}_{macos_arch}')

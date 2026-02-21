@@ -1,0 +1,74 @@
+[
+    {
+        "name": "TIME",
+        "type": "float",
+        "doc": "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.",
+        "qualifier": "in"
+    },
+    {
+        "name": "PI",
+        "type": "float",
+        "doc": "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TAU",
+        "type": "float",
+        "doc": "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "E",
+        "type": "float",
+        "doc": "An E constant (2.718281). Euler's number and a base of the natural logarithm.",
+        "qualifier": "in"
+    },
+    {
+        "name": "WORLD_POSITION",
+        "type": "vec3",
+        "doc": "Position of current froxel cell in world space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "OBJECT_POSITION",
+        "type": "vec3",
+        "doc": "Position of the center of the current FogVolume in world space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "UVW",
+        "type": "vec3",
+        "doc": "3-dimensional UV, used to map a 3D texture to the current FogVolume.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SIZE",
+        "type": "vec3",
+        "doc": "Size of the current FogVolume when its shape has a size.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SDF",
+        "type": "vec3",
+        "doc": "Signed distance field to the surface of the FogVolume. Negative if inside volume, positive otherwise.",
+        "qualifier": "in"
+    },
+    {
+        "name": "ALBEDO",
+        "type": "vec3",
+        "doc": "Output base color value, interacts with light to produce final color. Only written to fog volume if used.",
+        "qualifier": "out"
+    },
+    {
+        "name": "DENSITY",
+        "type": "float",
+        "doc": "Output density value. Can be negative to allow subtracting one volume from another. Density must be used for fog shader to write anything at all.",
+        "qualifier": "out"
+    },
+    {
+        "name": "EMISSION",
+        "type": "vec3",
+        "doc": "Output emission color value, added to color during light pass to produce final color. Only written to fog volume if used.",
+        "qualifier": "out"
+    }
+]
