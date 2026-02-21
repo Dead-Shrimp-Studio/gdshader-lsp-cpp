@@ -1,0 +1,266 @@
+[
+    {
+        "name": "TIME",
+        "type": "float",
+        "doc": "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.",
+        "qualifier": "in"
+    },
+    {
+        "name": "PI",
+        "type": "float",
+        "doc": "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TAU",
+        "type": "float",
+        "doc": "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "E",
+        "type": "float",
+        "doc": "An E constant (2.718281). Euler's number and a base of the natural logarithm.",
+        "qualifier": "in"
+    },
+    {
+        "name": "OUTPUT_IS_SRGB",
+        "type": "bool",
+        "doc": "true when output is in sRGB color space (this is true in the Compatibility renderer, false in Forward+ and Mobile).",
+        "qualifier": "in"
+    },
+    {
+        "name": "CLIP_SPACE_FAR",
+        "type": "float",
+        "doc": "Clip space far z value. In the Forward+ or Mobile renderers, it's 0.0. In the Compatibility renderer, it's -1.0.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEWPORT_SIZE",
+        "type": "vec2",
+        "doc": "Size of viewport (in pixels).",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEW_MATRIX",
+        "type": "mat4",
+        "doc": "World space to view space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "INV_VIEW_MATRIX",
+        "type": "mat4",
+        "doc": "View space to world space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "MAIN_CAM_INV_VIEW_MATRIX",
+        "type": "mat4",
+        "doc": "View space to world space transform of camera used to draw the current viewport.",
+        "qualifier": "in"
+    },
+    {
+        "name": "INV_PROJECTION_MATRIX",
+        "type": "mat4",
+        "doc": "Clip space to view space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "NODE_POSITION_WORLD",
+        "type": "vec3",
+        "doc": "Node position, in world space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "NODE_POSITION_VIEW",
+        "type": "vec3",
+        "doc": "Node position, in view space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CAMERA_POSITION_WORLD",
+        "type": "vec3",
+        "doc": "Camera position, in world space. Represents the midpoint of the two eyes when in multiview/stereo rendering.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CAMERA_DIRECTION_WORLD",
+        "type": "vec3",
+        "doc": "Camera direction, in world space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CAMERA_VISIBLE_LAYERS",
+        "type": "uint",
+        "doc": "Cull layers of the camera rendering the current pass.",
+        "qualifier": "in"
+    },
+    {
+        "name": "INSTANCE_ID",
+        "type": "int",
+        "doc": "Instance ID for instancing.",
+        "qualifier": "in"
+    },
+    {
+        "name": "INSTANCE_CUSTOM",
+        "type": "vec4",
+        "doc": "Instance custom data (for particles, mostly).",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEW_INDEX",
+        "type": "int",
+        "doc": "The view that we are rendering. VIEW_MONO_LEFT (0) for Mono (not multiview) or left eye, VIEW_RIGHT (1) for right eye.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEW_MONO_LEFT",
+        "type": "int",
+        "doc": "Constant for Mono or left eye, always 0.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEW_RIGHT",
+        "type": "int",
+        "doc": "Constant for right eye, always 1.",
+        "qualifier": "in"
+    },
+    {
+        "name": "EYE_OFFSET",
+        "type": "vec3",
+        "doc": "Position offset for the eye being rendered, in view space. Only applicable for multiview rendering.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VERTEX",
+        "type": "vec3",
+        "doc": "Position of the vertex, in model space. In world space if world_vertex_coords is used.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "VERTEX_ID",
+        "type": "int",
+        "doc": "The index of the current vertex in the vertex buffer.",
+        "qualifier": "in"
+    },
+    {
+        "name": "NORMAL",
+        "type": "vec3",
+        "doc": "Normal in model space. In world space if world_vertex_coords is used.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "TANGENT",
+        "type": "vec3",
+        "doc": "Tangent in model space. In world space if world_vertex_coords is used.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "BINORMAL",
+        "type": "vec3",
+        "doc": "Binormal in model space. In world space if world_vertex_coords is used.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "POSITION",
+        "type": "vec4",
+        "doc": "If written to, overrides final vertex position in clip space.",
+        "qualifier": "out"
+    },
+    {
+        "name": "UV",
+        "type": "vec2",
+        "doc": "UV main channel.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "UV2",
+        "type": "vec2",
+        "doc": "UV secondary channel.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "COLOR",
+        "type": "vec4",
+        "doc": "Color from vertices.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "ROUGHNESS",
+        "type": "float",
+        "doc": "Roughness for vertex lighting.",
+        "qualifier": "out"
+    },
+    {
+        "name": "POINT_SIZE",
+        "type": "float",
+        "doc": "Point size for point rendering.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "MODELVIEW_MATRIX",
+        "type": "mat4",
+        "doc": "Model/local space to view space transform (use if possible).",
+        "qualifier": "inout"
+    },
+    {
+        "name": "MODELVIEW_NORMAL_MATRIX",
+        "type": "mat3",
+        "doc": "",
+        "qualifier": "inout"
+    },
+    {
+        "name": "MODEL_MATRIX",
+        "type": "mat4",
+        "doc": "Model/local space to world space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "MODEL_NORMAL_MATRIX",
+        "type": "mat3",
+        "doc": "",
+        "qualifier": "in"
+    },
+    {
+        "name": "PROJECTION_MATRIX",
+        "type": "mat4",
+        "doc": "View space to clip space transform.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "BONE_INDICES",
+        "type": "uvec4",
+        "doc": "",
+        "qualifier": "in"
+    },
+    {
+        "name": "BONE_WEIGHTS",
+        "type": "vec4",
+        "doc": "",
+        "qualifier": "in"
+    },
+    {
+        "name": "CUSTOM0",
+        "type": "vec4",
+        "doc": "Custom value from vertex primitive. When using extra UVs, xy is UV3 and zw is UV4.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CUSTOM1",
+        "type": "vec4",
+        "doc": "Custom value from vertex primitive. When using extra UVs, xy is UV5 and zw is UV6.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CUSTOM2",
+        "type": "vec4",
+        "doc": "Custom value from vertex primitive. When using extra UVs, xy is UV7 and zw is UV8.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CUSTOM3",
+        "type": "vec4",
+        "doc": "Custom value from vertex primitive.",
+        "qualifier": "in"
+    }
+]

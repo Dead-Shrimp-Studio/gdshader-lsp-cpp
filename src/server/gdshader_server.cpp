@@ -81,6 +81,7 @@ void GdShaderServer::registerHandlers() {
             caps.referencesProvider = true;
             caps.renameProvider = true;
             caps.foldingRangeProvider = true;
+            caps.inlayHintProvider = true;
 
             return lsp::requests::Initialize::Result{
                 .capabilities = caps,
@@ -749,8 +750,7 @@ void GdShaderServer::registerHandlers() {
 
     // --- FEATURE: FOLDING RANGES ---
     handler.add<lsp::requests::TextDocument_FoldingRange>(
-        [this](lsp::requests::TextDocument_FoldingRange::Params&& params) 
-        -> lsp::requests::TextDocument_FoldingRange::Result 
+        [this](lsp::requests::TextDocument_FoldingRange::Params&& params) -> lsp::requests::TextDocument_FoldingRange::Result 
         {
             std::vector<lsp::FoldingRange> result;
 
@@ -769,6 +769,33 @@ void GdShaderServer::registerHandlers() {
             su->unitMutex.unlock();
 
             return result;
+        }
+    );
+
+    // --- FEATURE: INLAY HINTS ---
+    handler.add<lsp::requests::TextDocument_InlayHint>(
+        [this](lsp::requests::TextDocument_InlayHint::Params&& params) -> lsp::requests::TextDocument_InlayHint::Result
+        {
+            std::vector<lsp::InlayHint> hints;
+            
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            su->unitMutex.lock();
+            if (!su->ast || !su->symbols) 
+            {
+                su->unitMutex.unlock();
+                return hints;
+            }
+            // collectInlayHints(su->ast.get(), su->symbols.get(), params.range, hints);
+            su->unitMutex.unlock();
+
+            return hints;
         }
     );
 

@@ -1,0 +1,404 @@
+[
+    {
+        "name": "TIME",
+        "type": "float",
+        "doc": "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.",
+        "qualifier": "in"
+    },
+    {
+        "name": "PI",
+        "type": "float",
+        "doc": "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TAU",
+        "type": "float",
+        "doc": "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "E",
+        "type": "float",
+        "doc": "An E constant (2.718281). Euler's number and a base of the natural logarithm.",
+        "qualifier": "in"
+    },
+    {
+        "name": "OUTPUT_IS_SRGB",
+        "type": "bool",
+        "doc": "true when output is in sRGB color space (this is true in the Compatibility renderer, false in Forward+ and Mobile).",
+        "qualifier": "in"
+    },
+    {
+        "name": "CLIP_SPACE_FAR",
+        "type": "float",
+        "doc": "Clip space far z value. In the Forward+ or Mobile renderers, it's 0.0. In the Compatibility renderer, it's -1.0.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEWPORT_SIZE",
+        "type": "vec2",
+        "doc": "Size of viewport (in pixels).",
+        "qualifier": "in"
+    },
+    {
+        "name": "FRAGCOORD",
+        "type": "vec4",
+        "doc": "Coordinate of pixel center in screen space. xy specifies position in window. Origin is lower left. z specifies fragment depth. It is also used as the output value for the fragment depth unless DEPTH is written to.",
+        "qualifier": "in"
+    },
+    {
+        "name": "FRONT_FACING",
+        "type": "bool",
+        "doc": "true if current face is front facing, false otherwise.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEW",
+        "type": "vec3",
+        "doc": "Normalized vector from fragment position to camera (in view space). This is the same for both perspective and orthogonal cameras.",
+        "qualifier": "in"
+    },
+    {
+        "name": "UV",
+        "type": "vec2",
+        "doc": "UV that comes from the vertex() function.",
+        "qualifier": "in"
+    },
+    {
+        "name": "UV2",
+        "type": "vec2",
+        "doc": "UV2 that comes from the vertex() function.",
+        "qualifier": "in"
+    },
+    {
+        "name": "COLOR",
+        "type": "vec4",
+        "doc": "COLOR that comes from the vertex() function.",
+        "qualifier": "in"
+    },
+    {
+        "name": "POINT_COORD",
+        "type": "vec2",
+        "doc": "Point coordinate for drawing points with POINT_SIZE.",
+        "qualifier": "in"
+    },
+    {
+        "name": "MODEL_MATRIX",
+        "type": "mat4",
+        "doc": "Model/local space to world space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "MODEL_NORMAL_MATRIX",
+        "type": "mat3",
+        "doc": "Model/local space to world space transform for normals. This is the same as MODEL_MATRIX by default unless the object is scaled non-uniformly, in which case this is set to transpose(inverse(mat3(MODEL_MATRIX))).",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEW_MATRIX",
+        "type": "mat4",
+        "doc": "World space to view space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "INV_VIEW_MATRIX",
+        "type": "mat4",
+        "doc": "View space to world space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "PROJECTION_MATRIX",
+        "type": "mat4",
+        "doc": "View space to clip space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "INV_PROJECTION_MATRIX",
+        "type": "mat4",
+        "doc": "Clip space to view space transform.",
+        "qualifier": "in"
+    },
+    {
+        "name": "NODE_POSITION_WORLD",
+        "type": "vec3",
+        "doc": "Node position, in world space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "NODE_POSITION_VIEW",
+        "type": "vec3",
+        "doc": "Node position, in view space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CAMERA_POSITION_WORLD",
+        "type": "vec3",
+        "doc": "Camera position, in world space. Represents the midpoint of the two eyes when in multiview/stereo rendering.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CAMERA_DIRECTION_WORLD",
+        "type": "vec3",
+        "doc": "Camera direction, in world space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "CAMERA_VISIBLE_LAYERS",
+        "type": "uint",
+        "doc": "Cull layers of the camera rendering the current pass.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VERTEX",
+        "type": "vec3",
+        "doc": "Position of the fragment (pixel), in view space. It is the VERTEX value from vertex() interpolated between the face's vertices and transformed into view space. If skip_vertex_transform is enabled, it may not be in view space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "LIGHT_VERTEX",
+        "type": "vec3",
+        "doc": "A writable version of VERTEX that can be used to alter light and shadows. Writing to this will not change the position of the fragment.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "VIEW_INDEX",
+        "type": "int",
+        "doc": "The view that we are rendering. Used to distinguish between views in multiview/stereo rendering. VIEW_MONO_LEFT (0) for Mono (not multiview) or left eye, VIEW_RIGHT (1) for right eye.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEW_MONO_LEFT",
+        "type": "int",
+        "doc": "Constant for Mono or left eye, always 0.",
+        "qualifier": "in"
+    },
+    {
+        "name": "VIEW_RIGHT",
+        "type": "int",
+        "doc": "Constant for right eye, always 1.",
+        "qualifier": "in"
+    },
+    {
+        "name": "EYE_OFFSET",
+        "type": "vec3",
+        "doc": "Position offset for the eye being rendered, in view space. Only applicable for multiview rendering.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SCREEN_TEXTURE",
+        "type": "sampler2D",
+        "doc": "Removed in Godot 4. Use a sampler2D with hint_screen_texture instead.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SCREEN_UV",
+        "type": "vec2",
+        "doc": "Screen UV coordinate for current pixel.",
+        "qualifier": "in"
+    },
+    {
+        "name": "DEPTH_TEXTURE",
+        "type": "sampler2D",
+        "doc": "Removed in Godot 4. Use a sampler2D with hint_depth_texture instead.",
+        "qualifier": "in"
+    },
+    {
+        "name": "DEPTH",
+        "type": "float",
+        "doc": "Custom depth value (range of [0.0, 1.0]). If DEPTH is being written to in any shader branch, then you are responsible for setting the DEPTH for all other branches. Otherwise, the graphics API will leave them uninitialized.",
+        "qualifier": "out"
+    },
+    {
+        "name": "NORMAL",
+        "type": "vec3",
+        "doc": "Normal that comes from the vertex() function, in view space. If skip_vertex_transform is enabled, it may not be in view space.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "TANGENT",
+        "type": "vec3",
+        "doc": "Tangent that comes from the vertex() function, in view space. If skip_vertex_transform is enabled, it may not be in view space.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "BINORMAL",
+        "type": "vec3",
+        "doc": "Binormal that comes from the vertex() function, in view space. If skip_vertex_transform is enabled, it may not be in view space.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "NORMAL_MAP",
+        "type": "vec3",
+        "doc": "Set normal here if reading normal from a texture instead of NORMAL.",
+        "qualifier": "out"
+    },
+    {
+        "name": "NORMAL_MAP_DEPTH",
+        "type": "float",
+        "doc": "Depth from NORMAL_MAP. Defaults to 1.0.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ALBEDO",
+        "type": "vec3",
+        "doc": "Albedo (default white). Base color.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ALPHA",
+        "type": "float",
+        "doc": "Alpha (range of [0.0, 1.0]). If read from or written to, the material will go to the transparent pipeline.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ALPHA_SCISSOR_THRESHOLD",
+        "type": "float",
+        "doc": "If written to, values below a certain amount of alpha are discarded.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ALPHA_HASH_SCALE",
+        "type": "float",
+        "doc": "Alpha hash scale when using the alpha hash transparency mode. Defaults to 1.0. Higher values result in more visible pixels in the dithering pattern.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ALPHA_ANTIALIASING_EDGE",
+        "type": "float",
+        "doc": "The threshold below which alpha to coverage antialiasing should be used. Defaults to 0.0. Requires the alpha_to_coverage render mode. Should be set to a value lower than ALPHA_SCISSOR_THRESHOLD to be effective.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ALPHA_TEXTURE_COORDINATE",
+        "type": "vec2",
+        "doc": "The texture coordinate to use for alpha-to-coverge antialiasing. Requires the alpha_to_coverage render mode. Typically set to UV * vec2(albedo_texture_size) where albedo_texture_size is the size of the albedo texture in pixels.",
+        "qualifier": "out"
+    },
+    {
+        "name": "PREMUL_ALPHA_FACTOR",
+        "type": "float",
+        "doc": "Premultiplied alpha factor. Only effective if render_mode blend_premul_alpha; is used. This should be written to when using a shaded material with premultiplied alpha blending for interaction with lighting. This is not required for unshaded materials.",
+        "qualifier": "out"
+    },
+    {
+        "name": "METALLIC",
+        "type": "float",
+        "doc": "Metallic (range of [0.0, 1.0]).",
+        "qualifier": "out"
+    },
+    {
+        "name": "SPECULAR",
+        "type": "float",
+        "doc": "Specular (not physically accurate to change). Defaults to 0.5. 0.0 disables reflections.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ROUGHNESS",
+        "type": "float",
+        "doc": "Roughness (range of [0.0, 1.0]).",
+        "qualifier": "out"
+    },
+    {
+        "name": "RIM",
+        "type": "float",
+        "doc": "Rim (range of [0.0, 1.0]). If used, Godot calculates rim lighting. Rim size depends on ROUGHNESS.",
+        "qualifier": "out"
+    },
+    {
+        "name": "RIM_TINT",
+        "type": "float",
+        "doc": "Rim Tint, range of 0.0 (white) to 1.0 (albedo). If used, Godot calculates rim lighting.",
+        "qualifier": "out"
+    },
+    {
+        "name": "CLEARCOAT",
+        "type": "float",
+        "doc": "Small specular blob added on top of the existing one. If used, Godot calculates clearcoat.",
+        "qualifier": "out"
+    },
+    {
+        "name": "CLEARCOAT_GLOSS",
+        "type": "float",
+        "doc": "Gloss of clearcoat. If used, Godot calculates clearcoat.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ANISOTROPY",
+        "type": "float",
+        "doc": "For distorting the specular blob according to tangent space.",
+        "qualifier": "out"
+    },
+    {
+        "name": "ANISOTROPY_FLOW",
+        "type": "vec2",
+        "doc": "Distortion direction, use with flowmaps.",
+        "qualifier": "out"
+    },
+    {
+        "name": "SSS_STRENGTH",
+        "type": "float",
+        "doc": "Strength of subsurface scattering. If used, subsurface scattering will be applied to the object.",
+        "qualifier": "out"
+    },
+    {
+        "name": "SSS_TRANSMITTANCE_COLOR",
+        "type": "vec4",
+        "doc": "Color of subsurface scattering transmittance. If used, subsurface scattering transmittance will be applied to the object.",
+        "qualifier": "out"
+    },
+    {
+        "name": "SSS_TRANSMITTANCE_DEPTH",
+        "type": "float",
+        "doc": "Depth of subsurface scattering transmittance. Higher values allow the effect to reach deeper into the object.",
+        "qualifier": "out"
+    },
+    {
+        "name": "SSS_TRANSMITTANCE_BOOST",
+        "type": "float",
+        "doc": "Boosts the subsurface scattering transmittance if set above 0.0. This makes the effect show up even on directly lit surfaces",
+        "qualifier": "out"
+    },
+    {
+        "name": "BACKLIGHT",
+        "type": "vec3",
+        "doc": "Color of backlighting (works like direct light, but it's received even if the normal is slightly facing away from the light). If used, backlighting will be applied to the object. Can be used as a cheaper approximation of subsurface scattering.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "AO",
+        "type": "float",
+        "doc": "Strength of ambient occlusion. For use with pre-baked AO.",
+        "qualifier": "out"
+    },
+    {
+        "name": "AO_LIGHT_AFFECT",
+        "type": "float",
+        "doc": "How much ambient occlusion affects direct light (range of [0.0, 1.0], default 0.0).",
+        "qualifier": "out"
+    },
+    {
+        "name": "EMISSION",
+        "type": "vec3",
+        "doc": "Emission color (can go over (1.0, 1.0, 1.0) for HDR).",
+        "qualifier": "out"
+    },
+    {
+        "name": "FOG",
+        "type": "vec4",
+        "doc": "If written to, blends final pixel color with FOG.rgb based on FOG.a.",
+        "qualifier": "out"
+    },
+    {
+        "name": "RADIANCE",
+        "type": "vec4",
+        "doc": "If written to, blends environment map radiance with RADIANCE.rgb based on RADIANCE.a.",
+        "qualifier": "out"
+    },
+    {
+        "name": "IRRADIANCE",
+        "type": "vec4",
+        "doc": "If written to, blends environment map irradiance with IRRADIANCE.rgb based on IRRADIANCE.a.",
+        "qualifier": "out"
+    }
+]

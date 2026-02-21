@@ -1541,7 +1541,7 @@ void SemanticAnalyzer::registerGlobalFunctions()
         symbols.add(s);
     };
 
-    for (const auto& func : GLOBAL_FUNCTIONS) {
+    for (const auto& func : gdshader_lsp::generated::GLOBAL_FUNCTIONS) {
         
         bool isVectorGeneric = false;
         bool isSamplerGeneric = false;

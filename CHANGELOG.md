@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Features
+
+  - Seperation of data and LSP: The builtin functions and similar are now seperated into JSON files that make maintainence simpler and efficient
+    - The JSON files are baked into the binary for simpler deployment as c++ auto-generated header files using Scons
+
+  - Inlay hints are now possible
+
 - More cases to the test suite
   - Testing for incremental change events and updates
 

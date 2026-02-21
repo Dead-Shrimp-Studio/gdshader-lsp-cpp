@@ -1,0 +1,146 @@
+[
+    {
+        "name": "TIME",
+        "type": "float",
+        "doc": "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.",
+        "qualifier": "in"
+    },
+    {
+        "name": "PI",
+        "type": "float",
+        "doc": "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TAU",
+        "type": "float",
+        "doc": "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "E",
+        "type": "float",
+        "doc": "An E constant (2.718281). Euler's number and a base of the natural logarithm.",
+        "qualifier": "in"
+    },
+    {
+        "name": "FRAGCOORD",
+        "type": "vec4",
+        "doc": "Coordinate of pixel center. In screen space. xy specifies position in viewport. Upper-left of the viewport is the origin, (0.0, 0.0).",
+        "qualifier": "in"
+    },
+    {
+        "name": "SCREEN_PIXEL_SIZE",
+        "type": "vec2",
+        "doc": "Size of individual pixels. Equal to inverse of resolution.",
+        "qualifier": "in"
+    },
+    {
+        "name": "REGION_RECT",
+        "type": "vec4",
+        "doc": "Visible area of the sprite region in format(x, y, width, height). Varies according to Sprite2D's region_enabled property.",
+        "qualifier": "in"
+    },
+    {
+        "name": "POINT_COORD",
+        "type": "vec2",
+        "doc": "Coordinate for drawing points.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TEXTURE",
+        "type": "sampler2D",
+        "doc": "Default 2D texture.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TEXTURE_PIXEL_SIZE",
+        "type": "vec2",
+        "doc": "Normalized pixel size of default 2D texture. For a Sprite2D with a texture of size 64x32px, TEXTURE_PIXEL_SIZE = vec2(1/64, 1/32)",
+        "qualifier": "in"
+    },
+    {
+        "name": "AT_LIGHT_PASS",
+        "type": "bool",
+        "doc": "Always false.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SPECULAR_SHININESS_TEXTURE",
+        "type": "sampler2D",
+        "doc": "Specular shininess texture of this object.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SPECULAR_SHININESS",
+        "type": "vec4",
+        "doc": "Specular shininess color, as sampled from the texture.",
+        "qualifier": "in"
+    },
+    {
+        "name": "UV",
+        "type": "vec2",
+        "doc": "UV from the vertex() function. For Sprite2D with region enabled, this will sample the entire texture. Use REGION_RECT instead to sample only the region defined in the Sprite2D's properties.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SCREEN_UV",
+        "type": "vec2",
+        "doc": "Screen UV coordinate for current pixel.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SCREEN_TEXTURE",
+        "type": "sampler2D",
+        "doc": "Removed in Godot 4. Use a sampler2D with hint_screen_texture instead.",
+        "qualifier": "in"
+    },
+    {
+        "name": "NORMAL",
+        "type": "vec3",
+        "doc": "Normal read from NORMAL_TEXTURE. Writable.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "NORMAL_TEXTURE",
+        "type": "sampler2D",
+        "doc": "Default 2D normal texture.",
+        "qualifier": "in"
+    },
+    {
+        "name": "NORMAL_MAP",
+        "type": "vec3",
+        "doc": "Configures normal maps meant for 3D for use in 2D. If used, overrides NORMAL.",
+        "qualifier": "out"
+    },
+    {
+        "name": "NORMAL_MAP_DEPTH",
+        "type": "float",
+        "doc": "Normal map depth for scaling.",
+        "qualifier": "out"
+    },
+    {
+        "name": "VERTEX",
+        "type": "vec2",
+        "doc": "Pixel position in screen space.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "SHADOW_VERTEX",
+        "type": "vec2",
+        "doc": "Same as VERTEX but can be written to alter shadows.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "LIGHT_VERTEX",
+        "type": "vec3",
+        "doc": "Same as VERTEX but can be written to alter lighting. Z component represents height.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "COLOR",
+        "type": "vec4",
+        "doc": "COLOR from the vertex() function multiplied by the TEXTURE color. Also output color value.",
+        "qualifier": "inout"
+    }
+]

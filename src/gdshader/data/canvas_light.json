@@ -1,0 +1,128 @@
+[
+    {
+        "name": "TIME",
+        "type": "float",
+        "doc": "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.",
+        "qualifier": "in"
+    },
+    {
+        "name": "PI",
+        "type": "float",
+        "doc": "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TAU",
+        "type": "float",
+        "doc": "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.",
+        "qualifier": "in"
+    },
+    {
+        "name": "E",
+        "type": "float",
+        "doc": "An E constant (2.718281). Euler's number and a base of the natural logarithm.",
+        "qualifier": "in"
+    },
+    {
+        "name": "FRAGCOORD",
+        "type": "vec4",
+        "doc": "Coordinate of pixel center. In screen space. xy specifies position in viewport. Upper-left of the viewport is the origin, (0.0, 0.0).",
+        "qualifier": "in"
+    },
+    {
+        "name": "NORMAL",
+        "type": "vec3",
+        "doc": "Input normal.",
+        "qualifier": "in"
+    },
+    {
+        "name": "COLOR",
+        "type": "vec4",
+        "doc": "Input color. This is the output of the fragment() function.",
+        "qualifier": "in"
+    },
+    {
+        "name": "UV",
+        "type": "vec2",
+        "doc": "UV from the vertex() function, equivalent to the UV in the fragment() function.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TEXTURE",
+        "type": "sampler2D",
+        "doc": "Current texture in use for CanvasItem.",
+        "qualifier": "in"
+    },
+    {
+        "name": "TEXTURE_PIXEL_SIZE",
+        "type": "vec2",
+        "doc": "Normalized pixel size of TEXTURE. For a Sprite2D with a TEXTURE of size 64x32 pixels, TEXTURE_PIXEL_SIZE = vec2(1/64, 1/32)",
+        "qualifier": "in"
+    },
+    {
+        "name": "SCREEN_UV",
+        "type": "vec2",
+        "doc": "Screen UV coordinate for current pixel.",
+        "qualifier": "in"
+    },
+    {
+        "name": "POINT_COORD",
+        "type": "vec2",
+        "doc": "UV for Point Sprite.",
+        "qualifier": "in"
+    },
+    {
+        "name": "LIGHT_COLOR",
+        "type": "vec4",
+        "doc": "Color of the Light2D. If the light is a PointLight2D, multiplied by the light's texture.",
+        "qualifier": "in"
+    },
+    {
+        "name": "LIGHT_ENERGY",
+        "type": "float",
+        "doc": "Energy multiplier of the Light2D.",
+        "qualifier": "in"
+    },
+    {
+        "name": "LIGHT_POSITION",
+        "type": "vec3",
+        "doc": "Position of the Light2D in screen space. If using a DirectionalLight2D this is always (0.0, 0.0, 0.0).",
+        "qualifier": "in"
+    },
+    {
+        "name": "LIGHT_DIRECTION",
+        "type": "vec3",
+        "doc": "Direction of the Light2D in screen space.",
+        "qualifier": "in"
+    },
+    {
+        "name": "LIGHT_IS_DIRECTIONAL",
+        "type": "bool",
+        "doc": "true if this pass is a DirectionalLight2D.",
+        "qualifier": "in"
+    },
+    {
+        "name": "LIGHT_VERTEX",
+        "type": "vec3",
+        "doc": "Pixel position, in screen space as modified in the fragment() function.",
+        "qualifier": "in"
+    },
+    {
+        "name": "LIGHT",
+        "type": "vec4",
+        "doc": "Output color for this Light2D.",
+        "qualifier": "inout"
+    },
+    {
+        "name": "SPECULAR_SHININESS",
+        "type": "vec4",
+        "doc": "Specular shininess, as set in the object's texture.",
+        "qualifier": "in"
+    },
+    {
+        "name": "SHADOW_MODULATE",
+        "type": "vec4",
+        "doc": "Multiply shadows cast at this point by this color.",
+        "qualifier": "out"
+    }
+]
