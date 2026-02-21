@@ -6,18 +6,19 @@
 #include "gdshader/semantics/symbol_table.hpp"
 #include "gdshader/semantics/type_registry.hpp"
 
-#include <iostream>
-#include <thread>
-#include <memory>
-#include <vector>
-#include <unordered_map>
-
 #include <lsp/io/socket.h>
 #include <lsp/connection.h>
 
 #include <lsp/messagehandler.h>
 #include <lsp/messages.h>
 #include <lsp/types.h>
+
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <memory>
+#include <vector>
+#include <unordered_map>
 
 namespace gdshader_lsp {
 
@@ -38,6 +39,19 @@ class GdShaderServer {
 
 private:
 
+    // Threading
+
+    std::atomic<bool> running{true};
+    std::thread compilerThread;
+    std::mutex debounceMutex;
+    
+    // Maps a file URI to the exact time it was last modified
+    std::unordered_map<std::string, std::chrono::steady_clock::time_point> dirtyFiles;
+
+    void compilerLoop();
+
+    // LSP
+
     lsp::io::Socket socket;
     lsp::Connection connection;
     lsp::MessageHandler handler;
@@ -47,6 +61,7 @@ private:
 
     // Helper
 
+    size_t positionToOffset(const std::string& text, int line, int character);
     void collectFoldingRanges(const ASTNode* node, std::vector<lsp::FoldingRange>& ranges);
     std::pair<std::string, int> getFunctionCallContext(const std::string& source, int line, int col);
     std::string getWordAtPosition(const std::string& source, int line, int col);

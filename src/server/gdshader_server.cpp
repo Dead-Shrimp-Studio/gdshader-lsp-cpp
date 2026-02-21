@@ -14,10 +14,16 @@ using namespace gdshader_lsp;
 GdShaderServer::GdShaderServer(lsp::io::Socket s) : socket(std::move(s)), connection(socket), handler(connection)
 {
     registerHandlers();
+    compilerThread = std::thread(&GdShaderServer::compilerLoop, this);
 }
 
 GdShaderServer::~GdShaderServer()
 {
+    running = false;
+    if (compilerThread.joinable())
+    {
+        compilerThread.join();
+    }
 }
 
 void GdShaderServer::run() 
@@ -54,7 +60,7 @@ void GdShaderServer::registerHandlers() {
             // Text Document Sync
             lsp::TextDocumentSyncOptions syncOps;
             syncOps.openClose = true;
-            syncOps.change = lsp::TextDocumentSyncKind::Full;
+            syncOps.change = lsp::TextDocumentSyncKind::Incremental;
             caps.textDocumentSync = syncOps;
 
             // Completion
@@ -88,8 +94,26 @@ void GdShaderServer::registerHandlers() {
 
     // --- SYNCHRONIZATION: DID OPEN ---
     handler.add<lsp::notifications::TextDocument_DidOpen>(
-        [this](lsp::notifications::TextDocument_DidOpen::Params&& params) {
-            compileAndPublish(params.textDocument.uri, params.textDocument.text);
+        [this](lsp::notifications::TextDocument_DidOpen::Params&& params) 
+        {
+            auto uri = params.textDocument.uri;
+            std::string path = std::string(uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            SPDLOG_DEBUG("Opening file at path '{}'", path.c_str());
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            su->unitMutex.lock();
+            pm->updateFile(path, params.textDocument.text);
+            su->unitMutex.unlock();
+            {
+                std::lock_guard<std::mutex> lock(debounceMutex);
+                dirtyFiles[path] = std::chrono::steady_clock::now();
+            }
         }
     );
 
@@ -97,16 +121,49 @@ void GdShaderServer::registerHandlers() {
     handler.add<lsp::notifications::TextDocument_DidChange>(
         [this](lsp::notifications::TextDocument_DidChange::Params&& params) {
             
-            // Safety check: The vector should strictly have 1 element in Full Sync,
-            // but it is good practice to check.
-            if (params.contentChanges.empty() || params.contentChanges.size() > 1) return;
+            if (params.contentChanges.empty()) return;
 
             auto uri = params.textDocument.uri;
-            const auto& changeEvent = params.contentChanges.back();
+            std::string path = std::string(uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
 
-            std::visit([this, &uri](auto&& change) {
-                compileAndPublish(uri, change.text);
-            }, changeEvent);
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            su->unitMutex.lock();
+            std::string currentText = su->source_code;
+
+            for (const auto& changeEvent : params.contentChanges) {
+            
+                std::visit([this, &currentText](auto&& change) {
+                    using T = std::decay_t<decltype(change)>;
+                    
+                    if constexpr (std::is_same_v<T, lsp::TextDocumentContentChangeEvent_Range_Text>) {
+                        
+                        size_t startOff = positionToOffset(currentText, change.range.start.line, change.range.start.character);
+                        size_t endOff   = positionToOffset(currentText, change.range.end.line, change.range.end.character);
+                        
+                        if (startOff <= currentText.length() && endOff <= currentText.length() && startOff <= endOff) {
+                            currentText.replace(startOff, endOff - startOff, change.text);
+                            SPDLOG_DEBUG("Current text in content change: {}", currentText.c_str());
+                        }
+                    } 
+                    // Full doc sync fallback
+                    else if constexpr (std::is_same_v<T, lsp::TextDocumentContentChangeEvent_Text>) {
+                        currentText = change.text;
+                    }
+                    
+                }, changeEvent);
+            }
+
+            pm->updateFile(path, currentText);
+            su->unitMutex.unlock();
+            {
+                std::lock_guard<std::mutex> lock(debounceMutex);
+                dirtyFiles[path] = std::chrono::steady_clock::now();
+            }
         }
     );
 
@@ -130,7 +187,11 @@ void GdShaderServer::registerHandlers() {
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
 
-            if (!su->symbols) return hover;
+            su->unitMutex.lock();
+            if (!su->symbols) {
+                su->unitMutex.unlock();
+                return hover;                
+            }
 
             int line = params.position.line;
             int col = params.position.character;
@@ -193,6 +254,7 @@ void GdShaderServer::registerHandlers() {
                     };
                 }
             }
+            su->unitMutex.unlock();
             return hover;
         }
     );
@@ -212,7 +274,11 @@ void GdShaderServer::registerHandlers() {
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
 
-            if (!su->symbols) return result;
+            su->unitMutex.lock();
+            if (!su->symbols) {
+                su->unitMutex.unlock();
+                return result;                
+            }
 
             int line = params.position.line;
             int col = params.position.character;
@@ -305,6 +371,7 @@ void GdShaderServer::registerHandlers() {
                 result.items.push_back(item);
             }
 
+            su->unitMutex.unlock();
             return result;
         }
     );
@@ -322,7 +389,12 @@ void GdShaderServer::registerHandlers() {
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
 
-            if (!su->symbols) return loc;
+            su->unitMutex.lock();
+            if (!su->symbols) {
+                su->unitMutex.unlock();
+                return loc;                
+            }
+
             int line = params.position.line;
             int col = params.position.character;
 
@@ -345,6 +417,7 @@ void GdShaderServer::registerHandlers() {
                 return loc;
             }
 
+            su->unitMutex.unlock();
             return nullptr;
         }
     );
@@ -362,7 +435,11 @@ void GdShaderServer::registerHandlers() {
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
 
-            if (!su->symbols) return help;
+            su->unitMutex.lock();
+            if (!su->symbols) {
+                su->unitMutex.unlock();
+                return help;                
+            }
 
             int line = params.position.line;
             int col = params.position.character;
@@ -434,6 +511,7 @@ void GdShaderServer::registerHandlers() {
                 help.signatures.push_back(sigInfo);
             }
 
+            su->unitMutex.unlock();
             return help;
         }
     );
@@ -450,10 +528,16 @@ void GdShaderServer::registerHandlers() {
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
 
-            if (!su->symbols) return nullptr;
+            su->unitMutex.lock();
+            if (!su->symbols) {
+                su->unitMutex.unlock();
+                return nullptr;                
+            }
             
             // Generate symbol tree from the AST
-            return getDocumentSymbols(su->ast.get());
+            std::vector<lsp::DocumentSymbol> symbols = getDocumentSymbols(su->ast.get());
+            su->unitMutex.unlock();
+            return symbols;
         }
     );
 
@@ -469,9 +553,15 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
-            if (su->tokens.empty()) return result;
+            
+            su->unitMutex.lock();
+            if (!su->tokens.empty()) {
+                su->unitMutex.unlock();
+                return result;                
+            }
 
             result.data = encodeTokens(su->tokens); 
+            su->unitMutex.unlock();
             return result;
         }
     );
@@ -488,7 +578,12 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
-            if (!su->symbols) return result;
+            
+            su->unitMutex.lock();
+            if (!su->symbols) {
+                su->unitMutex.unlock();
+                return result;                
+            }
 
             int line = params.position.line;
             int column = params.position.character;
@@ -521,6 +616,7 @@ void GdShaderServer::registerHandlers() {
                 }
             }
 
+            su->unitMutex.unlock();
             return result;
         }
     );
@@ -538,7 +634,12 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
-            if (!su->symbols) return result;
+            
+            su->unitMutex.lock();
+            if (!su->symbols) {
+                su->unitMutex.unlock();
+                return result;                
+            }
 
             int line = params.position.line; 
             int col = params.position.character;
@@ -584,6 +685,7 @@ void GdShaderServer::registerHandlers() {
                 };
             }
 
+            su->unitMutex.unlock();
             return result;
         }
     );
@@ -601,7 +703,12 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
-            if (!su->symbols) return result;
+
+            su->unitMutex.lock();
+            if (!su->symbols) {
+                su->unitMutex.unlock();
+                return result;                
+            }
 
             int line = params.position.line;
             int col = params.position.character;
@@ -635,6 +742,7 @@ void GdShaderServer::registerHandlers() {
                 }
             }
 
+            su->unitMutex.unlock();
             return result;
         }
     );
@@ -654,10 +762,11 @@ void GdShaderServer::registerHandlers() {
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
 
-            // Just walk the AST!
+            su->unitMutex.lock();
             if (su->ast) {
                 collectFoldingRanges(su->ast.get(), result);
             }
+            su->unitMutex.unlock();
 
             return result;
         }
@@ -694,10 +803,14 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
     if (ast) {
         auto result = analyzer.analyze(ast.get());
         
+        su->unitMutex.lock();
+
         su->ast = std::move(ast);
         su->symbols = std::make_shared<SymbolTable>(std::move(result.symbols));
         su->types   = std::move(result.types);
         su->tokens = result.tokens;
+
+        su->unitMutex.unlock();
 
         auto semanticErrors = result.diagnostics;
         errors.insert(errors.end(), semanticErrors.begin(), semanticErrors.end());
@@ -739,8 +852,62 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
 }
 
 //////////////////////////////////////////////////
+// Thread loop
+//////////////////////////////////////////////////
+
+void GdShaderServer::compilerLoop() 
+{
+    while (running) {
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        
+        std::vector<std::string> toCompile;
+        auto now = std::chrono::steady_clock::now();
+        
+        // Safely check which files have "settled" (no keystrokes for > 250ms)
+        {
+            std::lock_guard<std::mutex> lock(debounceMutex);
+            for (auto it = dirtyFiles.begin(); it != dirtyFiles.end(); ) 
+            {
+                if (now - it->second > std::chrono::milliseconds(250)) 
+                {
+                    toCompile.push_back(it->first);
+                    it = dirtyFiles.erase(it); // Remove from dirty list
+                } else {
+                    ++it;
+                }
+            }
+        }
+        
+        for (const auto& uri_str : toCompile) 
+        {
+            auto pm = ProjectManager::get_singleton();            
+            auto unit = pm->getUnit(uri_str);
+            SPDLOG_DEBUG("Compiling file at path '{}'.", uri_str.c_str());
+            compileAndPublish(lsp::DocumentUri::fromPath(uri_str), unit->source_code);
+        }
+    }
+}
+
+//////////////////////////////////////////////////
 // Helper
 //////////////////////////////////////////////////
+
+size_t gdshader_lsp::GdShaderServer::positionToOffset(const std::string& text, int line, int character) 
+{
+    size_t offset = 0;
+    int currentLine = 0;
+
+    while (offset < text.length() && currentLine < line) {
+        if (text[offset] == '\n') {
+            currentLine++;
+        }
+        offset++;
+    }
+    offset += character;
+    
+    return std::min(offset, text.length()); // Clamp just in case
+}
 
 void gdshader_lsp::GdShaderServer::collectFoldingRanges(const ASTNode* node, std::vector<lsp::FoldingRange>& ranges) 
 {

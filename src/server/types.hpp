@@ -11,6 +11,7 @@
 #include <vector>
 #include <unordered_set>
 #include <memory>
+#include <mutex>
 
 namespace gdshader_lsp
 {
@@ -34,6 +35,9 @@ struct ShaderUnit {
 
     std::vector<Diagnostic> diagnostics;
     std::vector<RawToken> tokens;
+
+    // Snychronization primitive for locking the ast and symbols
+    std::mutex unitMutex;
 };
 
 } // namespace gdshader_lsp
