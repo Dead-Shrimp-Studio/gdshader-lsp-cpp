@@ -55,7 +55,7 @@ env.Append(LIBPATH=[lsp_lib_path])
 if build_target == 'release':
     env.Append(LIBS=['lsp'])
 else:
-    env.Append(LIBS=['lspd'])
+    env.Append(LIBS=['lsp'])
 
 # -------------------------------------------------------------------------
 # COMPILER CONFIGURATION
