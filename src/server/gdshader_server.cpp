@@ -405,15 +405,15 @@ void GdShaderServer::registerHandlers() {
             const Symbol* sym = su->symbols->lookupAt(word, line);
 
             // If found and it's not a built-in (line -1)
-            if (sym && sym->line >= 0) {
+            if (sym && sym->definition.startLine >= 0) {
                 loc.uri = params.textDocument.uri;
 
-                int lspLine = (sym->line > 0) ? sym->line - 1 : 0;
+                int lspLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
                 
                 loc.range.start.line = lspLine;
                 loc.range.start.character = 0; // TODO: Store column in Symbol
-                loc.range.start = lsp::Position{(unsigned)sym->line + 1, (unsigned)sym->column};
-                loc.range.end   = lsp::Position{(unsigned)sym->line + 1, (unsigned)sym->column + (unsigned)sym->name.length()};
+                loc.range.start = lsp::Position{(unsigned)sym->definition.startLine + 1, (unsigned)sym->definition.startCol};
+                loc.range.end   = lsp::Position{(unsigned)sym->definition.endLine + 1, (unsigned)sym->definition.endCol};
                 
                 return loc;
             }
@@ -596,21 +596,21 @@ void GdShaderServer::registerHandlers() {
 
             if (sym) {
 
-                if (sym->line >= 0) {
+                if (sym->definition.startLine >= 0) {
                     result.push_back(lsp::DocumentHighlight{
                         .range = lsp::Range{
-                            .start = { (unsigned)sym->line, (unsigned)sym->column },
-                            .end   = { (unsigned)sym->line, (unsigned)(sym->column + sym->name.length()) }
+                            .start = { (unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol },
+                            .end   = { (unsigned)sym->definition.endLine, (unsigned)(sym->definition.endCol) }
                         },
                         .kind = lsp::DocumentHighlightKind::Text
                     });
                 }
 
-                for (const auto& usage : sym->usages) {
+                for (const auto& usage : sym->references) {
                     result.push_back(lsp::DocumentHighlight{
                         .range = lsp::Range{
-                            .start = { (unsigned)usage.line, (unsigned)usage.column },
-                            .end   = { (unsigned)usage.line, (unsigned)(usage.column + sym->name.length()) }
+                            .start = { (unsigned)usage.startLine, (unsigned)usage.startCol },
+                            .end   = { (unsigned)usage.endLine, (unsigned)(usage.endCol) }
                         },
                         .kind = lsp::DocumentHighlightKind::Read
                     });
@@ -660,22 +660,22 @@ void GdShaderServer::registerHandlers() {
                 std::vector<lsp::TextEdit> edits;
 
                 // 1. Rename the Definition (if in this file)
-                if (sym->line >= 0) {
+                if (sym->definition.startLine >= 0) {
                     edits.push_back(lsp::TextEdit{
                         .range = lsp::Range{
-                            .start = { (unsigned)sym->line, (unsigned)sym->column },
-                            .end   = { (unsigned)sym->line, (unsigned)(sym->column + sym->name.length()) }
+                            .start = { (unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol },
+                            .end   = { (unsigned)sym->definition.endLine, (unsigned)(sym->definition.endCol) }
                         },
                         .newText = params.newName
                     });
                 }
 
                 // 2. Rename all Usages
-                for (const auto& usage : sym->usages) {
+                for (const auto& usage : sym->references) {
                     edits.push_back(lsp::TextEdit{
                         .range = lsp::Range{
-                            .start = { (unsigned)usage.line, (unsigned)usage.column },
-                            .end   = { (unsigned)usage.line, (unsigned)(usage.column + sym->name.length()) }
+                            .start = { (unsigned)usage.startLine, (unsigned)usage.startCol },
+                            .end   = { (unsigned)usage.endLine, (unsigned)(usage.endCol) }
                         },
                         .newText = params.newName
                     });
@@ -721,23 +721,23 @@ void GdShaderServer::registerHandlers() {
 
             if (sym) {
                 // 1. Add Definition (if requested context includes it)
-                if (params.context.includeDeclaration && sym->line >= 0) {
+                if (params.context.includeDeclaration && sym->definition.startLine >= 0) {
                     result.push_back(lsp::Location{
                         .uri = params.textDocument.uri,
                         .range = lsp::Range{
-                            .start = { (unsigned)sym->line, (unsigned)sym->column },
-                            .end   = { (unsigned)sym->line, (unsigned)(sym->column + sym->name.length()) }
+                            .start = { (unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol },
+                            .end   = { (unsigned)sym->definition.endLine, (unsigned)(sym->definition.endCol) }
                         }
                     });
                 }
 
                 // 2. Add Usages
-                for (const auto& usage : sym->usages) {
+                for (const auto& usage : sym->references) {
                     result.push_back(lsp::Location{
                         .uri = params.textDocument.uri, // Currently current-file only
                         .range = lsp::Range{
-                            .start = { (unsigned)usage.line, (unsigned)usage.column },
-                            .end   = { (unsigned)usage.line, (unsigned)(usage.column + sym->name.length()) }
+                            .start = { (unsigned)usage.startLine, (unsigned)usage.startCol },
+                            .end   = { (unsigned)usage.endLine, (unsigned)(usage.endCol) }
                         }
                     });
                 }
@@ -849,8 +849,6 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
     std::vector<lsp::Diagnostic> lspDiagnostics;
     for (const auto& err : errors) {
 
-        int len = (err.length > 0) ? err.length : 1;
-
         lsp::DiagnosticSeverity severity;
         if (err.level == DiagnosticLevel::Warning) {
             severity = lsp::DiagnosticSeverity::Warning;
@@ -860,8 +858,8 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
 
         lspDiagnostics.push_back(lsp::Diagnostic{
             .range = lsp::Range{
-                .start = lsp::Position{(unsigned)err.line, (unsigned)err.column},
-                .end   = lsp::Position{(unsigned)err.line, (unsigned)(err.column + len)}
+                .start = lsp::Position{(unsigned)err.range.startLine, (unsigned)err.range.startCol},
+                .end   = lsp::Position{(unsigned)err.range.endLine, (unsigned)(err.range.endCol)}
             },
             .message = err.message,
             .severity = severity,
