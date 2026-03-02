@@ -71,7 +71,7 @@ void Parser::reportErrorAt(const Token& token, const std::string& message)
     panicMode = true;
     
     SPDLOG_ERROR("Parse Error at {}:{}: {}", token.line, token.column, message);
-    diagnostics.push_back({token.line, token.column, message});
+    diagnostics.push_back({message, DiagnosticLevel::Error, {token.line, token.column, token.length, token.column}});
 }
 
 void Parser::synchronize() 
@@ -563,7 +563,7 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl()
     std::unique_ptr<TypeNode> typeNode = parseType();
 
     std::string name;
-    SourceRange nameRange;
+    Range nameRange;
 
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         name = current_token.value;
@@ -654,7 +654,7 @@ std::unique_ptr<FunctionNode> Parser::parseFunction(std::unique_ptr<TypeNode> re
 
     if (check(TokenType::TOKEN_LBRACE)) {
         node->body = parseBlock();
-        node->is_definition = true;
+        node->is_function_definition = true;
     } else {
         consume(TokenType::TOKEN_SEMI, "Expected body or ';'");
     }
@@ -1133,7 +1133,8 @@ std::unique_ptr<ExpressionNode> Parser::parseCallOrAccess()
             callNode->range.startLine = expr->range.startLine;
             callNode->range.startCol  = expr->range.startCol;
             
-            if (auto id = dynamic_cast<IdentifierNode*>(expr.get())) {
+            if (auto id = dynamic_cast<IdentifierNode*>(expr.get())) 
+            {
                 callNode->functionName = id->name;
                 callNode->nameRange = id->range;
             } else {

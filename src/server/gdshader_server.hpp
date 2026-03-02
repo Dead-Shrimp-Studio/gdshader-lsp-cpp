@@ -2,7 +2,7 @@
 #ifndef GDSHADER_SERVER_HPP 
 #define GDSHADER_SERVER_HPP
 
-#include "gdshader/parser/parser.hpp" // parser includes ast.h and lexer.h
+#include "gdshader/parser/parser.hpp"
 #include "gdshader/semantics/symbol_table.hpp"
 #include "gdshader/semantics/type_registry.hpp"
 

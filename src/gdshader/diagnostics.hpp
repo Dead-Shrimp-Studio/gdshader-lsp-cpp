@@ -6,20 +6,27 @@
 
 namespace gdshader_lsp
 {
-    
-enum class DiagnosticLevel {
+
+struct Range 
+{
+    int startLine = 0;
+    int startCol = 0;
+    int endLine = 0;
+    int endCol = 0;
+};
+
+enum class DiagnosticLevel 
+{
     Error,
     Warning
 };
 
 struct Diagnostic 
 {
-    int line;
-    int column;
     std::string message;
     DiagnosticLevel level = DiagnosticLevel::Error;
 
-    int length = 0;
+    Range range;
 };
 
 } // namespace gdshader_lsp

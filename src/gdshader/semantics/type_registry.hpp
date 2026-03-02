@@ -101,16 +101,50 @@ private:
         add("mat3", TypeKind::MATRIX, 3, vec3T);
         add("mat4", TypeKind::MATRIX, 4, vec4T);
 
+        // --- 2D Samplers ---
         add("sampler2D", TypeKind::SAMPLER);
         add("isampler2D", TypeKind::SAMPLER);
         add("usampler2D", TypeKind::SAMPLER);
 
+        // --- 3D Samplers ---
         add("sampler3D", TypeKind::SAMPLER);
         add("isampler3D", TypeKind::SAMPLER);
         add("usampler3D", TypeKind::SAMPLER);
 
+        // --- 2D Array Samplers ---
+        add("sampler2DArray", TypeKind::SAMPLER);
+        add("isampler2DArray", TypeKind::SAMPLER);
+        add("usampler2DArray", TypeKind::SAMPLER);
+
+        // --- Cube Samplers ---
         add("samplerCube", TypeKind::SAMPLER);
+        add("isamplerCube", TypeKind::SAMPLER);
+        add("usamplerCube", TypeKind::SAMPLER);
+
+        // --- Cube Array Samplers ---
         add("samplerCubeArray", TypeKind::SAMPLER);
+        add("isamplerCubeArray", TypeKind::SAMPLER);
+        add("usamplerCubeArray", TypeKind::SAMPLER);
+
+        // --- Buffer Samplers ---
+        add("samplerBuffer", TypeKind::SAMPLER);
+        add("isamplerBuffer", TypeKind::SAMPLER);
+        add("usamplerBuffer", TypeKind::SAMPLER);
+
+        // --- 2D Rect Samplers ---
+        add("sampler2DRect", TypeKind::SAMPLER);
+        add("isampler2DRect", TypeKind::SAMPLER);
+        add("usampler2DRect", TypeKind::SAMPLER);
+
+        // --- 2D Multi-Sample (MS) Samplers ---
+        add("sampler2DMS", TypeKind::SAMPLER);
+        add("isampler2DMS", TypeKind::SAMPLER);
+        add("usampler2DMS", TypeKind::SAMPLER);
+
+        // --- 2D Multi-Sample Array Samplers ---
+        add("sampler2DMSArray", TypeKind::SAMPLER);
+        add("isampler2DMSArray", TypeKind::SAMPLER);
+        add("usampler2DMSArray", TypeKind::SAMPLER);
     }
 
 public:

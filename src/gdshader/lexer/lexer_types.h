@@ -256,7 +256,8 @@ inline std::string tokenTypeToString(TokenType t) {
     return "UNKNOWN_TOKEN";
 }
 
-struct Token {
+struct Token 
+{
     TokenType type;
     std::string value;
 

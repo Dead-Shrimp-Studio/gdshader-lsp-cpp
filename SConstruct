@@ -146,8 +146,6 @@ for root, dirs, files in os.walk('src'):
             rel_path = os.path.relpath(os.path.join(root, file), 'src')
             sources.append(os.path.join('src', rel_path))
 
-sources.append(generated_nodes[1])
-
 if target_platform == 'macos':
     output_bin = os.path.join('bin', target_platform, f'{build_target}', f'gdshader_lsp_{build_target}_{target_platform}_{macos_arch}')
 else:

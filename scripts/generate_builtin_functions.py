@@ -61,21 +61,17 @@ def main():
                 ret_doc = ret.get("doc", "").replace('"', '\\"')
                 
                 args_cpp = []
-                deprecated_arg_types = []
                 
                 for arg in item.get("arguments", []):
                     a_name = arg.get("name", "")
                     a_type = arg.get("type", "")
                     a_doc = arg.get("doc", "").replace('"', '\\"')
-                    
                     args_cpp.append(f'{{"{a_name}", "{a_type}", "{a_doc}"}}')
-                    deprecated_arg_types.append(f'"{a_type}"')
                 
                 args_str = "{" + ", ".join(args_cpp) + "}"
-                dep_args_str = "{" + ", ".join(deprecated_arg_types) + "}"
-                
+
                 # Struct layout: name, returnProperties, args, doc, argTypes (dep), returnType (dep)
-                cpp_content.append(f'    {{"{name}", {{"{ret_type}", "{ret_doc}"}}, {args_str}, "{doc}", {dep_args_str}, "{ret_type}"}},')
+                cpp_content.append(f'    {{"{name}", {{"{ret_type}", "{ret_doc}"}}, {args_str}, "{doc}"}},')
                 
             else:
                 # --- PARSE VARIABLE ---

@@ -152,7 +152,7 @@ ERROR_CASES = [
             u_time = 10.0;
         }
         """,
-        "Cannot assign" # or "assign"
+        "Cannot assign"
     ),
     (
         "write_to_const",
@@ -163,7 +163,7 @@ ERROR_CASES = [
             PI = 3.14159;
         }
         """,
-        "constant" # or "read-only"
+        "read-only"
     ),
     (
         "opaque_type_construction",
@@ -216,7 +216,6 @@ ERROR_CASES = [
     (
         "missing_shader_type",
         """
-        # Missing shader_type at the top!
         void fragment() {
             ALBEDO = vec3(1.0);
         }

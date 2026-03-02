@@ -8,50 +8,10 @@
 #include <optional>
 
 #include "gdshader/semantics/types.hpp"
+#include "gdshader/semantics/symbol.hpp"
 
-namespace gdshader_lsp {
-
-enum class SymbolType 
+namespace gdshader_lsp 
 {
-    Variable,
-    Uniform,
-    Varying,
-    Function,
-    Struct,
-    Builtin
-};
-
-enum class Mutability {
-    Mutable,
-    ReadOnly,
-    WriteOnly
-};
-
-struct Symbol 
-{
-    std::string name;
-    
-    TypePtr type;
-    std::vector<TypePtr> parameterTypes;
-    
-    SymbolType category;
-
-    int line;
-    int column;
-
-    std::string doc_string;
-    std::string hint; 
-    std::vector<std::string> hintArgs; // e.g. hint_range(0, 1)
-
-    struct Usage {
-        int line;
-        int column;
-    };
-
-    mutable std::vector<Usage> usages;
-    bool is_definition = false;
-    Mutability mutability = Mutability::Mutable;
-};
 
 struct Scope 
 {
@@ -84,13 +44,11 @@ public:
     bool add(const Symbol& symbol);
 
     /**
-     * @brief Adds a usage notifiies to the appropiate symbol, in the current scope.
-     * 
-     * @param sym Pointer to the symbol 
-     * @param line Line
-     * @param col Column
+     * @brief Adds a usage notification to the appropriate symbol, in the current scope.
+     * * @param sym Pointer to the symbol 
+     * @param range The full range of the reference
      */
-    void addReference(const Symbol* sym, int line, int col);
+    void addReference(Symbol* sym, const Range& range);
 
     /**
      * @brief With overloading, this is mainly used for local variable lookup, where we retrieve the first symbol matched.
@@ -128,6 +86,8 @@ public:
     }
 
     const std::vector<Symbol> getAllSymbols();
+    Symbol createSymbol(const std::string& name, TypePtr type, SymbolType category, const Range& nodeRange, 
+        Mutability mutability = Mutability::Mutable, TypePtr returnType = nullptr, const std::vector<TypePtr>& paramterTypes = {}, const std::vector<std::string>& paramterNames = {}, bool is_func_def = true);
 
 private:
    

@@ -10,24 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Features
-
+  - Implemented the double-visitor pattern using mutliple AST passes
+    - Significantly improves performance, maintainability, and accuracy
   - Seperation of data and LSP: The builtin functions and similar are now seperated into JSON files that make maintainence simpler and efficient
     - The JSON files are baked into the binary for simpler deployment as c++ auto-generated header files using Scons
 
   - Inlay hints are now possible
+  - Added render_mode from spatial type shaders and its errors
 
 - More cases to the test suite
   - Testing for incremental change events and updates
+  - render_mode
 
 - Performance optimizations
+  - The double-visitor pattern as explained above
   - Debouncing timer saving cpu cycles
   - Background threading so parsing does not block the network loop anymore
+
+- Drastically improved logging & guard clauses
 
 ### Changed
 
 - LSP now runs on incremental change events, which saves a lot of network overhead
+- Symbols now have full range resolution
 
 ### Fixed
+
+- Missing types in the typeRegistry for almost all Sampler types
+- Minor bug in Sconstruct
 
 ## [0.2.2] - 2026-02-15
 

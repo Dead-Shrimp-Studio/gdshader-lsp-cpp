@@ -7,10 +7,9 @@
 
 using namespace gdshader_lsp;
 
-Lexer::Lexer(const std::string &source_code) 
-    : source(source_code), current_pos(0) 
+Lexer::Lexer(const std::string &source_code) : source(source_code), current_pos(0) 
 {
-    SPDLOG_TRACE("Lexer initialized. Source length: {}", source_code.length());
+    GDSHADER_WARN_IF(source.empty(), "Lexer initialized with an empty source string.");
     if (!source.empty()) {
         source_len = source.length();
         current_char = source.at(current_pos);
@@ -22,8 +21,9 @@ Lexer::Lexer(const std::string &source_code)
 /**
  * @brief Advances the current character pointer.
  */
-void Lexer::advance() {
-
+void Lexer::advance() 
+{
+    GDSHADER_ASSERT(current_pos <= source_len, "Lexer attempted to advance past EOF!");
     if (current_char == '\n') {
         line++;
         column = 0;
@@ -43,7 +43,9 @@ void Lexer::advance() {
  * @brief Skips Godot based comments.
  * 
  */
-void Lexer::skipComment() {
+void Lexer::skipComment() 
+{
+    GDSHADER_ASSERT(current_char == '/', "skipComment called but current character is '{}'", current_char);
     if (current_char == '/' && peek() == '/') {
         // Single-line comment: Skip until newline
         while (current_char != '\n' && current_char != '\0') {
@@ -89,7 +91,9 @@ void Lexer::skipWhitespace() {
  * @brief Parses a number token.
  * @return The number token.
  */
-Token Lexer::parseNumber(int startLine, int startCol) {
+Token Lexer::parseNumber(int startLine, int startCol)
+{
+    GDSHADER_ASSERT(isdigit(current_char) || current_char == '.', "parseNumber called on invalid starting character: '{}'", current_char);
 
     std::string number_str;
     while (current_pos < source_len && (isdigit(current_char) || current_char == '.')) {
@@ -110,7 +114,9 @@ Token Lexer::parseNumber(int startLine, int startCol) {
  * @brief Parses a string token.
  * @return The string token.
  */
-Token Lexer::parseString(int startLine, int startCol) {
+Token Lexer::parseString(int startLine, int startCol) 
+{
+    GDSHADER_ASSERT(current_char == '"', "parseString called without starting quote, found: '{}'", current_char);
 
     std::string str_val;
     advance(); // Consume the starting double quote
@@ -135,7 +141,9 @@ Token Lexer::parseString(int startLine, int startCol) {
  * @brief Parses an identifier or a keyword.
  * @return The appropriate token.
  */
-Token Lexer::parseIdentifier(int startLine, int startCol) {
+Token Lexer::parseIdentifier(int startLine, int startCol) 
+{
+    GDSHADER_ASSERT(isalpha(current_char) || current_char == '_', "parseIdentifier started with invalid character: '{}'", current_char);
 
     std::string result;
     while (current_pos < source_len && (isalnum(current_char) || current_char == '_')) {
@@ -350,8 +358,8 @@ Token Lexer::createToken()
  * @brief Provides access to the next token. This is the main lexing function.
  * @return The next token.
  */
-Token Lexer::getNextToken() {
-
+Token Lexer::getNextToken() 
+{
     if(!peek_buffer.empty()) {
 
         Token t = peek_buffer.front();
@@ -368,8 +376,10 @@ Token Lexer::getNextToken() {
  * @param offset 
  * @return Token 
  */
-Token Lexer::peekToken(unsigned int offset) {
-
+Token Lexer::peekToken(unsigned int offset) 
+{
+    GDSHADER_WARN_IF(offset > 50, "Lexer peeking unusually far ahead (offset: {} tokens)", offset);
+    
     if (offset < peek_buffer.size()) {
         return peek_buffer[offset];
     }

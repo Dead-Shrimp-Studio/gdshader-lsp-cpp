@@ -1,24 +1,42 @@
 
 #include "gdshader/semantics/symbol_table.hpp"
+#include "gdshader/semantics/types.hpp"
 #include "utils/logger.hpp"
 
 namespace gdshader_lsp {
 
-namespace { // Anonymous namespace for local helper
-    bool signaturesMatch(const std::vector<TypePtr>& a, const std::vector<TypePtr>& b) {
-        if (a.size() != b.size()) return false;
+namespace 
+{
+    bool signaturesMatch(const std::vector<TypePtr>& a, const std::vector<TypePtr>& b) 
+    {
+        GDSHADER_RETURN_VAL_IF(a.size() != b.size(), false, "Signature size mismatch: {} vs {}", a.size(), b.size());
         for (size_t i = 0; i < a.size(); ++i) {
             // Dereference pointers to compare the actual Type objects
             if (*a[i] != *b[i]) return false;
         }
         return true;
     }
+
+    void collectSymbolsRecursive(const Scope* scope, std::vector<Symbol>& results) 
+    {
+        GDSHADER_RETURN_IF(!scope, "Attempted to collect symbols from a null scope.");
+
+        for (const auto& pair : scope->symbols) {
+            for (const auto& sym : pair.second) {
+                results.push_back(sym);
+            }
+        }
+
+        for (const auto& child : scope->children) {
+            collectSymbolsRecursive(child.get(), results);
+        }
+    }
 }
 
 SymbolTable::SymbolTable() 
 {
-    SPDLOG_TRACE("[SymTable] Initializing Global Scope.");
     root = std::make_unique<Scope>(nullptr);
+    GDSHADER_ALWAYS_ASSERT(root != nullptr, "Failed to allocate memory for root scope.");
     current = root.get();
 }
 
@@ -48,83 +66,55 @@ void SymbolTable::popScope(int endLine)
 
 bool SymbolTable::add(const Symbol& symbol) 
 {
-    auto& store = current->symbols[symbol.name];
-    
-    if (!store.empty()) 
+    GDSHADER_RETURN_VAL_IF(symbol.name.empty(), false, "Attempted to add a symbol with an empty name.");
+    GDSHADER_ASSERT(current != nullptr, "Current scope is null while adding symbol '{}'", symbol.name);
+
+    if (!current->symbols.contains(symbol.name))
     {
-        const Symbol& existing = store[0];
-        bool isFunc = (symbol.category == SymbolType::Function || symbol.category == SymbolType::Builtin);
-        bool existingIsFunc = (store[0].category == SymbolType::Function || store[0].category == SymbolType::Builtin);
-
-        // Rule 1: Collision Check
-        // If either is NOT a function/builtin, it's a variable collision.
-        if (!isFunc || !existingIsFunc) {
-
-            if (existing.category == SymbolType::Builtin && symbol.category == SymbolType::Builtin) {
-                return true; // Silent success: It's the same built-in.
-            }
-
-            SPDLOG_WARN("[SymTable] Redefinition Error: '{}' already exists in this scope.", symbol.name);
-            return false; // Redefinition Error
-        }
-
-        // Rule 2: Function Overloading
-        // We must check if a function with the SAME signature already exists.
-        for (auto& existing : store) {
-            if (signaturesMatch(existing.parameterTypes, symbol.parameterTypes)) 
-            {
-                // SCENARIO A: Two Definitions (ERROR)
-                // "void foo() {}" AND "void foo() {}" -> BAD
-                if (existing.is_definition && symbol.is_definition) {
-                    SPDLOG_ERROR("[SymTable] Error: Body of function '{}' already defined.", symbol.name);
-                    return false;
-                }
-
-                // SCENARIO B: Declaration followed by Definition (UPGRADE)
-                // "void foo();" AND "void foo() {}" -> OK (Upgrade the symbol)
-                if (!existing.is_definition && symbol.is_definition) {
-                    SPDLOG_TRACE("[SymTable] Upgrading declaration of '{}' to definition.", symbol.name);
-                    
-                    // We replace the existing prototype with the full definition
-                    // (You might want to preserve the 'usages' from the old symbol)
-                    auto oldUsages = existing.usages;
-                    existing = symbol; 
-                    existing.usages = oldUsages; // Keep references pointing to it valid
-                    return true;
-                }
-
-                // SCENARIO C: Definition followed by Declaration (REDUNDANT)
-                // "void foo() {}" AND "void foo();" -> OK (Ignore new)
-                if (existing.is_definition && !symbol.is_definition) {
-                    return true;
-                }
-                
-                // SCENARIO D: Declaration followed by Declaration (IDEMPOTENT)
-                // "void foo();" AND "void foo();" -> OK (Ignore new)
-                return true;
-            }
-        }
-        SPDLOG_TRACE("[SymTable] Added Overload: '{}'", symbol.name);
-    } else {
-        SPDLOG_TRACE("[SymTable] Added Symbol: '{}' ({})", symbol.name, (int)symbol.category);
+        current->symbols[symbol.name] = std::vector<Symbol>();
+        SPDLOG_TRACE("[SymTable]: Created store for symbol with name '{}'.", symbol.name);
     }
 
-    // Safe to add
+    std::vector<Symbol>& store = current->symbols[symbol.name];
+
+    if (!store.empty()) 
+    {
+        for (Symbol& storeSymbol : store)
+        {
+            GDSHADER_ASSERT(symbol.name == storeSymbol.name, 
+                "Symbol store broken. Expected '{}', found '{}'", symbol.name, storeSymbol.name);
+
+            if (symbol.is_function_definition && storeSymbol.is_function_definition)
+            {
+                GDSHADER_RETURN_VAL_IF(
+                    signaturesMatch(symbol.parameterTypes, storeSymbol.parameterTypes), 
+                    false, 
+                    "[SymTable] Error: Body of function '{}' already defined.", symbol.name
+                );
+
+                SPDLOG_TRACE("[SymTable] Added Overload for '{}'.", symbol.name);
+
+            } else if (symbol.is_function_definition && !storeSymbol.is_function_definition){
+                auto oldUsages = storeSymbol.references;
+                storeSymbol = symbol; 
+                storeSymbol.references = oldUsages;
+            }
+        }
+    }
     store.push_back(symbol);
     return true;
 }
 
-void gdshader_lsp::SymbolTable::addReference(const Symbol* sym, int line, int col)
+void SymbolTable::addReference(Symbol* sym, const Range& range)
 {
-    // Note: We cast away constness because 'lookup' returns const, 
-    // but we are in the analysis phase populating data.
-    if (sym) {
-        const_cast<Symbol*>(sym)->usages.push_back({line, col});
-    }
+    GDSHADER_RETURN_IF(!sym, "Attempted to add reference to a null symbol pointer at line {}", range.startLine);
+    sym->references.push_back(range);
 }
 
 const Symbol* SymbolTable::lookup(const std::string& name, const int depth) const 
 {
+    GDSHADER_WARN_IF(name.empty(), "Looking up a symbol with an empty name.");
+
     Scope* walker = current;
     int rdepth = 0;
     while (walker) {
@@ -142,8 +132,10 @@ const Symbol* SymbolTable::lookup(const std::string& name, const int depth) cons
     return nullptr;
 }
 
-const std::vector<Symbol*> gdshader_lsp::SymbolTable::lookup_all(const std::string &name) const
+const std::vector<Symbol*> SymbolTable::lookup_all(const std::string &name) const
 {
+    GDSHADER_WARN_IF(name.empty(), "lookup_all called with an empty name.");
+
     std::vector<Symbol*> symbols;
     Scope* walker = current;
     while (walker) {
@@ -158,6 +150,8 @@ const std::vector<Symbol*> gdshader_lsp::SymbolTable::lookup_all(const std::stri
 
 std::vector<const Symbol*> SymbolTable::lookupFunctions(const std::string& name) const 
 {
+    GDSHADER_WARN_IF(name.empty(), "lookupFunctions called with an empty name.");
+
     Scope* walker = current;
     while (walker) {
         auto it = walker->symbols.find(name);
@@ -180,14 +174,14 @@ std::vector<const Symbol*> SymbolTable::lookupFunctions(const std::string& name)
 
 const Scope* SymbolTable::findScopeAt(int line) const 
 {
+    GDSHADER_ASSERT(root != nullptr, "Root scope is null during findScopeAt");
     const Scope* candidate = root.get();
     
     // Drill down as deep as possible
     while (true) {
         bool foundChild = false;
         for (const auto& child : candidate->children) {
-            // Check if line is inside child's range
-            // Note: We might need precise column checks later, but line is usually enough
+            GDSHADER_ASSERT(child != nullptr, "Encountered null child scope!");
             if (line >= child->startLine && line <= child->endLine) {
                 candidate = child.get();
                 foundChild = true;
@@ -199,7 +193,9 @@ const Scope* SymbolTable::findScopeAt(int line) const
     return candidate;
 }
 
-const Symbol* SymbolTable::lookupAt(const std::string& name, int line) const {
+const Symbol* SymbolTable::lookupAt(const std::string& name, int line) const 
+{
+    GDSHADER_WARN_IF(name.empty(), "lookupAt called with empty name at line {}", line);
     const Scope* searchScope = findScopeAt(line);
     
     // Walk up the scope tree
@@ -236,26 +232,9 @@ std::vector<Symbol> SymbolTable::getVisibleSymbolsAt(int line) const
     return results;
 }
 
-namespace {
-    // Helper to recursively collect symbols
-    void collectSymbolsRecursive(const Scope* scope, std::vector<Symbol>& results) 
-    {
-        if (!scope) return;
-
-        for (const auto& pair : scope->symbols) {
-            for (const auto& sym : pair.second) {
-                results.push_back(sym);
-            }
-        }
-
-        for (const auto& child : scope->children) {
-            collectSymbolsRecursive(child.get(), results);
-        }
-    }
-}
-
-const std::vector<Symbol> gdshader_lsp::SymbolTable::getAllSymbols()
+const std::vector<Symbol> SymbolTable::getAllSymbols()
 {
+    GDSHADER_RETURN_VAL_IF(!root, {}, "Root scope is null, cannot get all symbols");
     std::vector<Symbol> all_symbols;
     
     if (root) {
@@ -263,6 +242,28 @@ const std::vector<Symbol> gdshader_lsp::SymbolTable::getAllSymbols()
     }
     
     return all_symbols;
+}
+
+Symbol SymbolTable::createSymbol(const std::string& name, TypePtr type, SymbolType category, const Range& nodeRange, 
+                                            Mutability mutability, TypePtr returnType, const std::vector<TypePtr>& paramterTypes, const std::vector<std::string>& paramterNames, bool is_func_def) 
+{
+    GDSHADER_WARN_IF(name.empty(), "Creating a symbol with an empty name!");
+    
+    Symbol s;
+    s.name = name;
+    s.type = type;
+    s.category = category;
+    s.mutability = mutability;
+    
+    s.definition = nodeRange;
+    s.definition.startLine = (nodeRange.startLine > 0) ? nodeRange.startLine - 1 : 0;
+    s.definition.endLine = (nodeRange.endLine > 0) ? nodeRange.endLine - 1 : 0;
+    
+    s.returnType = returnType;
+    s.parameterTypes = paramterTypes;
+    s.parameterNames = paramterNames;
+    s.is_function_definition = is_func_def;
+    return s;
 }
 
 }
