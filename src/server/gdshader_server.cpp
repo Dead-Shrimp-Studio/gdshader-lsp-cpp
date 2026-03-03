@@ -148,7 +148,6 @@ void GdShaderServer::registerHandlers() {
                         
                         if (startOff <= currentText.length() && endOff <= currentText.length() && startOff <= endOff) {
                             currentText.replace(startOff, endOff - startOff, change.text);
-                            SPDLOG_DEBUG("Current text in content change: {}", currentText.c_str());
                         }
                     } 
                     // Full doc sync fallback

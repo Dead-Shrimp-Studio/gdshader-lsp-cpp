@@ -426,21 +426,56 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
         reportError("Expected uniform name");
     }
 
-    // Hint:  : hint_range(0, 1)
+    // Hint:  : hint_range(0, 1), source_color, filter_linear
     if (match(TokenType::TOKEN_COLON)) {
-        if (check(TokenType::TOKEN_IDENTIFIER)) {
-            node->hint = current_token.value;
+        
+        // Loop to support multiple comma-separated hints
+        while (check(TokenType::TOKEN_IDENTIFIER)) {
+            
+            if (!node->hint.empty()) {
+                node->hint += ", ";
+            }
+            node->hint += current_token.value;
             advance();
 
+            // If this specific hint has arguments
             if (match(TokenType::TOKEN_LPAREN)) {
                 node->hint += "(";
-                while (!check(TokenType::TOKEN_RPAREN) && !check(TokenType::TOKEN_EOF)) {
-                    // Just lazily consume token values for the hint string
-                    node->hint += current_token.value;
+                int depth = 1;
+                
+                // Track depth to safely allow nested parentheses
+                while (depth > 0 && !check(TokenType::TOKEN_EOF)) {
+                    
+                    // Safe-guard to prevent runaway consumption if ')' is missing
+                    if (check(TokenType::TOKEN_SEMI) || check(TokenType::TOKEN_EQUAL)) {
+                        break;
+                    }
+
+                    if (check(TokenType::TOKEN_LPAREN)) {
+                        depth++;
+                    } else if (check(TokenType::TOKEN_RPAREN)) {
+                        depth--;
+                        if (depth == 0) break; // Found the matching closing parenthesis
+                    }
+
+                    // Add a little formatting for readability in the hover text
+                    if (check(TokenType::TOKEN_COMMA)) {
+                        node->hint += ", ";
+                    } else {
+                        node->hint += current_token.value;
+                    }
                     advance();
                 }
+                
                 consume(TokenType::TOKEN_RPAREN, "Expected ')' after hint arguments");
                 node->hint += ")";
+            }
+
+            // Check if there is another hint chained after a comma
+            if (match(TokenType::TOKEN_COMMA)) {
+                continue;
+            } else {
+                break;
             }
         }
     }
@@ -743,9 +778,9 @@ std::unique_ptr<StatementNode> Parser::parseVarDecl()
     }
 
     node->type = parseType();
-    if (check(TokenType::TOKEN_IDENTIFIER)) {
+    if (check(TokenType::TOKEN_IDENTIFIER)) 
+    {
         node->name = current_token.value;
-
         node->nameRange.startLine = current_token.line;
         node->nameRange.startCol = current_token.column;
         node->nameRange.endLine = current_token.line;
@@ -753,7 +788,18 @@ std::unique_ptr<StatementNode> Parser::parseVarDecl()
 
         advance();
     } else {
-        reportError("Expected variable name");
+        reportError("Expected variable name, got '" + current_token.value + "'");
+
+        node->nameRange.startLine = current_token.line;
+        node->nameRange.startCol = current_token.column;
+        node->nameRange.endLine = current_token.line;
+        node->nameRange.endCol = current_token.column + current_token.length;
+        
+        if (current_token.type != TokenType::TOKEN_SEMI && current_token.type != TokenType::TOKEN_EQUAL && current_token.type != TokenType::TOKEN_EOF) 
+        {
+            SPDLOG_DEBUG("Parser consuming token for VarDeclNode that is non-identifier");
+            advance();
+        }
     }
 
     if (match(TokenType::TOKEN_EQUAL)) {
@@ -1304,9 +1350,7 @@ std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
                 node->arraySizes.push_back(0); // Error fallback
             }
         } else {
-            // Handle complex array sizes (const expressions) if needed, 
-            // or just report error for now.
-            reportError("Expected array size.");
+            reportError("Expected array size. Must be an integer value.");
         }
         consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
     }

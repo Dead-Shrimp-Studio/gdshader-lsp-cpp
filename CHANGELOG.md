@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - More cases to the test suite
   - Testing for incremental change events and updates
   - render_mode
+  - Increased diagnostic batch testing to 75 test cases
 
 - Performance optimizations
   - Pratt-Parser implementation
@@ -38,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Missing types in the typeRegistry for almost all Sampler types
+- uniform hints in several cases faulty
 - Minor bug in Sconstruct
 
 ## [0.2.2] - 2026-02-15
