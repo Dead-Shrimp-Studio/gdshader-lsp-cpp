@@ -95,7 +95,9 @@ void LintingVisitor::visit(BlockNode* node)
 
     for (const auto& stmt : node->statements) 
     {
-        if (auto varDecl = dynamic_cast<const VariableDeclNode*>(stmt.get())) {
+        if (auto varDecl = dynamic_cast<const VariableDeclNode*>(stmt.get())) 
+        {
+            GDSHADER_RETURN_IF(varDecl->name.empty(), "node name empty");
             int line = (varDecl->range.startLine > 0) ? varDecl->range.startLine - 1 : 0;
             const Symbol* sym = symbols.lookupAt(varDecl->name, line);
             

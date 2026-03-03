@@ -1,0 +1,775 @@
+[
+    {
+        "name": "missing_semicolon",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = 1.0",
+            "}"
+        ],
+        "expected_error": "expected ';'"
+    },
+    {
+        "name": "unbalanced_braces",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    if (true) {",
+            "        float x = 1.0;",
+            "}"
+        ],
+        "expected_error": "}"
+    },
+    {
+        "name": "assign_int_to_vec",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = 1;",
+            "}"
+        ],
+        "expected_error": "Type mismatch"
+    },
+    {
+        "name": "too_few_args",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(1.0, 2.0);",
+            "}"
+        ],
+        "expected_error": "components"
+    },
+    {
+        "name": "assign_int_to_float",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float f = 1;",
+            "}"
+        ],
+        "expected_error": "Type mismatch"
+    },
+    {
+        "name": "assign_vec3_to_float",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float f = vec3(1.0);",
+            "}"
+        ],
+        "expected_error": "Type mismatch"
+    },
+    {
+        "name": "bool_arithmetic",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    bool a = true;",
+            "    bool b = false;",
+            "    int c = a + b;",
+            "}"
+        ],
+        "expected_error": "Invalid binary operation"
+    },
+    {
+        "name": "swizzle_invalid_component",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(1.0);",
+            "    float f = v.q;",
+            "}"
+        ],
+        "expected_error": "out of bounds"
+    },
+    {
+        "name": "swizzle_out_of_bounds",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec2 v = vec2(1.0);",
+            "    float f = v.z;",
+            "}"
+        ],
+        "expected_error": "bounds"
+    },
+    {
+        "name": "swizzle_assignment_mismatch",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(1.0);",
+            "    v.xy = vec3(1.0);",
+            "}"
+        ],
+        "expected_error": "assign"
+    },
+    {
+        "name": "discard_in_vertex",
+        "code": [
+            "shader_type spatial;",
+            "void vertex() {",
+            "    discard;",
+            "}"
+        ],
+        "expected_error": "discard"
+    },
+    {
+        "name": "writing_albedo_in_vertex",
+        "code": [
+            "shader_type spatial;",
+            "void vertex() {",
+            "    ALBEDO = vec3(1.0);",
+            "}"
+        ],
+        "expected_error": "Undefined"
+    },
+    {
+        "name": "write_to_uniform",
+        "code": [
+            "shader_type spatial;",
+            "uniform float u_time;",
+            "void fragment() {",
+            "    u_time = 10.0;",
+            "}"
+        ],
+        "expected_error": "Cannot assign"
+    },
+    {
+        "name": "write_to_const",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    const float PI = 3.14;",
+            "    PI = 3.14159;",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "opaque_type_construction",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    sampler2D s = sampler2D(1.0);",
+            "}"
+        ],
+        "expected_error": "construct"
+    },
+    {
+        "name": "void_function_return_value",
+        "code": [
+            "shader_type spatial;",
+            "void do_nothing() {}",
+            "void fragment() {",
+            "    float x = do_nothing();",
+            "}"
+        ],
+        "expected_error": "void"
+    },
+    {
+        "name": "missing_return",
+        "code": [
+            "shader_type spatial;",
+            "float get_val() {}",
+            "void fragment() {}"
+        ],
+        "expected_error": "return"
+    },
+    {
+        "name": "recursion_check",
+        "code": [
+            "shader_type spatial;",
+            "void recursive() {",
+            "    recursive();",
+            "}",
+            "void fragment() { recursive(); }"
+        ],
+        "expected_error": "recursion"
+    },
+    {
+        "name": "missing_shader_type",
+        "code": [
+            "void fragment() {",
+            "    ALBEDO = vec3(1.0);",
+            "}"
+        ],
+        "expected_error": "shader_type missing"
+    },
+    {
+        "name": "duplicate_variable",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = 1.0;",
+            "    float x = 2.0;",
+            "}"
+        ],
+        "expected_error": "Redefinition of variable"
+    },
+    {
+        "name": "processor_wrong_return",
+        "code": [
+            "shader_type spatial;",
+            "float fragment() {",
+            "    return 1.0;",
+            "}"
+        ],
+        "expected_error": "must return 'void'"
+    },
+    {
+        "name": "processor_with_args",
+        "code": [
+            "shader_type spatial;",
+            "void fragment(float x) {",
+            "}"
+        ],
+        "expected_error": "must not have arguments"
+    },
+    {
+        "name": "not_all_paths_return",
+        "code": [
+            "shader_type spatial;",
+            "float do_math(int x) {",
+            "    if (x > 0) { return 1.0; }",
+            "}",
+            "void fragment() {}"
+        ],
+        "expected_error": "Not all code paths return"
+    },
+    {
+        "name": "write_to_varying_in_fragment",
+        "code": [
+            "shader_type spatial;",
+            "varying vec3 my_color;",
+            "void fragment() {",
+            "    my_color = vec3(1.0);",
+            "}"
+        ],
+        "expected_error": "read-only variable"
+    },
+    {
+        "name": "duplicate_swizzle_write",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(1.0);",
+            "    v.xx = vec2(2.0);",
+            "}"
+        ],
+        "expected_error": "assigned twice"
+    },
+    {
+        "name": "invalid_render_mode",
+        "code": [
+            "shader_type spatial;",
+            "render_mode potato;"
+        ],
+        "expected_error": "Unknown render_mode"
+    },
+    {
+        "name": "unreachable_code_warning",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    return;",
+            "    float x = 1.0;",
+            "}"
+        ],
+        "expected_error": "Unreachable code"
+    },
+    {
+        "name": "fuzz_lexical_error",
+        "code": [
+            "shader_type spatial;",
+            "@#$%",
+            "void fragment() {}"
+        ],
+        "expected_error": "Lexical error"
+    },
+    {
+        "name": "keyword_as_identifier",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float if = 1.0;",
+            "}"
+        ],
+        "expected_error": "Expected variable name"
+    },
+    {
+        "name": "missing_paren_if",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    if true { }",
+            "}"
+        ],
+        "expected_error": "Expected '('"
+    },
+    {
+        "name": "malformed_struct",
+        "code": [
+            "shader_type spatial;",
+            "struct {",
+            "    float x;",
+            "};",
+            "void fragment() {}"
+        ],
+        "expected_error": "Expected struct name"
+    },
+    {
+        "name": "non_int_array_size",
+        "code": [
+            "shader_type spatial;",
+            "float[true] x;",
+            "void fragment() {}"
+        ],
+        "expected_error": "Expected array size. Must be an integer value."
+    },
+    {
+        "name": "dangling_endif",
+        "code": [
+            "shader_type spatial;",
+            "#endif",
+            "void fragment() {}"
+        ],
+        "expected_error": "#endif without #if"
+    },
+    {
+        "name": "macro_redefinition",
+        "code": [
+            "shader_type spatial;",
+            "#define MY_VAL 1.0",
+            "#define MY_VAL 2.0",
+            "void fragment() {}"
+        ],
+        "expected_error": "Macro redefinition"
+    },
+    {
+        "name": "matrix_not_enough_args",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    mat2 m = mat2(1.0, 2.0, 3.0);",
+            "}"
+        ],
+        "expected_error": "Not enough components to construct"
+    },
+    {
+        "name": "vector_string_arg",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(\"hello\");",
+            "}"
+        ],
+        "expected_error": "Cannot construct 'vec3' from a string"
+    },
+    {
+        "name": "scalar_too_many_args",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float f = float(1.0, 2.0);",
+            "}"
+        ],
+        "expected_error": "expects exactly 1 argument"
+    },
+    {
+        "name": "index_non_indexable",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = 1.0;",
+            "    float y = x[0];",
+            "}"
+        ],
+        "expected_error": "is not indexable"
+    },
+    {
+        "name": "index_with_float",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(1.0);",
+            "    float x = v[1.5];",
+            "}"
+        ],
+        "expected_error": "must be an integer"
+    },
+    {
+        "name": "swizzle_on_scalar",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = 1.0;",
+            "    float y = x.x;",
+            "}"
+        ],
+        "expected_error": "Invalid member"
+    },
+    {
+        "name": "mixed_swizzle_sets",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec4 v = vec4(1.0);",
+            "    vec2 v2 = v.xg;",
+            "}"
+        ],
+        "expected_error": "Cannot mix xyzw and rgba sets"
+    },
+    {
+        "name": "struct_constructor_arity",
+        "code": [
+            "shader_type spatial;",
+            "struct MyStruct { float a; float b; };",
+            "void fragment() {",
+            "    MyStruct s = MyStruct(1.0);",
+            "}"
+        ],
+        "expected_error": "expects 2 arguments"
+    },
+    {
+        "name": "struct_constructor_type",
+        "code": [
+            "shader_type spatial;",
+            "struct MyStruct { float a; };",
+            "void fragment() {",
+            "    MyStruct s = MyStruct(true);",
+            "}"
+        ],
+        "expected_error": "Type mismatch in struct constructor argument"
+    },
+    {
+        "name": "assign_to_function",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    fragment = 1.0;",
+            "}"
+        ],
+        "expected_error": "Cannot assign to function"
+    },
+    {
+        "name": "render_mode_not_spatial",
+        "code": [
+            "shader_type canvas_item;",
+            "render_mode unshaded;",
+            "void fragment() {}"
+        ],
+        "expected_error": "only valid in spatial type shaders"
+    },
+    {
+        "name": "unused_variable_warning",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float unused_var = 1.0;",
+            "}"
+        ],
+        "expected_error": "Unused variable"
+    },
+    {
+        "name": "variable_shadowing_warning",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = 1.0;",
+            "    { float x = 2.0; }",
+            "}"
+        ],
+        "expected_error": "shadows an existing declaration"
+    },
+    {
+        "name": "wrong_argument_count",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = sin(1.0, 2.0);",
+            "}"
+        ],
+        "expected_error": "Invalid argument count"
+    },
+    {
+        "name": "call_unknown_func",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    do_something();",
+            "}"
+        ],
+        "expected_error": "Unknown function"
+    },
+    {
+        "name": "compound_assign_type_mismatch",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = 1.0;",
+            "    x += vec3(1.0);",
+            "}"
+        ],
+        "expected_error": "cannot be assigned to"
+    },
+    {
+        "name": "binary_op_type_mismatch",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(1.0);",
+            "    mat2 m = mat2(1.0, 1.0, 1.0, 1.0);",
+            "    vec3 result = v * m;",
+            "}"
+        ],
+        "expected_error": "Invalid binary operation"
+    },
+    {
+        "name": "vector_constructor_void",
+        "code": [
+            "shader_type spatial;",
+            "void do_nothing() {}",
+            "void fragment() {",
+            "    vec3 v = vec3(do_nothing());",
+            "}"
+        ],
+        "expected_error": "Cannot use 'void' expression in constructor"
+    },
+    {
+        "name": "struct_constructor_too_many_args",
+        "code": [
+            "shader_type spatial;",
+            "struct MyStruct { float a; float b; };",
+            "void fragment() {",
+            "    MyStruct s = MyStruct(1.0, 2.0, 3.0);",
+            "}"
+        ],
+        "expected_error": "arguments, but got 3"
+    },
+    {
+        "name": "vector_constructor_too_many",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec2 v = vec2(1.0, 2.0, 3.0);",
+            "}"
+        ],
+        "expected_error": "components, but found"
+    },
+    {
+        "name": "switch_expression_not_int",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    switch(1.0) { case 1: break; }",
+            "}"
+        ],
+        "expected_error": "Switch expression must be 'int' or 'uint'"
+    },
+    {
+        "name": "switch_case_type_mismatch",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    switch(1) {",
+            "        case 1.0: break;",
+            "    }",
+            "}"
+        ],
+        "expected_error": "Case Type mismatch"
+    },
+    {
+        "name": "switch_missing_cases",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    switch(1) {}",
+            "}"
+        ],
+        "expected_error": "require at least one execution path"
+    },
+    {
+        "name": "for_loop_condition_not_bool",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    for (int i = 0; 1.0; i++) {}",
+            "}"
+        ],
+        "expected_error": "For loop condition must be bool"
+    },
+    {
+        "name": "while_loop_condition_not_bool",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    while (1) {}",
+            "}"
+        ],
+        "expected_error": "While condition must be bool"
+    },
+    {
+        "name": "do_while_condition_not_bool",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    do {} while (1.0);",
+            "}"
+        ],
+        "expected_error": "Do-while condition must be bool"
+    },
+    {
+        "name": "if_condition_not_bool",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    if (1.0) {}",
+            "}"
+        ],
+        "expected_error": "If condition must be bool"
+    },
+    {
+        "name": "return_value_in_void_func",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    return 1.0;",
+            "}"
+        ],
+        "expected_error": "Void function cannot return a value"
+    },
+    {
+        "name": "redefinition_of_struct",
+        "code": [
+            "shader_type spatial;",
+            "struct MyData { float x; };",
+            "struct MyData { float y; };",
+            "void fragment() {}"
+        ],
+        "expected_error": "Redefinition of struct"
+    },
+    {
+        "name": "redefinition_of_function",
+        "code": [
+            "shader_type spatial;",
+            "void my_func() {}",
+            "void my_func() {}",
+            "void fragment() {}"
+        ],
+        "expected_error": "Redefinition of function"
+    },
+    {
+        "name": "redefinition_of_uniform",
+        "code": [
+            "shader_type spatial;",
+            "uniform float u_val;",
+            "uniform float u_val;",
+            "void fragment() {}"
+        ],
+        "expected_error": "Redefinition of uniform"
+    },
+    {
+        "name": "redefinition_of_varying",
+        "code": [
+            "shader_type spatial;",
+            "varying vec3 v_color;",
+            "varying vec3 v_color;",
+            "void fragment() {}"
+        ],
+        "expected_error": "Redefinition of varying"
+    },
+    {
+        "name": "assign_to_const_var",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    const float x = 1.0;",
+            "    x = 2.0;",
+            "}"
+        ],
+        "expected_error": "Cannot assign to read-only variable"
+    },
+    {
+        "name": "shadowing_parameter",
+        "code": [
+            "shader_type spatial;",
+            "void custom_func(float x) {",
+            "    float x = 2.0;",
+            "}",
+            "void fragment() {}"
+        ],
+        "expected_error": "shadows an existing declaration"
+    },
+    {
+        "name": "elif_without_if",
+        "code": [
+            "shader_type spatial;",
+            "#elif defined(SOMETHING)",
+            "void fragment() {}"
+        ],
+        "expected_error": "#elif without #if"
+    },
+    {
+        "name": "else_without_if",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "   else {}",
+            "}"
+        ],
+        "expected_error": "Expected expression"
+    },
+    {
+        "name": "missing_type_specifier",
+        "code": [
+            "shader_type spatial;",
+            "uniform my_var;",
+            "void fragment() {}"
+        ],
+        "expected_error": "Expected type specifier"
+    },
+    {
+        "name": "invalid_uniform_hint_args",
+        "code": [
+            "shader_type spatial;",
+            "uniform float x : hint_range(0.0, 1.0;",
+            "void fragment() {}"
+        ],
+        "expected_error": "Expected ')' after hint arguments"
+    },
+    {
+        "name": "unreachable_code_after_break",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    for(int i=0; i<10; i++) {",
+            "        break;",
+            "        float x = 1.0;",
+            "    }",
+            "}"
+        ],
+        "expected_error": "Unreachable code"
+    },
+    {
+        "name": "swizzle_too_long",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(1.0);",
+            "    float f = v.xyzwx;",
+            "}"
+        ],
+        "expected_error": "too long"
+    },
+    {
+        "name": "uniform_type_mismatch",
+        "code": [
+            "shader_type spatial;",
+            "uniform float my_val = vec3(1.0);",
+            "void fragment() {}"
+        ],
+        "expected_error": "Cannot initialize uniform"
+    }
+]

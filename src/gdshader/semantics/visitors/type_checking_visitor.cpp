@@ -27,6 +27,8 @@ void TypeCheckingVisitor::visit(VariableDeclNode* node)
     GDSHADER_RETURN_IF(!node, "VariableDeclNode is null");
     if (node->initializer) {
         node->initializer->accept(*this);
+
+        GDSHADER_RETURN_IF(node->name.empty(), "node name is empty");
         
         // We use lookupAt to get the type we registered in Pass 1
         int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
@@ -169,6 +171,11 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
 {
     GDSHADER_RETURN_IF(!node, "BinaryOpNode (Assignment) is null");
     if (node->right) node->right->accept(*this);
+
+    if (!node->left) {
+        SPDLOG_TRACE("Left node of binaryOpNode is empty.");
+        return; 
+    }
 
     const Symbol* s = getRootSymbol(node->left.get());
     TypePtr lType = typeRegistry.getUnknownType();

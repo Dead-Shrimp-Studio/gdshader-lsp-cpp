@@ -87,6 +87,12 @@ namespace gdshader_lsp {
     void SymbolDeclarationVisitor::visit(VariableDeclNode* node) 
     {
         GDSHADER_RETURN_IF(!node, "VariableDeclNode is null");
+        
+        if (node->name.empty()) {
+            if (node->initializer) node->initializer->accept(*this);
+            return;
+        }
+
         TypePtr type = resolveTypeFromNode(node->type.get());
         Mutability mut = node->isConst ? Mutability::ReadOnly : Mutability::Mutable;
 

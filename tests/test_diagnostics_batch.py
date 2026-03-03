@@ -1,233 +1,24 @@
 import pytest # type: ignore
+import json
+import os
 
-# List of test cases: (Name, Shader Code, Expected Error Substring)
-ERROR_CASES = [
+# --- Load Error Cases from JSON ---
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+JSON_PATH = os.path.join(TEST_DIR, "diagnostics_batch.json")
 
-    # Basic syntax
-    (
-    "missing_semicolon",
-        """
-        shader_type spatial;
-        void fragment() {
-            float x = 1.0
-        }
-        """,
-        "expected ';'"
-    ),
-    (
-        "unbalanced_braces",
-        """
-        shader_type spatial;
-        void fragment() {
-            if (true) {
-                float x = 1.0;
-            // Missing closing brace
-        }
-        """,
-        "}"
-    ),
-
-    # Type safety
-
-    (
-        "assign_int_to_vec",
-        """
-        shader_type spatial;
-        void fragment() {
-            vec3 v = 1;
-        }
-        """,
-        "Type mismatch"
-    ),
-    (
-        "too_few_args",
-        """
-        shader_type spatial;
-        void fragment() {
-            vec3 v = vec3(1.0, 2.0);
-        }
-        """,
-        "components"
-    ),
-    (
-        "assign_int_to_float",
-        """
-        shader_type spatial;
-        void fragment() {
-            float f = 1;
-        }
-        """,
-        "Type mismatch"
-    ),
-    (
-        "assign_vec3_to_float",
-        """
-        shader_type spatial;
-        void fragment() {
-            float f = vec3(1.0);
-        }
-        """,
-        "Type mismatch"
-    ),
-    (
-        "bool_arithmetic",
-        """
-        shader_type spatial;
-        void fragment() {
-            bool a = true;
-            bool b = false;
-            int c = a + b;
-        }
-        """,
-        "Invalid binary operation"
-    ),
-
-    # Vector and swizzle logic
-
-    (
-        "swizzle_invalid_component",
-        """
-        shader_type spatial;
-        void fragment() {
-            vec3 v = vec3(1.0);
-            float f = v.q;
-        }
-        """,
-        "swizzle" # or "member"
-    ),
-    (
-        "swizzle_out_of_bounds",
-        """
-        shader_type spatial;
-        void fragment() {
-            vec2 v = vec2(1.0);
-            float f = v.z;
-        }
-        """,
-        "swizzle"
-    ),
-    (
-        "swizzle_assignment_mismatch",
-        """
-        shader_type spatial;
-        void fragment() {
-            vec3 v = vec3(1.0);
-            v.xy = vec3(1.0);
-        }
-        """,
-        "assign" # "Cannot assign 'vec3' to 'vec2'"
-    ),
-
-    # Shader stage validation
-
-    (
-        "discard_in_vertex",
-        """
-        shader_type spatial;
-        void vertex() {
-            discard;
-        }
-        """,
-        "discard" # "discard only allowed in fragment shader"
-    ),
-    (
-        "writing_albedo_in_vertex",
-        """
-        shader_type spatial;
-        void vertex() {
-            ALBEDO = vec3(1.0);
-        }
-        """,
-        "Undefined" # or "ALBEDO"
-    ),
-
-    # Qualifiers and constants
-
-    (
-        "write_to_uniform",
-        """
-        shader_type spatial;
-        uniform float u_time;
-        void fragment() {
-            u_time = 10.0;
-        }
-        """,
-        "Cannot assign"
-    ),
-    (
-        "write_to_const",
-        """
-        shader_type spatial;
-        void fragment() {
-            const float PI = 3.14;
-            PI = 3.14159;
-        }
-        """,
-        "read-only"
-    ),
-    (
-        "opaque_type_construction",
-        """
-        shader_type spatial;
-        void fragment() {
-            sampler2D s = sampler2D(1.0);
-        }
-        """,
-        "construct"
-    ),
-
-    # Functions and control flow
-
-    (
-        "void_function_return_value",
-        """
-        shader_type spatial;
+def load_error_cases():
+    with open(JSON_PATH, "r") as f:
+        raw_cases = json.load(f)
+    
+    formatted_cases = []
+    for case in raw_cases:
+        # Reconstruct the array of strings back into a multiline string
+        code_str = "\n".join(case["code"]) if isinstance(case["code"], list) else case["code"]
+        formatted_cases.append((case["name"], code_str, case["expected_error"]))
         
-        void do_nothing() {
-        
-        }
+    return formatted_cases
 
-        void fragment() {
-            float x = do_nothing();
-        }
-        """,
-        "void"
-    ),
-    (
-        "missing_return",
-        """
-        shader_type spatial;
-        float get_val() {
-            
-        }
-        void fragment() {
-        
-        }
-        """,
-        "return"
-    ),
-    (
-        "recursion_check",
-        """
-        shader_type spatial;
-        void recursive() {
-            recursive();
-        }
-        void fragment() { recursive(); }
-        """,
-        "recursion"
-    ),
-    (
-        "missing_shader_type",
-        """
-        void fragment() {
-            ALBEDO = vec3(1.0);
-        }
-        """,
-        "shader_type missing"
-    )
-
-]
+ERROR_CASES = load_error_cases()
 
 @pytest.mark.parametrize("name, code, expected_error", ERROR_CASES)
 def test_error_messages_specifically(lsp, name, code, expected_error):
