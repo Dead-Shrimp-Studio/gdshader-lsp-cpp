@@ -182,8 +182,11 @@ ERROR_CASES = [
         "void_function_return_value",
         """
         shader_type spatial;
+        
         void do_nothing() {
+        
         }
+
         void fragment() {
             float x = do_nothing();
         }
@@ -198,6 +201,7 @@ ERROR_CASES = [
             
         }
         void fragment() {
+        
         }
         """,
         "return"
@@ -220,7 +224,7 @@ ERROR_CASES = [
             ALBEDO = vec3(1.0);
         }
         """,
-        "Unknown shader type"
+        "shader_type missing"
     )
 
 ]

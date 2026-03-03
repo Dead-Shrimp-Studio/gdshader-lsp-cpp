@@ -89,11 +89,13 @@ void SemanticAnalyzer::registerGlobalFunctions()
         std::vector<std::string> argNames;
         std::vector<TypePtr> argTypes;
         for (const auto& a : args) {
-            argTypes.push_back(typeRegistry.getType(a.type));
+            TypePtr argType = typeRegistry.getType(a.type);
+            GDSHADER_ERROR_IF(argType->kind == TypeKind::UNKNOWN, "Function registering with unkwown argument type {}", a.type);
+            argTypes.push_back(argType);
             argNames.push_back(a.name);
         }
 
-        Symbol s = symbols.createSymbol(name, typeRegistry.getUnknownType(), SymbolType::Function, {}, Mutability::ReadOnly, returnType, argTypes, argNames, true);
+        Symbol s = symbols.createSymbol(name, typeRegistry.getUnknownType(), SymbolType::Function, {0,0,0,0}, Mutability::ReadOnly, returnType, argTypes, argNames, true);
         s.doc_string = doc;
         symbols.add(s);
     };

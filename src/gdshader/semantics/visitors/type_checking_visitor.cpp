@@ -1,23 +1,30 @@
+
 #include "gdshader/diagnostics.hpp"
 #include "gdshader/ast/ast.h"
 #include "gdshader/semantics/visitors/type_checking_visitor.hpp"
+#include "utils/logger.hpp"
 
 namespace gdshader_lsp {
 
 // --- Pass Throughs ---
 void TypeCheckingVisitor::visit(ProgramNode* node) {
+    GDSHADER_RETURN_IF(!node, "ProgramNode is null");
     for (const auto& child : node->nodes) if (child) child->accept(*this);
 }
 void TypeCheckingVisitor::visit(BlockNode* node) {
+    GDSHADER_RETURN_IF(!node, "BlockNode is null");
     for (const auto& stmt : node->statements) if (stmt) stmt->accept(*this);
 }
 void TypeCheckingVisitor::visit(ExpressionStatementNode* node) {
+    GDSHADER_RETURN_IF(!node, "ExpressionStatementNode is null");
     if (node->expr) node->expr->accept(*this);
 }
 
 // --- Declarations Validation ---
 
-void TypeCheckingVisitor::visit(VariableDeclNode* node) {
+void TypeCheckingVisitor::visit(VariableDeclNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "VariableDeclNode is null");
     if (node->initializer) {
         node->initializer->accept(*this);
         
@@ -27,6 +34,16 @@ void TypeCheckingVisitor::visit(VariableDeclNode* node) {
         
         if (s) {
             TypePtr initType = resolveType(node->initializer.get());
+            
+            if (!initType) {
+                GDSHADER_ERROR_IF(true, "resolveType returned a nullptr for initializer of '{}'", node->name);
+                return;
+            }
+            if (!s->type) {
+                GDSHADER_ERROR_IF(true, "Symbol type is nullptr for variable '{}'", node->name);
+                return;
+            }
+
             if (initType->kind != TypeKind::UNKNOWN && *initType != *s->type) {
                 reportTypeMismatch(node, s->type->toString(), initType->toString());
             }
@@ -34,7 +51,9 @@ void TypeCheckingVisitor::visit(VariableDeclNode* node) {
     }
 }
 
-void TypeCheckingVisitor::visit(UniformNode* node) {
+void TypeCheckingVisitor::visit(UniformNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "UniformNode is null");
     int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
     const Symbol* s = symbols.lookupAt(node->name, line);
     
@@ -42,6 +61,7 @@ void TypeCheckingVisitor::visit(UniformNode* node) {
         node->defaultValue->accept(*this);
         TypePtr valType = resolveType(node->defaultValue.get());
         if (*valType != *s->type && valType->kind != TypeKind::UNKNOWN) {
+            GDSHADER_ERROR_IF(true, "Uniform type mismatch: '{}' vs '{}'", s->type->toString(), valType->toString());
             diagnostics.push_back(reportError(node, "Type mismatch: Cannot initialize uniform '" + s->type->toString() + 
                 "' with value of type '" + valType->toString() + "'"));
         }
@@ -52,6 +72,7 @@ void TypeCheckingVisitor::visit(UniformNode* node) {
 
 void TypeCheckingVisitor::visit(FunctionNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "FunctionNode is null");
     int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
     const Symbol* funcSym = symbols.lookupAt(node->name, line);
     if (!funcSym) return;
@@ -60,7 +81,7 @@ void TypeCheckingVisitor::visit(FunctionNode* node)
     ShaderStage previousStage = currentProcessorFunction;
     TypePtr previousExpected = currentExpectedReturnType;
 
-    currentExpectedReturnType = funcSym->type;
+    currentExpectedReturnType = funcSym->returnType;
 
     if (node->name == "vertex") currentProcessorFunction = ShaderStage::Vertex;
     else if (node->name == "fragment") currentProcessorFunction = ShaderStage::Fragment;
@@ -76,6 +97,7 @@ void TypeCheckingVisitor::visit(FunctionNode* node)
 }
 
 void TypeCheckingVisitor::visit(ReturnNode* node) {
+    GDSHADER_RETURN_IF(!node, "ReturnNode is null");
     TypePtr actualType = typeRegistry.getType("void");
     
     if (node->value) {
@@ -86,11 +108,16 @@ void TypeCheckingVisitor::visit(ReturnNode* node) {
     if (!currentExpectedReturnType) return;
 
     if (currentExpectedReturnType->name == "void") {
-        if (actualType->name != "void") diagnostics.push_back(reportError(node, "Void function cannot return a value"));
+        if (actualType->name != "void") {
+            GDSHADER_ERROR_IF(true, "Void function attempting to return a value");
+            diagnostics.push_back(reportError(node, "Void function cannot return a value"));
+        }
     } else {
         if (actualType->name == "void") {
+            GDSHADER_ERROR_IF(true, "Function expected to return '{}', but returned void", currentExpectedReturnType->toString());
             diagnostics.push_back(reportError(node, "Function must return a value of type '" + currentExpectedReturnType->toString() + "'"));
         } else if (actualType->kind != TypeKind::UNKNOWN && *actualType != *currentExpectedReturnType) {
+            GDSHADER_ERROR_IF(true, "Return type mismatch: Expected '{}', found '{}'", currentExpectedReturnType->toString(), actualType->toString());
             diagnostics.push_back(reportError(node, "Type mismatch: Expected return type '" + currentExpectedReturnType->toString() + 
                 "' but found '" + actualType->toString() + "'"));
         }
@@ -99,18 +126,21 @@ void TypeCheckingVisitor::visit(ReturnNode* node) {
 
 // --- Expressions ---
 
-void TypeCheckingVisitor::visit(IdentifierNode* node) {
+void TypeCheckingVisitor::visit(IdentifierNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "IdentifierNode is null");
     int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
-    const Symbol* s = symbols.lookupAt(node->name, line); // Magic happens here
+    const Symbol* s = symbols.lookupAt(node->name, line);
     
     if (!s) {
+        GDSHADER_ERROR_IF(true, "Undefined identifier '{}'", node->name);
         diagnostics.push_back(reportError(node, "Undefined identifier '" + node->name + "'"));
     }
-    // Semantic highlighting can be added here
 }
 
 void TypeCheckingVisitor::visit(BinaryOpNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "BinaryOpNode is null");
     bool isAssignment = (node->op == TokenType::TOKEN_EQUAL || node->op == TokenType::TOKEN_PLUS_EQUAL ||
                         node->op == TokenType::TOKEN_MINUS_EQUAL || node->op == TokenType::TOKEN_STAR_EQUAL || 
                         node->op == TokenType::TOKEN_SLASH_EQUAL || node->op == TokenType::TOKEN_PERCENT_EQUAL);
@@ -130,24 +160,39 @@ void TypeCheckingVisitor::visit(BinaryOpNode* node)
 
     TypePtr result = getBinaryOpResultType(l, r, node->op);
     if (result->kind == TypeKind::UNKNOWN) {
+        GDSHADER_ERROR_IF(true, "Invalid binary operation between '{}' and '{}'", l->toString(), r->toString());
         diagnostics.push_back(reportError(node, "Invalid binary operation '" + l->toString() + "' and '" + r->toString() + "'"));
     }
 }
 
 void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "BinaryOpNode (Assignment) is null");
     if (node->right) node->right->accept(*this);
 
     const Symbol* s = getRootSymbol(node->left.get());
     TypePtr lType = typeRegistry.getUnknownType();
 
-    if (auto id = dynamic_cast<const IdentifierNode*>(node->left.get())) {
-        if (s) lType = s->type;
-        else diagnostics.push_back(reportError(node, "Undefined '" + id->name + "'"));
-    } else if (dynamic_cast<const MemberAccessNode*>(node->left.get())) {
+    if (auto id = dynamic_cast<const IdentifierNode*>(node->left.get())) 
+    {
+        if (s && s->type) lType = s->type; 
+        else if (s && !s->type) {
+            GDSHADER_ERROR_IF(true, "Attempted assignment to function symbol '{}'", id->name);
+            diagnostics.push_back(reportError(node, "Cannot assign to function '" + id->name + "'"));
+            return;
+        }
+        else {
+            GDSHADER_ERROR_IF(true, "Undefined identifier '{}' in assignment", id->name);
+            diagnostics.push_back(reportError(node, "Undefined '" + id->name + "'"));
+            return;
+        }
+    } else if (dynamic_cast<const MemberAccessNode*>(node->left.get())) 
+    {
         node->left->accept(*this);
         lType = resolveType(node->left.get());
-    } else {
+    } else 
+    {
+        GDSHADER_ERROR_IF(true, "Expression on LHS is not assignable");
         diagnostics.push_back(reportError(node->left.get(), "Expression is not assignable."));
         return;
     }
@@ -155,8 +200,10 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
     // Validate Mutability
     if (s) {
         if (s->mutability == Mutability::ReadOnly) {
+            GDSHADER_ERROR_IF(true, "Attempted assignment to read-only variable '{}'", s->name);
             diagnostics.push_back(reportError(node->left.get(), "Cannot assign to read-only variable '" + s->name + "'"));
         } else if (s->category == SymbolType::Varying && currentProcessorFunction != ShaderStage::Vertex) {
+            GDSHADER_ERROR_IF(true, "Attempted to write to varying in fragment processor");
             diagnostics.push_back(reportError(node->left.get(), "Varyings are read-only in the fragment processor."));
         }
     }
@@ -166,6 +213,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
 
     if (node->op == TokenType::TOKEN_EQUAL) {
         if (getConversionCost(rType, lType) == -1) {
+            GDSHADER_ERROR_IF(true, "Type mismatch on assignment: cannot assign '{}' to '{}'", rType->toString(), lType->toString());
             diagnostics.push_back(reportError(node, "Type mismatch: Cannot assign '" + rType->toString() + "' to '" + lType->toString() + "'"));
         }
     } else {
@@ -183,15 +231,15 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
         TypePtr resultType = getBinaryOpResultType(lType, rType, mathOp);
         
         if (resultType->kind == TypeKind::UNKNOWN) {
+            GDSHADER_ERROR_IF(true, "Invalid operation for compound assignment");
             diagnostics.push_back(reportError(node, "Invalid operation for compound assignment."));
             return;
         }
 
         // 2. Check if the result can be assigned back to LHS
-        // e.g. int += float -> (int + float) is float. float cannot be assigned to int. Error.
-        // e.g. vec2 *= float -> (vec2 * float) is vec2. vec2 can be assigned to vec2. OK.
         int cost = getConversionCost(resultType, lType);
         if (cost == -1) {
+            GDSHADER_ERROR_IF(true, "Type mismatch on compound assignment: '{}' cannot be assigned to '{}'", resultType->toString(), lType->toString());
             diagnostics.push_back(reportError(node, "Type mismatch: Result of compound assignment '" + resultType->toString() + 
                         "' cannot be assigned to '" + lType->toString() + "'"));
         }
@@ -201,9 +249,6 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
     
     if (auto mem = dynamic_cast<const MemberAccessNode*>(lhs)) {
         // CHECK: Swizzle duplication (e.g. v.xx = vec2(1.0) is INVALID)
-        // Only applies if the member is a swizzle (len <= 4 and chars are xyzw/rgba/stpq)
-        // We assume valid chars because visitMemberAccess checked that.
-        
         std::string s = mem->member;
         if (s.length() <= 4) { // Heuristic: it's likely a swizzle
             
@@ -220,6 +265,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
                 for(size_t i=0; i<s.length(); ++i) {
                     for(size_t j=i+1; j<s.length(); ++j) {
                         if (s[i] == s[j]) {
+                            GDSHADER_ERROR_IF(true, "Invalid Write Mask: Component '{}' assigned twice", std::string(1, s[i]));
                             diagnostics.push_back(reportError(node, "Invalid Write Mask: Component '" + 
                             std::string(1, s[i]) + "' is assigned twice."));
                         }
@@ -235,6 +281,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
 // -------------------------------------------------------------------------
 
 void TypeCheckingVisitor::visit(ConstNode* node) {
+    GDSHADER_RETURN_IF(!node, "ConstNode is null");
     int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
     const Symbol* s = symbols.lookupAt(node->name, line);
     
@@ -242,16 +289,19 @@ void TypeCheckingVisitor::visit(ConstNode* node) {
         node->value->accept(*this);
         TypePtr valType = resolveType(node->value.get());
         if (*valType != *s->type && valType->kind != TypeKind::UNKNOWN) {
+            GDSHADER_ERROR_IF(true, "Type mismatch in const declaration");
             diagnostics.push_back(reportError(node, "Type mismatch in const declaration."));
         }
     }
 }
 
 void TypeCheckingVisitor::visit(IfNode* node) {
+    GDSHADER_RETURN_IF(!node, "IfNode is null");
     if (node->condition) {
         node->condition->accept(*this);
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
+            GDSHADER_ERROR_IF(true, "If condition is not bool");
             diagnostics.push_back(reportError(node, "If condition must be bool"));
         }
     }
@@ -260,11 +310,13 @@ void TypeCheckingVisitor::visit(IfNode* node) {
 }
 
 void TypeCheckingVisitor::visit(ForNode* node) {
+    GDSHADER_RETURN_IF(!node, "ForNode is null");
     if (node->init) node->init->accept(*this);
     if (node->condition) {
         node->condition->accept(*this);
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
+            GDSHADER_ERROR_IF(true, "For loop condition is not bool");
             diagnostics.push_back(reportError(node, "For loop condition must be bool"));
         }
     }
@@ -273,10 +325,12 @@ void TypeCheckingVisitor::visit(ForNode* node) {
 }
 
 void TypeCheckingVisitor::visit(WhileNode* node) {
+    GDSHADER_RETURN_IF(!node, "WhileNode is null");
     if (node->condition) {
         node->condition->accept(*this);
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
+            GDSHADER_ERROR_IF(true, "While condition is not bool");
             diagnostics.push_back(reportError(node, "While condition must be bool"));
         }
     }
@@ -284,17 +338,20 @@ void TypeCheckingVisitor::visit(WhileNode* node) {
 }
 
 void TypeCheckingVisitor::visit(DoWhileNode* node) {
+    GDSHADER_RETURN_IF(!node, "DoWhileNode is null");
     if (node->body) node->body->accept(*this);
     if (node->condition) {
         node->condition->accept(*this);
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
+            GDSHADER_ERROR_IF(true, "Do-while condition is not bool");
             diagnostics.push_back(reportError(node, "Do-while condition must be bool"));
         }
     }
 }
 
 void TypeCheckingVisitor::visit(SwitchNode* node) {
+    GDSHADER_RETURN_IF(!node, "SwitchNode is null");
     TypePtr exprType = typeRegistry.getUnknownType();
     
     if (node->expression) {
@@ -302,6 +359,7 @@ void TypeCheckingVisitor::visit(SwitchNode* node) {
         exprType = resolveType(node->expression.get());
         
         if (exprType->name != "int" && exprType->name != "uint" && exprType->name != "unknown") {
+            GDSHADER_ERROR_IF(true, "Switch expression must be int/uint, found '{}'", exprType->name);
             diagnostics.push_back(reportError(node->expression.get(), "Switch expression must be 'int' or 'uint', found '" + exprType->name + "'"));
         }
     }
@@ -311,6 +369,7 @@ void TypeCheckingVisitor::visit(SwitchNode* node) {
             c->value->accept(*this);
             TypePtr cType = resolveType(c->value.get());
             if (*cType != *exprType && cType->kind != TypeKind::UNKNOWN) {
+                GDSHADER_ERROR_IF(true, "Switch case type mismatch");
                 diagnostics.push_back(reportError(c->value.get(), "Case Type mismatch"));
             }
         }
@@ -326,15 +385,23 @@ void TypeCheckingVisitor::visit(SwitchNode* node) {
 
 void TypeCheckingVisitor::visit(UnaryOpNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "UnaryOpNode is null");
     if (node->operand) node->operand->accept(*this);
 }
 
 void TypeCheckingVisitor::visit(FunctionCallNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "FunctionCallNode is null");
     std::string name = node->functionName;
 
     std::vector<TypePtr> argTypes;
-    for (const auto& arg : node->arguments) {
+    for (const auto& arg : node->arguments) 
+    {
+        if (!arg) {
+            argTypes.push_back(typeRegistry.getUnknownType());
+            continue;
+        }
+
         arg->accept(*this);
         argTypes.push_back(resolveType(arg.get()));
     }
@@ -347,6 +414,7 @@ void TypeCheckingVisitor::visit(FunctionCallNode* node)
     std::vector<const Symbol*> candidates = symbols.lookupFunctions(name);
 
     if (candidates.empty()) {
+        GDSHADER_ERROR_IF(true, "Call to unknown function '{}'", name);
         diagnostics.push_back(reportError(node, "Unknown function '" + name + "'"));
         return;
     }
@@ -363,6 +431,7 @@ void TypeCheckingVisitor::visit(FunctionCallNode* node)
 
         if (arityMatches.empty()) {
             size_t expected = candidates[0]->parameterTypes.size();
+            GDSHADER_ERROR_IF(true, "Invalid argument count for '{}'", name);
             diagnostics.push_back(reportError(node, "Invalid argument count for '" + name + "'. Expected " + 
                         std::to_string(expected) + ", but got " + std::to_string(argTypes.size()) + "."));
         } else {
@@ -384,6 +453,7 @@ void TypeCheckingVisitor::visit(FunctionCallNode* node)
                 TypePtr expected = closest->parameterTypes[i];
                 TypePtr actual = argTypes[i];
                 if (getConversionCost(actual, expected) == -1) {
+                    GDSHADER_ERROR_IF(true, "Invalid argument type in function call '{}'", name);
                     diagnostics.push_back(reportError(node->arguments[i].get(), 
                     "Invalid argument " + std::to_string(i + 1) + " for function '" + name + "'. Expected '" + 
                     expected->toString() + "', but found '" + actual->toString() + "'."));
@@ -396,6 +466,7 @@ void TypeCheckingVisitor::visit(FunctionCallNode* node)
 
 void TypeCheckingVisitor::visit(MemberAccessNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "MemberAccessNode is null");
     if (node->base) node->base->accept(*this);
     TypePtr baseT = resolveType(node->base.get());
 
@@ -408,6 +479,7 @@ void TypeCheckingVisitor::visit(MemberAccessNode* node)
             std::string swizzle = node->member;
             
             if (swizzle.length() > 4) {
+                GDSHADER_ERROR_IF(true, "Swizzle '{}' too long", swizzle);
                 diagnostics.push_back(reportError(node, "Swizzle '" + swizzle + "' is too long (max 4 components)."));
                 return;
             }
@@ -436,8 +508,10 @@ void TypeCheckingVisitor::visit(MemberAccessNode* node)
                     if (std::string("rgba").find(c) != std::string::npos) hasRGBA = true;
                 }
                 if (hasXYZW && hasRGBA) {
+                    GDSHADER_ERROR_IF(true, "Illegal swizzle '{}', mixed sets", swizzle);
                     diagnostics.push_back(reportError(node, "Illegal swizzle '" + swizzle + "'. Cannot mix xyzw and rgba sets."));
                 } else {
+                    GDSHADER_ERROR_IF(true, "Invalid swizzle component in '{}'", swizzle);
                     diagnostics.push_back(reportError(node, "Invalid swizzle component in '" + swizzle + "'."));
                 }
                 return;
@@ -447,17 +521,20 @@ void TypeCheckingVisitor::visit(MemberAccessNode* node)
             for (char c : swizzle) {
                 size_t componentIndex = currentSet.find(c);
                 if (componentIndex >= (size_t)baseT->componentCount) {
+                    GDSHADER_ERROR_IF(true, "Swizzle component out of bounds");
                     diagnostics.push_back(reportError(node, "Swizzle component '" + std::string(1, c) + "' is out of bounds for " + baseT->toString() + "."));
                     return;
                 }
             }
         }
+        GDSHADER_ERROR_IF(true, "Invalid member '{}' on type '{}'", node->member, baseT->toString());
         diagnostics.push_back(reportError(node, "Invalid member '" + node->member + "' on type '" + baseT->toString() + "'"));
     }
 }
 
 void TypeCheckingVisitor::visit(ArrayAccessNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "ArrayAccessNode is null");
     if (node->base) node->base->accept(*this);
     if (node->index) node->index->accept(*this);
 
@@ -465,10 +542,12 @@ void TypeCheckingVisitor::visit(ArrayAccessNode* node)
     TypePtr indexType = resolveType(node->index.get());
 
     if (baseType->kind != TypeKind::ARRAY && baseType->kind != TypeKind::VECTOR && baseType->kind != TypeKind::MATRIX && baseType->kind != TypeKind::UNKNOWN) {
+        GDSHADER_ERROR_IF(true, "Type '{}' is not indexable", baseType->toString());
         diagnostics.push_back(reportError(node, "Type '" + baseType->toString() + "' is not indexable."));
     }
 
     if (indexType->name != "int" && indexType->name != "uint" && indexType->kind != TypeKind::UNKNOWN) {
+        GDSHADER_ERROR_IF(true, "Array index is not an integer");
         diagnostics.push_back(reportError(node->index.get(), "Array index must be an integer."));
     }
 }
@@ -479,7 +558,7 @@ void TypeCheckingVisitor::visit(ArrayAccessNode* node)
 
 TypePtr TypeCheckingVisitor::resolveType(const ExpressionNode* node) 
 {
-    if (!node) return typeRegistry.getUnknownType();
+    GDSHADER_RETURN_VAL_IF(!node, typeRegistry.getUnknownType(), "ExpressionNode is null in resolveType");
 
     if (auto lit = dynamic_cast<const LiteralNode*>(node)) {
         if (lit->type == TokenType::TOKEN_NUMBER) 
@@ -491,8 +570,9 @@ TypePtr TypeCheckingVisitor::resolveType(const ExpressionNode* node)
 
     if (auto id = dynamic_cast<const IdentifierNode*>(node)) {
         int line = (id->range.startLine > 0) ? id->range.startLine - 1 : 0;
-        if (const Symbol* s = symbols.lookupAt(id->name, line)) {
-            return s->type;
+        const Symbol* s = symbols.lookupAt(id->name, line);
+        if (s) {
+            return s->type ? s->type : typeRegistry.getUnknownType();
         }
         return typeRegistry.getUnknownType();
     }
@@ -511,17 +591,23 @@ TypePtr TypeCheckingVisitor::resolveType(const ExpressionNode* node)
         return typeRegistry.getUnknownType();
     }
 
-    if (auto call = dynamic_cast<const FunctionCallNode*>(node)) {
+    if (auto call = dynamic_cast<const FunctionCallNode*>(node)) 
+    {
         TypePtr t = typeRegistry.getType(call->functionName);
         if (t->kind != TypeKind::UNKNOWN) return t;
 
         std::vector<TypePtr> argTypes;
         for (const auto& arg : call->arguments) {
+            if (!arg) {
+                SPDLOG_ERROR("arg in functionCallNode is nullptr");
+                argTypes.push_back(typeRegistry.getUnknownType());
+                continue;
+            }
             argTypes.push_back(resolveType(arg.get()));
         }
 
         const Symbol* match = findBestOverload(call, argTypes);
-        if (match) return match->type;
+        if (match && match->returnType) return match->returnType;
         return typeRegistry.getUnknownType();
     }
     
@@ -544,6 +630,8 @@ TypePtr TypeCheckingVisitor::resolveType(const ExpressionNode* node)
 
 TypePtr TypeCheckingVisitor::getBinaryOpResultType(TypePtr l, TypePtr r, TokenType op) 
 {
+    GDSHADER_RETURN_VAL_IF(!l || !r, typeRegistry.getUnknownType(), "Left or right type is null in getBinaryOpResultType");
+    
     if (l->kind == TypeKind::UNKNOWN || r->kind == TypeKind::UNKNOWN) return typeRegistry.getUnknownType();
 
     bool isComparison = (op == TokenType::TOKEN_EQ_EQ || op == TokenType::TOKEN_NOT_EQ ||
@@ -590,6 +678,7 @@ TypePtr TypeCheckingVisitor::getBinaryOpResultType(TypePtr l, TypePtr r, TokenTy
 
 int TypeCheckingVisitor::getConversionCost(TypePtr from, TypePtr to) 
 {
+    GDSHADER_RETURN_VAL_IF(!from || !to, -1, "Source or target type is null in getConversionCost");
     if (*from == *to) return 0;
     if (from->name == "int" && to->name == "float") return 1;
     if (from->name == "uint" && to->name == "float") return 1;
@@ -598,6 +687,8 @@ int TypeCheckingVisitor::getConversionCost(TypePtr from, TypePtr to)
 
 const Symbol* TypeCheckingVisitor::getRootSymbol(const ExpressionNode* node) 
 {
+    GDSHADER_RETURN_VAL_IF(!node, nullptr, "ExpressionNode is null in getRootSymbol");
+
     if (auto id = dynamic_cast<const IdentifierNode*>(node)) {
         int line = (id->range.startLine > 0) ? id->range.startLine - 1 : 0;
         return symbols.lookupAt(id->name, line);
@@ -616,7 +707,9 @@ const Symbol* TypeCheckingVisitor::getRootSymbol(const ExpressionNode* node)
 
 const Symbol* TypeCheckingVisitor::findBestOverload(const FunctionCallNode* node, const std::vector<TypePtr>& argTypes) 
 {
+    GDSHADER_RETURN_VAL_IF(!node, nullptr, "FunctionCallNode is null in findBestOverload");
     std::string name = node->functionName;
+    
     auto candidates = symbols.lookupFunctions(name);
     if (candidates.empty()) return nullptr;
 
@@ -652,6 +745,7 @@ const Symbol* TypeCheckingVisitor::findBestOverload(const FunctionCallNode* node
     }
     
     if (isAmbiguous) {
+        GDSHADER_ERROR_IF(true, "Ambiguous function call for '{}'", name);
         diagnostics.push_back(reportError(node, "Ambiguous function call for '" + name + "'. Multiple overloads match these arguments."));
     }
     return bestMatch;
@@ -659,10 +753,12 @@ const Symbol* TypeCheckingVisitor::findBestOverload(const FunctionCallNode* node
 
 void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, const std::string& typeName) 
 {
+    GDSHADER_RETURN_IF(!node, "FunctionCallNode is null in validateConstructor");
     TypePtr target = typeRegistry.getType(typeName);
     
     if (target->kind == TypeKind::STRUCT) {
         if (node->arguments.size() != target->members.size()) {
+            GDSHADER_ERROR_IF(true, "Struct constructor arg mismatch for '{}'", typeName);
             diagnostics.push_back(reportError(node, "Constructor for '" + typeName + "' expects " + 
                         std::to_string(target->members.size()) + " arguments, but got " + 
                         std::to_string(node->arguments.size())));
@@ -674,6 +770,7 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
             TypePtr expectedType = target->members[i].second;
 
             if (*argType != *expectedType) {
+                GDSHADER_ERROR_IF(true, "Struct constructor type mismatch for arg {}", i+1);
                 diagnostics.push_back(reportError(node->arguments[i].get(), 
                     "Type mismatch in struct constructor argument " + std::to_string(i+1) + 
                     ". Expected '" + expectedType->toString() + "', found '" + argType->toString() + "'"));
@@ -692,20 +789,24 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
             if (argT->kind == TypeKind::UNKNOWN) {
                 if (auto lit = dynamic_cast<const LiteralNode*>(arg.get())) {
                     if (lit->type == TokenType::TOKEN_STRING) {
+                        GDSHADER_ERROR_IF(true, "Attempted to construct '{}' from string", typeName);
                         diagnostics.push_back(reportError(arg.get(), "Cannot construct '" + typeName + "' from a string."));
                         continue;
                     }
                 }
+                GDSHADER_ERROR_IF(true, "Invalid argument type in vector constructor");
                 diagnostics.push_back(reportError(arg.get(), "Invalid argument type."));
                 continue; 
             }
 
             if (argT->name == "void") {
+                GDSHADER_ERROR_IF(true, "Attempted to use void in constructor");
                 diagnostics.push_back(reportError(arg.get(), "Cannot use 'void' expression in constructor."));
                 continue;
             }
             
             if (argT->kind != TypeKind::SCALAR && argT->kind != TypeKind::VECTOR) {
+                GDSHADER_ERROR_IF(true, "Invalid arg for vector constructor (needs scalar or vector)");
                 diagnostics.push_back(reportError(arg.get(), "Invalid argument for vector constructor. Expected Scalar or Vector."));
                 continue; 
             }
@@ -716,6 +817,7 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
         if (node->arguments.size() == 1 && provided == 1 && expected > 1) return;
 
         if (provided != expected) {
+            GDSHADER_ERROR_IF(true, "Component count mismatch in vector constructor (Expected: {}, Found: {})", expected, provided);
             diagnostics.push_back(reportError(node, "Invalid constructor. Expected " + std::to_string(expected) + 
                 " components, but found " + std::to_string(provided)));
         }
@@ -732,8 +834,9 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
         for (const auto& arg : node->arguments) {
             TypePtr argT = resolveType(arg.get());
             if (argT == typeRegistry.getUnknownType() || argT == typeRegistry.getType("void")) {
-                 diagnostics.push_back(reportError(arg.get(), "Invalid matrix constructor argument."));
-                 continue;
+                GDSHADER_ERROR_IF(true, "Invalid matrix constructor argument");
+                diagnostics.push_back(reportError(arg.get(), "Invalid matrix constructor argument."));
+                continue;
             }
 
             if (argT->kind == TypeKind::SCALAR) provided += 1;
@@ -742,38 +845,53 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
         }
 
         if (provided < expected && provided < 50) {
+            GDSHADER_ERROR_IF(true, "Not enough components for matrix constructor '{}'", typeName);
             diagnostics.push_back(reportError(node, "Not enough components to construct '" + typeName + "'"));
         }
     }
 
     if (target->kind == TypeKind::SCALAR) {
         if (typeName == "void") {
+            GDSHADER_ERROR_IF(true, "Attempted to construct void");
             diagnostics.push_back(reportError(node, "Cannot construct 'void'."));
             return;
         }
 
         bool isBasic = (typeName == "float" || typeName == "int" || typeName == "uint" || typeName == "bool");
         if (!isBasic) {
+            GDSHADER_ERROR_IF(true, "Attempted to construct opaque type '{}'", typeName);
             diagnostics.push_back(reportError(node, "Cannot construct opaque type '" + typeName + "'."));
             return;
         }
 
         if (node->arguments.size() != 1) {
+            GDSHADER_ERROR_IF(true, "Scalar constructor expects 1 argument");
             diagnostics.push_back(reportError(node, "Scalar constructor expects exactly 1 argument."));
         }
 
         if (!node->arguments.empty()) {
             TypePtr argT = resolveType(node->arguments[0].get());
              if (argT->kind == TypeKind::UNKNOWN) {
+                GDSHADER_ERROR_IF(true, "Invalid argument in scalar constructor");
                 diagnostics.push_back(reportError(node->arguments[0].get(), "Invalid argument."));
             }
         }
         return;
     }
+
+    if (target->kind == TypeKind::SAMPLER) {
+        GDSHADER_ERROR_IF(true, "Attempted to construct opaque sampler type '{}'", typeName);
+        diagnostics.push_back(reportError(node, "Samplers are opaque types and cannot be instantiated via constructors."));
+        return;
+    }
+    
+    GDSHADER_ERROR_IF(true, "Cannot construct type '{}'", typeName);
     diagnostics.push_back(reportError(node, "Cannot construct type '" + typeName + "'."));
 }
 
-void TypeCheckingVisitor::reportTypeMismatch(const ASTNode* node, const std::string& expected, const std::string& found) {
+void TypeCheckingVisitor::reportTypeMismatch(const ASTNode* node, const std::string& expected, const std::string& found) 
+{
+    GDSHADER_ERROR_IF(true, "Type mismatch reported: Expected '{}', Found '{}'", expected, found);
     diagnostics.push_back(reportError(node, "Type mismatch: Expected '" + expected + "', but found '" + found + "'."));
 }
 

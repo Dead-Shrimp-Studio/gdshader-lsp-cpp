@@ -1,5 +1,7 @@
+
 #include "linting_visitor.hpp"
 #include "gdshader/ast/ast.h"
+#include "utils/logger.hpp"
 
 namespace gdshader_lsp {
 
@@ -7,7 +9,9 @@ namespace gdshader_lsp {
 // ACTIVE CHECKERS
 // -------------------------------------------------------------------------
 
-void LintingVisitor::visit(ProgramNode* node) {
+void LintingVisitor::visit(ProgramNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "ProgramNode is null");
     for (const auto& child : node->nodes) {
         if (child) child->accept(*this);
     }
@@ -15,6 +19,8 @@ void LintingVisitor::visit(ProgramNode* node) {
 
 void LintingVisitor::visit(FunctionNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "FunctionNode is null");
+
     // Save previous state
     std::string prevFunc = currentFunctionName;
     ShaderStage prevStage = currentProcessorFunction;
@@ -22,10 +28,6 @@ void LintingVisitor::visit(FunctionNode* node)
 
     currentFunctionName = node->name;
     currentFunctionHasReturn = false;
-
-    if (currentFunctionName == prevFunc) {
-        diagnostics.push_back(reportError(node, "Recursion is not allowed in shader functions (function '" + node->name + "' called itself)"));
-    }
 
     // Determine Processor Stage
     if (node->name == "vertex") currentProcessorFunction = ShaderStage::Vertex;
@@ -39,10 +41,12 @@ void LintingVisitor::visit(FunctionNode* node)
 
     // 1. Processor Rules
     if (currentProcessorFunction != ShaderStage::Global) {
-        if (node->returnType->baseName != "void") {
+        if (node->returnType && node->returnType->baseName != "void") {
+            GDSHADER_ERROR_IF(true, "Processor function '{}' does not return void", node->name);
             diagnostics.push_back(reportError(node, "Processor function '" + node->name + "' must return 'void'."));
         }
         if (!node->parameters.empty()) {
+            GDSHADER_ERROR_IF(true, "Processor function '{}' has arguments", node->name);
             diagnostics.push_back(reportError(node, "Processor function '" + node->name + "' must not have arguments."));
         }
     }
@@ -51,10 +55,12 @@ void LintingVisitor::visit(FunctionNode* node)
     if (node->body) node->body->accept(*this);
 
     // 2. Return Validation
-    if (node->returnType->baseName != "void") {
+    if (node->returnType && node->returnType->baseName != "void") {
         if (!currentFunctionHasReturn) {
+            GDSHADER_ERROR_IF(true, "Function '{}' missing return value", node->name);
             diagnostics.push_back(reportError(node, "Function '" + node->name + "' must return a value."));
         } else if (!allPathsReturn(node->body.get())) {
+            GDSHADER_ERROR_IF(true, "Not all paths return a value in '{}'", node->name);
             diagnostics.push_back(reportError(node, "Not all code paths return a value in function '" + node->name + "'."));
         }
     }
@@ -65,14 +71,16 @@ void LintingVisitor::visit(FunctionNode* node)
     currentFunctionHasReturn = prevReturn;
 }
 
-void LintingVisitor::visit(BlockNode* node) {
+void LintingVisitor::visit(BlockNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "BlockNode is null");
     bool unreachable = false;
     
-    // 3. Unreachable Code Check
-    for (const auto& stmt : node->statements) {
+    for (const auto& stmt : node->statements) 
+    {
         if (unreachable) {
+            GDSHADER_WARN_IF(true, "Unreachable code detected in block");
             diagnostics.push_back(reportWarning(stmt.get(), "Unreachable code detected."));
-            break; 
         }
 
         if (stmt) stmt->accept(*this);
@@ -85,34 +93,51 @@ void LintingVisitor::visit(BlockNode* node) {
         }
     }
 
-    // 4. Unused Variables Check
-    for (const auto& stmt : node->statements) {
+    for (const auto& stmt : node->statements) 
+    {
         if (auto varDecl = dynamic_cast<const VariableDeclNode*>(stmt.get())) {
             int line = (varDecl->range.startLine > 0) ? varDecl->range.startLine - 1 : 0;
             const Symbol* sym = symbols.lookupAt(varDecl->name, line);
             
-            // Ignore globals, only warn for local variables
-            if (sym && sym->category == SymbolType::Variable && sym->references.empty()) {
+            if (!sym) continue;
+            if (sym->category == SymbolType::Variable && sym->references.empty()) {
+                GDSHADER_WARN_IF(true, "Unused variable '{}'", varDecl->name);
                 diagnostics.push_back(reportWarning(varDecl, "Unused variable '" + varDecl->name + "'"));
             }
         }
     }
 }
 
-void LintingVisitor::visit(ReturnNode* node) {
+void LintingVisitor::visit(ReturnNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "ReturnNode is null");
     currentFunctionHasReturn = true;
+
+    if (node->value) node->value->accept(*this);
 }
 
-void LintingVisitor::visit(DiscardNode* node) {
+void LintingVisitor::visit(DiscardNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "DiscardNode is null");
     if (currentProcessorFunction == ShaderStage::Vertex) {
+        GDSHADER_ERROR_IF(true, "Invalid discard in vertex processor");
         diagnostics.push_back(reportError(node, "'discard' cannot be used in the vertex processor."));
     }
 }
 
 void LintingVisitor::visit(FunctionCallNode* node) 
 {
-    if (node->functionName == currentFunctionName) {
+    GDSHADER_RETURN_IF(!node, "FunctionCallNode is null");
+
+    if (node->functionName == currentFunctionName) 
+    {
+        GDSHADER_ERROR_IF(true, "Recursion detected: '{}' calls itself", node->functionName);
         diagnostics.push_back(reportError(node, "Recursion is not allowed in shaders (function '" + node->functionName + "' calls itself)."));
+    }
+
+    for (const auto& arg : node->arguments) 
+    {
+        if (arg) arg->accept(*this);
     }
 }
 
@@ -122,17 +147,17 @@ void LintingVisitor::visit(FunctionCallNode* node)
 
 void LintingVisitor::visit(IfNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "IfNode is null");
+
     // Checked the condition validity in type checking already
-    if (!node->condition)
-    {
-        diagnostics.push_back(reportError(node, "If statement is missing condition."));
-    }
+    if (node->condition) node->condition->accept(*this);
 
     if (node->thenBranch)
     {
         node->thenBranch->accept(*this);
     } else 
     {
+        GDSHADER_ERROR_IF(true, "If statement missing execution branch");
         diagnostics.push_back(reportError(node, "If statements require at least one execution path (missing branch)."));
     }
     if (node->elseBranch) node->elseBranch->accept(*this);
@@ -140,41 +165,63 @@ void LintingVisitor::visit(IfNode* node)
 
 void LintingVisitor::visit(WhileNode* node) 
 {
-    if (node->body) 
+    GDSHADER_RETURN_IF(!node, "WhileNode is null");
+
+    if (node->condition) node->condition->accept(*this);
+
+    if (node->body)
     {
         node->body->accept(*this);
     } else 
     {
+        GDSHADER_ERROR_IF(true, "While statement missing body");
         diagnostics.push_back(reportError(node, "while statement require at least one execution path (missing branch)."));
     }
 }
 
 void LintingVisitor::visit(ForNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "ForNode is null");
+    
+    if (node->init) node->init->accept(*this);
+    if (node->condition) node->condition->accept(*this);
+    if (node->increment) node->increment->accept(*this);
+
     if (node->body) 
     {
         node->body->accept(*this);
     } else 
     {
+        GDSHADER_ERROR_IF(true, "For statement missing body");
         diagnostics.push_back(reportError(node, "for statement require at least one execution path (missing branch)."));
     }
 }
 
 void LintingVisitor::visit(DoWhileNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "DoWhileNode is null");
+
+    if (node->condition) node->condition->accept(*this);
+    
     if (node->body) 
     {
         node->body->accept(*this);
     } else
     {
+        GDSHADER_ERROR_IF(true, "Do-while statement missing body");
         diagnostics.push_back(reportError(node, "do-while statement require at least one execution path (missing branch)."));
     }
 }
 
 void LintingVisitor::visit(SwitchNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "SwitchNode is null");
+
+    if (node->expression) node->expression->accept(*this);
+
     if (node->cases.empty())
     {
+        GDSHADER_ERROR_IF(true, "Switch statement missing cases");
         diagnostics.push_back(reportError(node, "switch statement require at least one execution path (missing branch)."));
     }
 
@@ -185,31 +232,93 @@ void LintingVisitor::visit(SwitchNode* node)
     }
 }
 
+void LintingVisitor::visit(ExpressionStatementNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "ExpressionStatementNode is null");
+    if (node->expr) node->expr->accept(*this);
+}
+
+void LintingVisitor::visit(VariableDeclNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "VariableDeclNode is null");
+    if (node->initializer) node->initializer->accept(*this);
+}
+
+void LintingVisitor::visit(BinaryOpNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "BinaryOpNode is null");
+    if (node->left) node->left->accept(*this);
+    if (node->right) node->right->accept(*this);
+}
+
+void LintingVisitor::visit(UnaryOpNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "UnaryOpNode is null");
+    if (node->operand) node->operand->accept(*this);
+}
+
+void LintingVisitor::visit(TernaryNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "TernaryNode is null");
+    if (node->condition) node->condition->accept(*this);
+    if (node->trueExpr) node->trueExpr->accept(*this);
+    if (node->falseExpr) node->falseExpr->accept(*this);
+}
+
+void LintingVisitor::visit(ConstructorNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "ConstructorNode is null");
+    for (const auto& arg : node->arguments) {
+        if (arg) arg->accept(*this);
+    }
+}
+
+void LintingVisitor::visit(ArrayAccessNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "ArrayAccessNode is null");
+    if (node->base) node->base->accept(*this);
+    if (node->index) node->index->accept(*this);
+}
+
+void LintingVisitor::visit(MemberAccessNode* node) 
+{
+    GDSHADER_RETURN_IF(!node, "MemberAccessNode is null");
+    if (node->base) node->base->accept(*this);
+}
+
 // -------------------------------------------------------------------------
 // HELPERS
 // -------------------------------------------------------------------------
 
 bool LintingVisitor::allPathsReturn(const ASTNode* node) 
 {
-    if (!node) return false;
+    if (!node)
+    {
+        SPDLOG_ERROR("ASTNode in return path check is nullptr");
+        return false;
+    }
 
     if (dynamic_cast<const ReturnNode*>(node)) return true;
     if (dynamic_cast<const DiscardNode*>(node)) return true;
     
     if (auto block = dynamic_cast<const BlockNode*>(node)) {
         for (const auto& stmt : block->statements) {
-            if (allPathsReturn(stmt.get())) return true;
+            if (stmt) {
+                if (allPathsReturn(stmt.get())) return true;
+            }
         }
         return false;
     }
 
-    if (auto ifNode = dynamic_cast<const IfNode*>(node)) {
-        // BOTH branches must return
-        return ifNode->elseBranch && 
+    if (auto ifNode = dynamic_cast<const IfNode*>(node)) 
+    {
+        if (ifNode) {
+            return ifNode->elseBranch && 
                allPathsReturn(ifNode->thenBranch.get()) && 
                allPathsReturn(ifNode->elseBranch.get());
+        }
     }
-    
+
     return false;
 }
 

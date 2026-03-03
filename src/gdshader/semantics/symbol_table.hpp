@@ -55,7 +55,7 @@ public:
      * @param name 
      * @return const Symbol* 
      */
-    const Symbol* lookup(const std::string& name, const int depth = 0) const;
+    const Symbol* lookup(const std::string& name) const;
 
     /**
      * @brief Returns all symbols that match the symbol name across ALL scopes.
