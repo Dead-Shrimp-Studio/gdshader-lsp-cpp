@@ -63,16 +63,25 @@ namespace gdshader_lsp
 
             Diagnostic reportError(const ASTNode* node, const std::string& msg)
             {
-                GDSHADER_ALWAYS_ASSERT(node != nullptr, "Node to report error on is nullptr.");
+                Diagnostic dg;
+                dg.message = msg;
+                GDSHADER_RETURN_VAL_IF(!node, dg, "ASTNode to report error on is nullptr");
+
                 SPDLOG_DEBUG("Reporting error: {}", msg);
-                return {msg, DiagnosticLevel::Error, node->range};
+                dg.range = node->range;
+                return dg;
             }
 
             Diagnostic reportWarning(const ASTNode* node, const std::string& msg)
             {
-                GDSHADER_ALWAYS_ASSERT(node != nullptr, "Node to report warning on is nullptr.");
-                SPDLOG_DEBUG("Reporting warning: {}", msg);
-                return {msg, DiagnosticLevel::Warning, node->range};
+                Diagnostic dg;
+                dg.message = msg;
+                dg.level = DiagnosticLevel::Warning;
+                GDSHADER_RETURN_VAL_IF(!node, dg, "ASTNode to report error on is nullptr");
+
+                SPDLOG_DEBUG("Reporting error: {}", msg);
+                dg.range = node->range;
+                return dg;
             }
 
     };

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.3] - Unreleased
+## [0.2.3] - 2026-03-03
 
 ### Added
 
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Debouncing timer saving cpu cycles
   - Background threading so parsing does not block the network loop anymore
 
-- Drastically improved logging & guard clauses
+- Drastically improved logging
 
 ### Changed
 
@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Missing types in the typeRegistry for almost all Sampler types
-- uniform hints in several cases faulty
+- uniform hints in several cases caused major problems in the parser
 - Minor bug in Sconstruct
 
 ## [0.2.2] - 2026-02-15
