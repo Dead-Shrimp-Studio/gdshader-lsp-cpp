@@ -71,7 +71,7 @@ void Parser::reportErrorAt(const Token& token, const std::string& message)
     panicMode = true;
     
     SPDLOG_ERROR("Parse Error at {}:{}: {}", token.line, token.column, message);
-    diagnostics.push_back({message, DiagnosticLevel::Error, {token.line, token.column, token.length, token.column}});
+    diagnostics.push_back({message, DiagnosticLevel::Error, {token.line, token.column, token.length, token.column + token.length}});
 }
 
 void Parser::synchronize() 

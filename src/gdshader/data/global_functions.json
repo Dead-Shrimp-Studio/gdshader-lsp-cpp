@@ -543,7 +543,7 @@
             },
             {
                 "name": "i",
-                "type": "out vec_type",
+                "type": "vec_type",
                 "doc": ""
             }
         ],
@@ -1637,12 +1637,12 @@
                 "doc": "The sampler to which the texture from which texels will be retrieved is bound."
             },
             {
-                "name": "[",
-                "type": "vec3 p",
-                "doc": ""
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
             },
             {
-                "name": "bias]",
+                "name": "bias",
                 "type": "float",
                 "doc": ""
             }
@@ -2093,7 +2093,7 @@
             },
             {
                 "name": "exp",
-                "type": "out vec_int_type",
+                "type": "vec_int_type",
                 "doc": "The value to be used as a source of exponent."
             }
         ],
@@ -2113,7 +2113,7 @@
             },
             {
                 "name": "exp",
-                "type": "out vec_int_type",
+                "type": "vec_int_type",
                 "doc": "The variable into which to place the exponent of `x`."
             }
         ],

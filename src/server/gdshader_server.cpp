@@ -241,8 +241,15 @@ void GdShaderServer::registerHandlers() {
                 const Symbol* sym = su->symbols->lookupAt(word, line);
 
                 if (sym) {
+                    
                     std::string content = "**" + sym->name + "**\n\n";
-                    content += "Type: `" + sym->type->toString() + "`\n";
+                    
+                    if (sym->category == SymbolType::Function || sym->category == SymbolType::Builtin) {
+                        content += "Return Type: `" + (sym->returnType ? sym->returnType->toString() : "void") + "`\n";
+                    } else {
+                        content += "Type: `" + (sym->type ? sym->type->toString() : "unknown") + "`\n";
+                    }
+                    
                     if (!sym->doc_string.empty()) {
                         content += "\n" + sym->doc_string;
                     }
@@ -347,7 +354,7 @@ void GdShaderServer::registerHandlers() {
                     item.kind = lsp::CompletionItemKind::Function;
                     
                     // Indicate overloading in the detail text ?
-                    item.detail = s.type->toString(); 
+                    item.detail = s.returnType ? s.returnType->toString() : "void";
                     
                     item.insertTextFormat = lsp::InsertTextFormat::Snippet;
                     std::string insertionText = s.name + "(";
@@ -365,7 +372,7 @@ void GdShaderServer::registerHandlers() {
                 }
                 else {
                     item.kind = lsp::CompletionItemKind::Variable;
-                    item.detail = s.type->toString();
+                    item.detail = s.type ? s.type->toString() : "unknown";
                     item.insertText = s.name;
                 }
 
@@ -473,8 +480,8 @@ void GdShaderServer::registerHandlers() {
             for (const auto* sym : overloads) {
                 lsp::SignatureInformation sigInfo;
                 
-                // Label: "float mix(float a, float b, float t)"
-                std::string label = sym->type->toString() + " " + sym->name + "(";
+                std::string returnStr = sym->returnType ? sym->returnType->toString() : "void";
+                std::string label = returnStr + " " + sym->name + "(";
                 
                 std::vector<lsp::ParameterInformation> paramsInfo;
                 

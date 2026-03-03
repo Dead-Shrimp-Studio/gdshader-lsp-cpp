@@ -183,7 +183,6 @@ public:
                 SPDLOG_WARN("[TypeReg] Invalid array size parsing: {}", sizeStr);
             }
         }
-
         return unknownType;
     }
 

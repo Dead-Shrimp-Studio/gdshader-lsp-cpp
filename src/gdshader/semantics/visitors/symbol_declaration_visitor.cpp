@@ -1,6 +1,7 @@
 
 #include "gdshader/ast/ast.h"
 #include "gdshader/semantics/visitors/symbol_declaration_visitor.hpp"
+#include "utils/logger.hpp"
 
 namespace gdshader_lsp {
 
@@ -17,13 +18,20 @@ namespace gdshader_lsp {
         else if (funcName == "sky") scope = ShaderStage::Sky;
         else if (funcName == "fog") scope = ShaderStage::Fog;
 
-        if (scope != ShaderStage::Global) {
+        if (scope != ShaderStage::Global)
+        {
             const auto& builtins = get_builtins(currentShaderType, scope); //
-            for (const auto& b : builtins) {
+            for (const auto& b : builtins) 
+            {
                 TypePtr t = typeRegistry.getType(b.type);
-                Mutability m = (b.qualifier == "in" || b.qualifier == "const") ? Mutability::ReadOnly : Mutability::Mutable;
 
-                Symbol s = symbols.createSymbol(b.name, t, SymbolType::Builtin, {}, m);
+                if (t->kind == TypeKind::UNKNOWN) {
+                    GDSHADER_WARN_IF(true, "Registering builtin '{}' failed: unknown type '{}'", b.name, b.type);
+                    continue; 
+                }
+
+                Mutability m = (b.qualifier == "in" || b.qualifier == "const") ? Mutability::ReadOnly : Mutability::Mutable;
+                Symbol s = symbols.createSymbol(b.name, t, SymbolType::Variable, {0,0,0,0}, m);
                 symbols.add(s);
             }
         }
@@ -31,7 +39,7 @@ namespace gdshader_lsp {
 
     TypePtr SymbolDeclarationVisitor::resolveTypeFromNode(const TypeNode *node)
     {
-        if (!node) return typeRegistry.getUnknownType(); // or unknown
+        GDSHADER_RETURN_VAL_IF(!node, typeRegistry.getUnknownType(), "TypeNode is null in resolveTypeFromNode");
 
         TypePtr currentType = typeRegistry.getType(node->baseName);
         for (int size : node->arraySizes) {
@@ -45,6 +53,7 @@ namespace gdshader_lsp {
 
     void SymbolDeclarationVisitor::visit(ProgramNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "ProgramNode is null");
         for (const auto& child : node->nodes) {
             if (child) child->accept(*this);
         }
@@ -52,24 +61,24 @@ namespace gdshader_lsp {
 
     void SymbolDeclarationVisitor::visit(BlockNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "BlockNode is null");
         int startLine = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
-        symbols.pushScope(startLine); // Open Scope
+        symbols.pushScope(startLine); 
 
         for (const auto& stmt : node->statements) {
             if (stmt) stmt->accept(*this);
         }
 
-        symbols.popScope(node->range.endLine); // Close Scope
+        symbols.popScope(node->range.endLine); 
     }
 
     void SymbolDeclarationVisitor::visit(ForNode* node) 
     {
-        // 'for' creates a scope for its init variable
+        GDSHADER_RETURN_IF(!node, "ForNode is null");
         int startLine = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
         symbols.pushScope(startLine); 
 
         if (node->init) node->init->accept(*this);
-        // Condition and Increment don't declare symbols, so we can skip them in this pass!
         if (node->body) node->body->accept(*this);
 
         symbols.popScope(node->range.endLine);
@@ -77,6 +86,7 @@ namespace gdshader_lsp {
 
     void SymbolDeclarationVisitor::visit(VariableDeclNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "VariableDeclNode is null");
         TypePtr type = resolveTypeFromNode(node->type.get());
         Mutability mut = node->isConst ? Mutability::ReadOnly : Mutability::Mutable;
 
@@ -85,6 +95,7 @@ namespace gdshader_lsp {
         if (symbols.lookup(node->name)) {
             if (symbols.add(s)) {
                 diagnostics.push_back(reportWarning(node, "Variable '" + node->name + "' shadows an existing declaration.")); 
+                GDSHADER_WARN_IF(true, "Variable shadowed: {}", node->name); // Log shadow instances to the server
             } else {
                 diagnostics.push_back(reportError(node, "Redefinition of variable '" + node->name + "' in the same scope."));
             }
@@ -92,13 +103,12 @@ namespace gdshader_lsp {
             symbols.add(s);
         }
 
-        // We do NOT check if initializer matches the type here. 
-        // But we DO visit it, in case it contains something we need (usually expressions don't).
         if (node->initializer) node->initializer->accept(*this);
     }
 
     void SymbolDeclarationVisitor::visit(FunctionNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "FunctionNode is null");
         TypePtr returnType = resolveTypeFromNode(node->returnType.get());
         
         std::vector<std::string> paramNames;
@@ -114,12 +124,18 @@ namespace gdshader_lsp {
         s.parameterNames = paramNames;
         s.returnType = returnType;
 
-        if (!symbols.add(s)) {
+        if (!symbols.add(s)) 
+        {
             diagnostics.push_back(reportError(node, "Redefinition of function '" + node->name + "'"));
         }
         
-        // Functions create a scope for their parameters
         symbols.pushScope(node->range.startLine);
+
+        if (currentShaderType == ShaderType::Unknown)
+        {
+            diagnostics.push_back(reportError(node, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
+        }
+
         loadBuiltinsForFunction(node->name);
 
         for (size_t i = 0; i < node->parameters.size(); i++) {
@@ -138,6 +154,7 @@ namespace gdshader_lsp {
 
     void SymbolDeclarationVisitor::visit(StructNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "StructNode is null");
         std::vector<std::pair<std::string, TypePtr>> members;
 
         for(const auto& m : node->members) {
@@ -154,6 +171,7 @@ namespace gdshader_lsp {
 
     void SymbolDeclarationVisitor::visit(ShaderTypeNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "ShaderTypeNode is null");
         if (node->shaderType == "canvas_item") currentShaderType = ShaderType::CanvasItem;
         else if (node->shaderType == "spatial") currentShaderType = ShaderType::Spatial;
         else if (node->shaderType == "particles") currentShaderType = ShaderType::Particles;
@@ -161,28 +179,38 @@ namespace gdshader_lsp {
         else if (node->shaderType == "fog") currentShaderType = ShaderType::Fog;
         else {
             currentShaderType = ShaderType::Unknown;
-            reportError(node, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog.");
+            GDSHADER_ERROR_IF(true, "Unknown shader type encountered: {}", node->shaderType);
+            diagnostics.push_back(reportError(node, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
         }
     }
 
     void gdshader_lsp::SymbolDeclarationVisitor::visit(RenderModeNode *node)
     {
-        if (currentShaderType != ShaderType::Spatial)
+        GDSHADER_RETURN_IF(!node, "RenderModeNode is null");
+        
+        bool is_not_spatial = (currentShaderType != ShaderType::Spatial);
+        GDSHADER_ERROR_IF(is_not_spatial, "render_mode declared outside spatial shader");
+        
+        if (is_not_spatial)
         {
-            reportError(node, "render_mode declarations are only valid in spatial type shaders.");
+            diagnostics.push_back(reportError(node, "render_mode declarations are only valid in spatial type shaders."));
         }
 
         for (const std::string& mode : node->modes)
         {
-            if (stringToRenderMode(mode) == RenderMode::UNKNOWN)
+            bool is_unknown = (stringToRenderMode(mode) == RenderMode::UNKNOWN);
+            GDSHADER_ERROR_IF(is_unknown, "Unknown render_mode: {}", mode);
+            
+            if (is_unknown)
             {
-                reportError(node, "Unknown render_mode: " + mode);
+                diagnostics.push_back(reportError(node, "Unknown render_mode: " + mode));
             }
         }
     }
 
     void SymbolDeclarationVisitor::visit(UniformNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "UniformNode is null");
         TypePtr type = resolveTypeFromNode(node->type.get());
 
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Uniform, node->range, Mutability::ReadOnly);
@@ -192,8 +220,6 @@ namespace gdshader_lsp {
             diagnostics.push_back(reportError(node, "Redefinition of uniform '" + s.name + "'"));
         }
         
-        // Visit the default value in case it contains nested expressions we need to traverse.
-        // Type checking (does the value match the uniform type?) is deferred to TypeCheckingVisitor.
         if (node->defaultValue) {
             node->defaultValue->accept(*this);
         }
@@ -201,6 +227,7 @@ namespace gdshader_lsp {
 
     void SymbolDeclarationVisitor::visit(VaryingNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "VaryingNode is null");
         TypePtr type = resolveTypeFromNode(node->type.get());
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Varying, node->range, Mutability::ReadOnly);        
         if (!symbols.add(s)) {
@@ -210,6 +237,7 @@ namespace gdshader_lsp {
 
     void SymbolDeclarationVisitor::visit(ConstNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "ConstNode is null");
         TypePtr type = resolveTypeFromNode(node->type.get());
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, Mutability::ReadOnly);         
         if (!symbols.add(s)) {
@@ -221,11 +249,9 @@ namespace gdshader_lsp {
         }
     }
 
-    // We only need to traverse these to ensure any declarations inside their 
-    // branches (e.g., inside block nodes) are reached and registered.
-
     void SymbolDeclarationVisitor::visit(IfNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "IfNode is null");
         if (node->condition) node->condition->accept(*this);
         if (node->thenBranch) node->thenBranch->accept(*this);
         if (node->elseBranch) node->elseBranch->accept(*this);
@@ -233,18 +259,21 @@ namespace gdshader_lsp {
 
     void SymbolDeclarationVisitor::visit(WhileNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "WhileNode is null");
         if (node->condition) node->condition->accept(*this);
         if (node->body) node->body->accept(*this);
     }
 
     void SymbolDeclarationVisitor::visit(DoWhileNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "DoWhileNode is null");
         if (node->body) node->body->accept(*this);
         if (node->condition) node->condition->accept(*this);
     }
 
     void SymbolDeclarationVisitor::visit(SwitchNode* node) 
     {
+        GDSHADER_RETURN_IF(!node, "SwitchNode is null");
         if (node->expression) node->expression->accept(*this);
 
         for (const auto& c : node->cases) {
@@ -257,4 +286,4 @@ namespace gdshader_lsp {
         }
     }
 
-} // namespace
+} // namespace gdshader_lsp

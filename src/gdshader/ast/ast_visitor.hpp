@@ -3,7 +3,7 @@
 
 #include "gdshader/ast/ast.h"
 #include "gdshader/diagnostics.hpp"
-#include <spdlog/spdlog.h>
+#include "utils/logger.hpp"
 
 namespace gdshader_lsp 
 {
@@ -63,12 +63,14 @@ namespace gdshader_lsp
 
             Diagnostic reportError(const ASTNode* node, const std::string& msg)
             {
+                GDSHADER_ALWAYS_ASSERT(node != nullptr, "Node to report error on is nullptr.");
                 SPDLOG_DEBUG("Reporting error: {}", msg);
                 return {msg, DiagnosticLevel::Error, node->range};
             }
 
             Diagnostic reportWarning(const ASTNode* node, const std::string& msg)
             {
+                GDSHADER_ALWAYS_ASSERT(node != nullptr, "Node to report warning on is nullptr.");
                 SPDLOG_DEBUG("Reporting warning: {}", msg);
                 return {msg, DiagnosticLevel::Warning, node->range};
             }

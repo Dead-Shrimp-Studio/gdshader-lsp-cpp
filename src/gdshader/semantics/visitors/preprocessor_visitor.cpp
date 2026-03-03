@@ -9,6 +9,7 @@ namespace gdshader_lsp {
 
 void PreprocessorVisitor::visit(ProgramNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "Program node is null.");
     for (const auto& child : node->nodes) {
         if (child) child->accept(*this);
     }
@@ -16,6 +17,7 @@ void PreprocessorVisitor::visit(ProgramNode* node)
 
 void PreprocessorVisitor::visit(BlockNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "Block node is null.");
     for (const auto& stmt : node->statements) {
         if (stmt) stmt->accept(*this);
     }
@@ -23,6 +25,8 @@ void PreprocessorVisitor::visit(BlockNode* node)
 
 void PreprocessorVisitor::visit(IncludeNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "Include node is null.");
+
     auto pm = ProjectManager::get_singleton();
     std::string absPath = pm->resolvePath(currentFilePath, node->path);
 
@@ -36,7 +40,7 @@ void PreprocessorVisitor::visit(IncludeNode* node)
     auto exportedSymbols = pm->getExports(absPath);
 
     if (!exportedSymbols) {
-        diagnostics.push_back(reportError(node, "Could not load include: " + node->path + " (Cycle or Not Found)"));
+        diagnostics.push_back(reportError(node, "Could not load include: " + node->path + " (not found or cyclic include)"));
         return;
     }
 
@@ -59,6 +63,7 @@ void PreprocessorVisitor::visit(IncludeNode* node)
 
 void PreprocessorVisitor::visit(DefineNode* node) 
 {
+    GDSHADER_RETURN_IF(!node, "Define node is null.");
     if (node->value) {
         TypePtr type = resolveType(node->value.get());
         
@@ -80,8 +85,7 @@ void PreprocessorVisitor::visit(DefineNode* node)
 
 TypePtr PreprocessorVisitor::resolveType(const ExpressionNode* node) 
 {
-    // A lightweight resolver just for basic macro values
-    if (!node) return typeRegistry.getUnknownType();
+    GDSHADER_RETURN_VAL_IF(!node, typeRegistry.getUnknownType(), "Expression node is null.");
 
     if (auto lit = dynamic_cast<const LiteralNode*>(node)) {
         if (lit->type == TokenType::TOKEN_NUMBER) 

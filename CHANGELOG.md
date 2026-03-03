@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - render_mode
 
 - Performance optimizations
+  - Pratt-Parser implementation
   - The double-visitor pattern as explained above
   - Debouncing timer saving cpu cycles
   - Background threading so parsing does not block the network loop anymore

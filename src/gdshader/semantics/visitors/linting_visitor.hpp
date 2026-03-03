@@ -48,18 +48,20 @@ public:
     void visit(DoWhileNode* node) override;
     void visit(SwitchNode* node) override;
 
+    void visit(ExpressionStatementNode* node) override;
+    void visit(VariableDeclNode* node) override;
+    
+    void visit(BinaryOpNode* node) override;
+    void visit(UnaryOpNode* node) override;
+    void visit(ConstructorNode* node) override;
+    void visit(MemberAccessNode* node) override;
+    void visit(ArrayAccessNode* node) override;
+    void visit(TernaryNode* node) override;
+
     // --- Ignored (No-ops for this pass) ---
     void visit(TypeNode* node) override {}
     void visit(LiteralNode* node) override {}
     void visit(IdentifierNode* node) override {}
-    void visit(BinaryOpNode* node) override {}
-    void visit(UnaryOpNode* node) override {}
-    void visit(ConstructorNode* node) override {}
-    void visit(MemberAccessNode* node) override {}
-    void visit(ArrayAccessNode* node) override {}
-    void visit(TernaryNode* node) override {}
-    void visit(ExpressionStatementNode* node) override {}
-    void visit(VariableDeclNode* node) override {}
     void visit(ParameterNode* node) override {}
     void visit(StructMemberNode* node) override {}
     void visit(CaseNode* node) override {}

@@ -9,7 +9,7 @@ namespace
 {
     bool signaturesMatch(const std::vector<TypePtr>& a, const std::vector<TypePtr>& b) 
     {
-        GDSHADER_RETURN_VAL_IF(a.size() != b.size(), false, "Signature size mismatch: {} vs {}", a.size(), b.size());
+        if (a.size() != b.size()) return false;
         for (size_t i = 0; i < a.size(); ++i) {
             // Dereference pointers to compare the actual Type objects
             if (*a[i] != *b[i]) return false;
@@ -111,7 +111,7 @@ void SymbolTable::addReference(Symbol* sym, const Range& range)
     sym->references.push_back(range);
 }
 
-const Symbol* SymbolTable::lookup(const std::string& name, const int depth) const 
+const Symbol* SymbolTable::lookup(const std::string& name) const 
 {
     GDSHADER_WARN_IF(name.empty(), "Looking up a symbol with an empty name.");
 
@@ -124,11 +124,10 @@ const Symbol* SymbolTable::lookup(const std::string& name, const int depth) cons
         }
         
         rdepth++;
-        if (depth > 0 && rdepth >= depth) break;
         
         walker = walker->parent;
     }
-    SPDLOG_DEBUG("Lookup Failed: '{}' with depth {} (checked {} scopes)", name, depth, rdepth);
+    SPDLOG_DEBUG("Lookup Failed: '{}' with depth {}", name, rdepth);
     return nullptr;
 }
 
@@ -197,8 +196,7 @@ const Symbol* SymbolTable::lookupAt(const std::string& name, int line) const
 {
     GDSHADER_WARN_IF(name.empty(), "lookupAt called with empty name at line {}", line);
     const Scope* searchScope = findScopeAt(line);
-    
-    // Walk up the scope tree
+
     while (searchScope) {
         auto it = searchScope->symbols.find(name);
         if (it != searchScope->symbols.end() && !it->second.empty()) {
@@ -248,7 +246,7 @@ Symbol SymbolTable::createSymbol(const std::string& name, TypePtr type, SymbolTy
                                             Mutability mutability, TypePtr returnType, const std::vector<TypePtr>& paramterTypes, const std::vector<std::string>& paramterNames, bool is_func_def) 
 {
     GDSHADER_WARN_IF(name.empty(), "Creating a symbol with an empty name!");
-    
+
     Symbol s;
     s.name = name;
     s.type = type;
