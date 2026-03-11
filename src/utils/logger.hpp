@@ -1,4 +1,3 @@
-
 #ifndef GDSHADER_LOGGER_H
 #define GDSHADER_LOGGER_H
 
@@ -85,14 +84,14 @@ class Logger
 #define GDSHADER_WARN_IF(condition, format_str, ...) \
     do { \
         if (condition) { \
-            SPDLOG_WARN("Triggered [{}]: " format_str, #condition, ##__VA_ARGS__); \
+            SPDLOG_WARN("Triggered [{}]: " format_str, #condition __VA_OPT__(,) __VA_ARGS__); \
         } \
     } while(0)
 
 #define GDSHADER_ERROR_IF(condition, format_str, ...) \
     do { \
         if (condition) { \
-            SPDLOG_ERROR("Triggered [{}]: " format_str, #condition, ##__VA_ARGS__); \
+            SPDLOG_ERROR("Triggered [{}]: " format_str, #condition __VA_OPT__(,) __VA_ARGS__); \
         } \
     } while(0)
 
@@ -101,7 +100,7 @@ class Logger
 #define GDSHADER_RETURN_IF(condition, format_str, ...) \
     do { \
         if (condition) { \
-            SPDLOG_ERROR("Early exit [{}]: " format_str, #condition, ##__VA_ARGS__); \
+            SPDLOG_ERROR("Early exit [{}]: " format_str, #condition __VA_OPT__(,) __VA_ARGS__); \
             return; \
         } \
     } while(0)
@@ -109,7 +108,7 @@ class Logger
 #define GDSHADER_RETURN_VAL_IF(condition, ret_val, format_str, ...) \
     do { \
         if (condition) { \
-            SPDLOG_ERROR("Early exit [{}]: " format_str, #condition, ##__VA_ARGS__); \
+            SPDLOG_ERROR("Early exit [{}]: " format_str, #condition __VA_OPT__(,) __VA_ARGS__); \
             return ret_val; \
         } \
     } while(0)
@@ -118,7 +117,7 @@ class Logger
 
 #define GDSHADER_FATAL(format_str, ...) \
     do { \
-        SPDLOG_CRITICAL(format_str, ##__VA_ARGS__); \
+        SPDLOG_CRITICAL(format_str __VA_OPT__(,) __VA_ARGS__); \
         spdlog::dump_backtrace(); \
         spdlog::default_logger()->flush(); \
         GDSHADER_DEBUG_BREAK(); \
@@ -130,7 +129,7 @@ class Logger
     #define GDSHADER_ASSERT(condition, format_str, ...) \
         do { \
             if (!(condition)) { \
-                SPDLOG_CRITICAL("Assertion Failed [{}] | " format_str, #condition, ##__VA_ARGS__); \
+                SPDLOG_CRITICAL("Assertion Failed [{}] | " format_str, #condition __VA_OPT__(,) __VA_ARGS__); \
                 spdlog::dump_backtrace(); \
                 spdlog::default_logger()->flush(); \
                 GDSHADER_DEBUG_BREAK(); \
@@ -141,7 +140,7 @@ class Logger
 #define GDSHADER_ALWAYS_ASSERT(condition, format_str, ...) \
     do { \
         if (!(condition)) { \
-            SPDLOG_CRITICAL("Fatal Assertion Failed [{}] | " format_str, #condition, ##__VA_ARGS__); \
+            SPDLOG_CRITICAL("Fatal Assertion Failed [{}] | " format_str, #condition __VA_OPT__(,) __VA_ARGS__); \
             spdlog::dump_backtrace(); \
             spdlog::default_logger()->flush(); \
             GDSHADER_DEBUG_BREAK(); \
