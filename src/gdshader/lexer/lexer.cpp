@@ -281,13 +281,16 @@ Token Lexer::createToken()
     // --- OPERATORS (Compound vs Single) ---
     
     if (current == '+') { 
+        if (peek() == '+') { advance(); advance(); return traceToken(TokenType::TOKEN_PLUS_PLUS, "++"); }
         if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_PLUS_EQUAL, "+="); }
         advance(); return traceToken(TokenType::TOKEN_PLUS, "+"); 
     }
     if (current == '-') { 
+        if (peek() == '-') { advance(); advance(); return traceToken(TokenType::TOKEN_MINUS_MINUS, "--"); }
         if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_MINUS_EQUAL, "-="); }
         advance(); return traceToken(TokenType::TOKEN_MINUS, "-"); 
     }
+
     if (current == '*') { 
         if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_STAR_EQUAL, "*="); }
         advance(); return traceToken(TokenType::TOKEN_STAR, "*"); 
@@ -303,20 +306,38 @@ Token Lexer::createToken()
 
     if (current == '&') { 
         if (peek() == '&') { advance(); advance(); return traceToken(TokenType::TOKEN_AND, "&&"); }
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_AMPERSAND_EQUAL, "&="); }
         advance(); return traceToken(TokenType::TOKEN_AMPERSAND, "&"); 
     }
 
     if (current == '|') { 
         if (peek() == '|') { advance(); advance(); return traceToken(TokenType::TOKEN_OR, "||"); }
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_PIPE_EQUAL, "|="); }
         advance(); return traceToken(TokenType::TOKEN_PIPE, "|"); 
     }
 
+    if (current == '^') { 
+        if (peek() == '^') { advance(); advance(); return traceToken(TokenType::TOKEN_CARET_CARET, "^^"); }
+        if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_CARET_EQUAL, "^="); }
+        advance(); return traceToken(TokenType::TOKEN_CARET, "^"); 
+    }
+
     if (current == '<') {
+        if (peek() == '<') { 
+            advance(); 
+            if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_LESS_LESS_EQUAL, "<<="); }
+            advance(); return traceToken(TokenType::TOKEN_LESS_LESS, "<<"); 
+        }
         if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_LESS_EQ, "<="); }
         advance(); return traceToken(TokenType::TOKEN_LESS, "<");
     }
 
     if (current == '>') {
+        if (peek() == '>') { 
+            advance(); 
+            if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_GREATER_GREATER_EQUAL, ">>="); }
+            advance(); return traceToken(TokenType::TOKEN_GREATER_GREATER, ">>"); 
+        }
         if (peek() == '=') { advance(); advance(); return traceToken(TokenType::TOKEN_GREATER_EQ, ">="); }
         advance(); return traceToken(TokenType::TOKEN_GREATER, ">");
     }

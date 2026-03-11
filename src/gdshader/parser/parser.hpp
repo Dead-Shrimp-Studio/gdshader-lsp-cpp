@@ -93,22 +93,33 @@ namespace gdshader_lsp
         std::unique_ptr<StatementNode> parseBreak();
         std::unique_ptr<StatementNode> parseContinue();
 
-        // --- Expression Parsing (Precedence Climbing) ---
+        // --- Expression Parsing (Pratt Parser) ---
         std::unique_ptr<ExpressionNode> parseExpression();
-        std::unique_ptr<ExpressionNode> parseAssignment();
-        std::unique_ptr<ExpressionNode> parseTernary();
-        std::unique_ptr<ExpressionNode> parseLogicOr();
-        std::unique_ptr<ExpressionNode> parseLogicAnd();
-        std::unique_ptr<ExpressionNode> parseEquality();
-        std::unique_ptr<ExpressionNode> parseComparison();
-        std::unique_ptr<ExpressionNode> parseTerm();       // + -
-        std::unique_ptr<ExpressionNode> parseFactor();     // * / %
-        std::unique_ptr<ExpressionNode> parseUnary();      // - !
-        std::unique_ptr<ExpressionNode> parseCallOrAccess(); // Postfix: (), [], .
-        std::unique_ptr<ExpressionNode> parsePrimary();
+        std::unique_ptr<ExpressionNode> parsePrecedence(Precedence precedence);
+        
+        // Dispatchers
+        std::unique_ptr<ExpressionNode> parsePrefix(TokenType type);
+        std::unique_ptr<ExpressionNode> parseInfix(std::unique_ptr<ExpressionNode> left, TokenType type);
+
+        // Precedence mapping
+        Precedence getPrecedence(TokenType type);
+
+        // Individual expression parsers
+        std::unique_ptr<ExpressionNode> parseNumber();
+        std::unique_ptr<ExpressionNode> parseString();
+        std::unique_ptr<ExpressionNode> parseBoolean();
+        std::unique_ptr<ExpressionNode> parseIdentifier();
+        std::unique_ptr<ExpressionNode> parseGrouping();
+        std::unique_ptr<ExpressionNode> parseUnary();
+        std::unique_ptr<ExpressionNode> parseBinary(std::unique_ptr<ExpressionNode> left);
+        std::unique_ptr<ExpressionNode> parseTernary(std::unique_ptr<ExpressionNode> left);
+        std::unique_ptr<ExpressionNode> parseCall(std::unique_ptr<ExpressionNode> left);
+        std::unique_ptr<ExpressionNode> parseMemberAccess(std::unique_ptr<ExpressionNode> left);
+        std::unique_ptr<ExpressionNode> parseArrayAccess(std::unique_ptr<ExpressionNode> left);
         
         // Helper for parsing types (e.g. "vec3", "void", "Sampler2D")
         std::string parseTypeString();
+        bool isTypeKeyword(TokenType type);
         std::unique_ptr<TypeNode> parseType();
 
         void mergeBinaryRange(BinaryOpNode* node);

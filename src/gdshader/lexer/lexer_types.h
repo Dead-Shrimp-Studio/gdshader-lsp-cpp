@@ -57,6 +57,17 @@ enum class TokenType {
     TOKEN_LBRACKET,     // [
     TOKEN_RBRACKET,     // ]
 
+    TOKEN_PLUS_PLUS,            // ++
+    TOKEN_MINUS_MINUS,          // --
+    TOKEN_LESS_LESS,            // <<
+    TOKEN_GREATER_GREATER,      // >>
+    TOKEN_LESS_LESS_EQUAL,      // <<=
+    TOKEN_GREATER_GREATER_EQUAL, // >>=
+    TOKEN_AMPERSAND_EQUAL,      // &=
+    TOKEN_PIPE_EQUAL,           // |=
+    TOKEN_CARET_EQUAL,          // ^=
+    TOKEN_CARET_CARET,          // ^^
+
     // -------------------------------------------------------------------------
     // KEYWORDS: GODOT SPECIFIC
     // -------------------------------------------------------------------------
@@ -181,6 +192,17 @@ inline std::string tokenTypeToString(TokenType t) {
         case TokenType::TOKEN_RBRACE:          return "TOKEN_RBRACE";
         case TokenType::TOKEN_LBRACKET:        return "TOKEN_LBRACKET";
         case TokenType::TOKEN_RBRACKET:        return "TOKEN_RBRACKET";
+
+        case TokenType::TOKEN_PLUS_PLUS:       return "TOKEN_PLUS_PLUS";
+        case TokenType::TOKEN_MINUS_MINUS:     return "TOKEN_MINUS_MINUS";
+        case TokenType::TOKEN_LESS_LESS:       return "TOKEN_LESS_LESS";
+        case TokenType::TOKEN_GREATER_GREATER: return "TOKEN_GREATER_GREATER";
+        case TokenType::TOKEN_LESS_LESS_EQUAL: return "TOKEN_LESS_LESS_EQUAL";
+        case TokenType::TOKEN_GREATER_GREATER_EQUAL: return "TOKEN_GREATER_GREATER_EQUAL";
+        case TokenType::TOKEN_AMPERSAND_EQUAL: return "TOKEN_AMPERSAND_EQUAL";
+        case TokenType::TOKEN_PIPE_EQUAL:      return "TOKEN_PIPE_EQUAL";
+        case TokenType::TOKEN_CARET_EQUAL:     return "TOKEN_CARET_EQUAL";
+        case TokenType::TOKEN_CARET_CARET:     return "TOKEN_CARET_CARET";
 
         // ---------------------------------------------------------------------
         // KEYWORDS: GODOT SPECIFIC
