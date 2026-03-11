@@ -70,8 +70,8 @@ void Parser::reportErrorAt(const Token& token, const std::string& message)
     if (panicMode) return; // Suppress cascade errors
     panicMode = true;
     
-    SPDLOG_ERROR("Parse Error at {}:{}: {}", token.line, token.column, message);
-    diagnostics.push_back({message, DiagnosticLevel::Error, {token.line, token.column, token.length, token.column + token.length}});
+    SPDLOG_DEBUG("Parse Error at {}:{}: {}", token.line, token.column, message);
+    diagnostics.push_back({message, DiagnosticLevel::Error, {token.line, token.column, token.line, token.column + token.length}});
 }
 
 void Parser::synchronize() 
@@ -97,7 +97,8 @@ void Parser::synchronize()
             case TokenType::KEYWORD_FOR:
             case TokenType::KEYWORD_WHILE:
             case TokenType::KEYWORD_RETURN:
-                return; // Found a synchronization point
+                SPDLOG_INFO("[Parser] Found sync point at {}", tokenTypeToString(current_token.type));
+                return;
             default:
                 advance();
         }

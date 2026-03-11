@@ -122,7 +122,7 @@ enum class TokenType {
     KEYWORD_BREAK,
     KEYWORD_CONTINUE,
     KEYWORD_RETURN,
-    KEYWORD_DISCARD, // <-- Shader specific
+    KEYWORD_DISCARD,
     KEYWORD_STRUCT,
     KEYWORD_TRUE,
     KEYWORD_FALSE
