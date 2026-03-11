@@ -315,7 +315,6 @@ std::unique_ptr<ExpressionNode> Parser::parseCall(std::unique_ptr<ExpressionNode
 
     if (!check(TokenType::TOKEN_RPAREN)) {
         do {
-            if (check(TokenType::TOKEN_RPAREN)) break; // Handle trailing commas gracefully
             callNode->arguments.push_back(parseExpression());
         } while (match(TokenType::TOKEN_COMMA));
     }

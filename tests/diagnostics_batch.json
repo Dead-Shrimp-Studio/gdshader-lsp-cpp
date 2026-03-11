@@ -771,5 +771,148 @@
             "void fragment() {}"
         ],
         "expected_error": "Cannot initialize uniform"
+    },
+    {
+        "name": "increment_const",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    const int x = 1;",
+            "    x++;",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "increment_literal",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    1++;",
+            "}"
+        ],
+        "expected_error": "assign"
+    },
+    {
+        "name": "bitwise_shift_float",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = 1.0 << 2.0;",
+            "}"
+        ],
+        "expected_error": "Invalid binary operation"
+    },
+    {
+        "name": "invalid_prefix_plus",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    int x = +1;",
+            "}"
+        ],
+        "expected_error": "Expected expression"
+    },
+    {
+        "name": "missing_operand_bitwise",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    int x = 1 | ;",
+            "}"
+        ],
+        "expected_error": "Expected expression"
+    },
+    {
+        "name": "logical_xor_type_mismatch",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    bool b = true ^^ 1.0;",
+            "}"
+        ],
+        "expected_error": "Invalid binary operation"
+    },
+    {
+        "name": "bitwise_assign_to_const",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    const int x = 1;",
+            "    x ^= 2;",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "dangling_comma_func_call",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = sin(1.0, );",
+            "}"
+        ],
+        "expected_error": "Expected expression"
+    },
+    {
+        "name": "group_uniforms_no_name",
+        "code": [
+            "shader_type spatial;",
+            "group_uniforms;",
+            "void fragment() {}"
+        ],
+        "expected_error": "Expected identifier"
+    },
+    {
+        "name": "double_increment",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    int x = 1;",
+            "    x++++;",
+            "}"
+        ],
+        "expected_error": "assign"
+    },
+    {
+        "name": "bitwise_not_on_float",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = ~1.0;",
+            "}"
+        ],
+        "expected_error": "Type mismatch"
+    },
+    {
+        "name": "nested_ternary_missing_colon",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    int x = true ? 1 : false ? 2 ;",
+            "}"
+        ],
+        "expected_error": "Expected ':'"
+    },
+    {
+        "name": "empty_array_access",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    vec3 v = vec3(1.0);",
+            "    float x = v[];",
+            "}"
+        ],
+        "expected_error": "Expected expression"
+    },
+    {
+        "name": "preprocessor_defined_no_parens",
+        "code": [
+            "shader_type spatial;",
+            "#if defined MACRO",
+            "#endif",
+            "void fragment() {}"
+        ],
+        "expected_error": "Expected '(' after defined"
     }
 ]

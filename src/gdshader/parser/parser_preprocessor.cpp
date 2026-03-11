@@ -13,7 +13,8 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
     int startLine = previous_token.line; // The line of the '#' token
 
     // 1. Consume the directive name (define, ifdef, etc.)
-    if (check(TokenType::TOKEN_IDENTIFIER)) {
+    if (check(TokenType::TOKEN_IDENTIFIER) || check(TokenType::KEYWORD_IF) || check(TokenType::KEYWORD_ELSE)) {
+        
         std::string directive = current_token.value;
         advance();
 
@@ -54,6 +55,14 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
 
                 return node;
             }
+        }
+
+        // --- #if EXPRESSION ---
+        else if (directive == "if") {
+            bool condition = evaluatePreprocessorExpression();
+            preprocessorStack.push_back(condition);
+            if (!condition) skipBlock();
+            return nullptr;
         }
 
         // --- #ifdef NAME ---
