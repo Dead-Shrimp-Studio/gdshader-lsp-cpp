@@ -76,7 +76,7 @@ else:
 # COMPILER CONFIGURATION
 # -------------------------------------------------------------------------
 if target_platform == 'windows' and is_native_build:
-    env.Append(CXXFLAGS=['/std:c++20', '/W3', '/EHsc', '/nologo', '/utf-8', '/wd4267'])
+    env.Append(CXXFLAGS=['/std:c++20', '/Zc:preprocessor', '/W3', '/EHsc', '/nologo', '/utf-8', '/wd4267'])
     
     if build_target == 'release':
         env.Append(CXXFLAGS=['/O2', '/MD'])
