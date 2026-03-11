@@ -11,16 +11,21 @@ namespace gdshader_lsp
     enum Precedence
     {
         PREC_NONE,
-        PREC_ASSIGNMENT,  // = += -= *= /= %=
+        PREC_ASSIGNMENT,  // = += -= *= /= %= <<= >>= &= ^= |=
         PREC_TERNARY,     // ?:
         PREC_OR,          // ||
+        PREC_LOGICAL_XOR, // ^^
         PREC_AND,         // &&
+        PREC_BITWISE_OR,  // |
+        PREC_BITWISE_XOR, // ^
+        PREC_BITWISE_AND, // &
         PREC_EQUALITY,    // == !=
         PREC_COMPARISON,  // < > <= >=
+        PREC_SHIFT,       // << >>
         PREC_TERM,        // + -
         PREC_FACTOR,      // * / %
-        PREC_UNARY,       // ! -
-        PREC_CALL,        // . () []
+        PREC_UNARY,       // ! - ~ ++ -- (prefix)
+        PREC_CALL,        // . () [] ++ -- (postfix)
         PREC_PRIMARY
     };
 

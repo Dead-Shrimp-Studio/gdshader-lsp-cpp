@@ -118,6 +118,41 @@ std::string Parser::parseTypeString()
     return type;
 }
 
+bool Parser::isTypeKeyword(TokenType type) 
+{
+    switch (type) {
+        case TokenType::KEYWORD_VOID:
+        case TokenType::KEYWORD_BOOL:
+        case TokenType::KEYWORD_INT:
+        case TokenType::KEYWORD_UINT:
+        case TokenType::KEYWORD_FLOAT:
+        case TokenType::KEYWORD_VEC2:
+        case TokenType::KEYWORD_VEC3:
+        case TokenType::KEYWORD_VEC4:
+        case TokenType::KEYWORD_IVEC2:
+        case TokenType::KEYWORD_IVEC3:
+        case TokenType::KEYWORD_IVEC4:
+        case TokenType::KEYWORD_UVEC2:
+        case TokenType::KEYWORD_UVEC3:
+        case TokenType::KEYWORD_UVEC4:
+        case TokenType::KEYWORD_BVEC2:
+        case TokenType::KEYWORD_BVEC3:
+        case TokenType::KEYWORD_BVEC4:
+        case TokenType::KEYWORD_MAT2:
+        case TokenType::KEYWORD_MAT3:
+        case TokenType::KEYWORD_MAT4:
+        case TokenType::KEYWORD_SAMPLER2D:
+        case TokenType::KEYWORD_ISAMPLER2D:
+        case TokenType::KEYWORD_USAMPLER2D:
+        case TokenType::KEYWORD_SAMPLER3D:
+        case TokenType::KEYWORD_SAMPLERCUBE:
+        case TokenType::KEYWORD_SAMPLER2DARRAY:
+            return true;
+        default:
+            return false;
+    }
+}
+
 std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
 {
     Token start = current_token;
