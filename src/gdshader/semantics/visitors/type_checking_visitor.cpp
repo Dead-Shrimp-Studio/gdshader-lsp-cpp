@@ -143,9 +143,13 @@ void TypeCheckingVisitor::visit(IdentifierNode* node)
 void TypeCheckingVisitor::visit(BinaryOpNode* node) 
 {
     GDSHADER_RETURN_IF(!node, "BinaryOpNode is null");
-    bool isAssignment = (node->op == TokenType::TOKEN_EQUAL || node->op == TokenType::TOKEN_PLUS_EQUAL ||
-                        node->op == TokenType::TOKEN_MINUS_EQUAL || node->op == TokenType::TOKEN_STAR_EQUAL || 
-                        node->op == TokenType::TOKEN_SLASH_EQUAL || node->op == TokenType::TOKEN_PERCENT_EQUAL);
+    bool isAssignment = (
+        node->op == TokenType::TOKEN_EQUAL || node->op == TokenType::TOKEN_PLUS_EQUAL ||
+        node->op == TokenType::TOKEN_MINUS_EQUAL || node->op == TokenType::TOKEN_STAR_EQUAL || 
+        node->op == TokenType::TOKEN_SLASH_EQUAL || node->op == TokenType::TOKEN_PERCENT_EQUAL ||
+        node->op == TokenType::TOKEN_LESS_LESS_EQUAL || node->op == TokenType::TOKEN_GREATER_GREATER_EQUAL ||
+        node->op == TokenType::TOKEN_AMPERSAND_EQUAL || node->op == TokenType::TOKEN_PIPE_EQUAL || node->op == TokenType::TOKEN_CARET_EQUAL
+    );
 
     if (isAssignment) {
         visitAssignment(node); // Route to assignment logic
@@ -226,12 +230,17 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
     } else {
         TokenType mathOp;
         switch (node->op) {
-            case TokenType::TOKEN_PLUS_EQUAL:    mathOp = TokenType::TOKEN_PLUS; break;
-            case TokenType::TOKEN_MINUS_EQUAL:   mathOp = TokenType::TOKEN_MINUS; break;
-            case TokenType::TOKEN_STAR_EQUAL:    mathOp = TokenType::TOKEN_STAR; break;
-            case TokenType::TOKEN_SLASH_EQUAL:   mathOp = TokenType::TOKEN_SLASH; break;
-            case TokenType::TOKEN_PERCENT_EQUAL: mathOp = TokenType::TOKEN_PERCENT; break;
-            default: mathOp = TokenType::TOKEN_ERROR; break;
+            case TokenType::TOKEN_PLUS_EQUAL:                   mathOp = TokenType::TOKEN_PLUS; break;
+            case TokenType::TOKEN_MINUS_EQUAL:                  mathOp = TokenType::TOKEN_MINUS; break;
+            case TokenType::TOKEN_STAR_EQUAL:                   mathOp = TokenType::TOKEN_STAR; break;
+            case TokenType::TOKEN_SLASH_EQUAL:                  mathOp = TokenType::TOKEN_SLASH; break;
+            case TokenType::TOKEN_PERCENT_EQUAL:                mathOp = TokenType::TOKEN_PERCENT; break;
+            case TokenType::TOKEN_LESS_LESS_EQUAL:              mathOp = TokenType::TOKEN_LESS_LESS; break;
+            case TokenType::TOKEN_GREATER_GREATER_EQUAL:        mathOp = TokenType::TOKEN_GREATER_GREATER; break;
+            case TokenType::TOKEN_AMPERSAND_EQUAL:              mathOp = TokenType::TOKEN_AMPERSAND; break;
+            case TokenType::TOKEN_PIPE_EQUAL:                   mathOp = TokenType::TOKEN_PIPE; break;
+            case TokenType::TOKEN_CARET_EQUAL:                  mathOp = TokenType::TOKEN_CARET; break;
+            default:                                            mathOp = TokenType::TOKEN_ERROR; break;
         }
 
         // 1. Check if the math is valid (e.g. vec2 * float -> vec2)
@@ -394,6 +403,38 @@ void TypeCheckingVisitor::visit(UnaryOpNode* node)
 {
     GDSHADER_RETURN_IF(!node, "UnaryOpNode is null");
     if (node->operand) node->operand->accept(*this);
+
+    // Rule: ++ and -- require an L-Value (assignable target)
+    if (node->op == TokenType::TOKEN_PLUS_PLUS || node->op == TokenType::TOKEN_MINUS_MINUS) {
+        bool assignable = false;
+        if (dynamic_cast<const IdentifierNode*>(node->operand.get()) || 
+            dynamic_cast<const MemberAccessNode*>(node->operand.get()) || 
+            dynamic_cast<const ArrayAccessNode*>(node->operand.get())) {
+            assignable = true;
+        }
+
+        if (!assignable) {
+            GDSHADER_ERROR_IF(true, "Expression is not assignable");
+            diagnostics.push_back(reportError(node->operand.get(), "Expression is not assignable."));
+        } else {
+            const Symbol* s = getRootSymbol(node->operand.get());
+            if (s && s->mutability == Mutability::ReadOnly) {
+                GDSHADER_ERROR_IF(true, "Attempted assignment to read-only variable '{}'", s->name);
+                diagnostics.push_back(reportError(node->operand.get(), "Cannot assign to read-only variable '" + s->name + "'"));
+            }
+        }
+    }
+
+    // Rule: ~ (Bitwise NOT) only works on Integers
+    if (node->op == TokenType::TOKEN_TILDE) {
+        TypePtr t = resolveType(node->operand.get());
+        if (t->kind != TypeKind::UNKNOWN && t->name.find("int") == std::string::npos && 
+            t->name.find("uint") == std::string::npos && t->name.find("ivec") == std::string::npos && 
+            t->name.find("uvec") == std::string::npos) {
+            GDSHADER_ERROR_IF(true, "Bitwise NOT on non-integer type");
+            diagnostics.push_back(reportError(node, "Type mismatch: bitwise NOT requires integer type."));
+        }
+    }
 }
 
 void TypeCheckingVisitor::visit(FunctionCallNode* node) 
@@ -646,6 +687,24 @@ TypePtr TypeCheckingVisitor::getBinaryOpResultType(TypePtr l, TypePtr r, TokenTy
                          op == TokenType::TOKEN_LESS_EQ || op == TokenType::TOKEN_GREATER_EQ);
 
     if (isComparison) return typeRegistry.getType("bool"); 
+
+    if (op == TokenType::TOKEN_CARET_CARET) {
+        if (l->name == "bool" && r->name == "bool") return typeRegistry.getType("bool");
+        return typeRegistry.getUnknownType();
+    }
+
+    bool isBitwise = (op == TokenType::TOKEN_LESS_LESS || op == TokenType::TOKEN_GREATER_GREATER ||
+                      op == TokenType::TOKEN_AMPERSAND || op == TokenType::TOKEN_PIPE || op == TokenType::TOKEN_CARET);
+    if (isBitwise) {
+        bool lIsInt = (l->name.find("int") != std::string::npos || l->name.find("uint") != std::string::npos || l->name.find("ivec") != std::string::npos || l->name.find("uvec") != std::string::npos);
+        bool rIsInt = (r->name.find("int") != std::string::npos || r->name.find("uint") != std::string::npos || r->name.find("ivec") != std::string::npos || r->name.find("uvec") != std::string::npos);
+        
+        if (lIsInt && rIsInt) {
+            return l->kind == TypeKind::VECTOR ? l : (r->kind == TypeKind::VECTOR ? r : l); 
+        }
+        return typeRegistry.getUnknownType();
+    }
+
     if (l == typeRegistry.getType("bool") || r == typeRegistry.getType("bool")) return typeRegistry.getUnknownType();
     if (*l == *r) return l; 
 

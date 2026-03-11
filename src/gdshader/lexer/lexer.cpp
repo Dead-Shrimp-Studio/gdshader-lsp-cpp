@@ -365,6 +365,7 @@ Token Lexer::createToken()
     if (current == ']') { advance(); return traceToken(TokenType::TOKEN_RBRACKET, "]", "Symbol"); }
     if (current == ',') { advance(); return traceToken(TokenType::TOKEN_COMMA, ",", "Symbol"); }
     if (current == '?') { advance(); return traceToken(TokenType::TOKEN_QUESTION, "?", "Symbol"); }
+    if (current == '~') { advance(); return traceToken(TokenType::TOKEN_TILDE, "~", "Symbol"); }
 
     // Fallback
     advance();

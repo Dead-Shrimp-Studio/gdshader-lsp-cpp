@@ -91,7 +91,9 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parseGroupUniform()
                 reportError("Expected identifier after '.' in group name");
             }
         }
-    } 
+    } else {
+        reportError("Expected identifier");
+    }
 
     consume(TokenType::TOKEN_SEMI, "Expected ';' after group_uniforms");
     setRange(node.get(), start, previous_token);
