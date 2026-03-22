@@ -8,10 +8,12 @@
 
 #include "gdshader/lexer/lexer_types.h"
 #include "gdshader/diagnostics.hpp"
+#include "gdshader/semantics/type_registry.hpp"
 
 namespace gdshader_lsp 
 {
     class ASTVisitor;
+    class Symbol;
 }
 
 namespace gdshader_lsp {
@@ -49,7 +51,10 @@ struct TypeNode : public ASTNode
 // EXPRESSIONS
 // -------------------------------------------------------------------------
 
-struct ExpressionNode : public ASTNode {};
+struct ExpressionNode : public ASTNode 
+{
+    TypePtr evaluatedType = nullptr;
+};
 
 struct LiteralNode : public ExpressionNode {
     void accept(ASTVisitor& visitor) override;
@@ -60,6 +65,7 @@ struct LiteralNode : public ExpressionNode {
 struct IdentifierNode : public ExpressionNode {
     void accept(ASTVisitor& visitor) override;
     std::string name;
+    const Symbol* resolvedSymbol = nullptr;
 };
 
 struct BinaryOpNode : public ExpressionNode {

@@ -31,7 +31,7 @@ void TypeCheckingVisitor::visit(VariableDeclNode* node)
         GDSHADER_RETURN_IF(node->name.empty(), "node name is empty");
         
         // We use lookupAt to get the type we registered in Pass 1
-        int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
+        int line = node->range.startLine;
         const Symbol* s = symbols.lookupAt(node->name, line);
         
         if (s) {
@@ -56,7 +56,7 @@ void TypeCheckingVisitor::visit(VariableDeclNode* node)
 void TypeCheckingVisitor::visit(UniformNode* node) 
 {
     GDSHADER_RETURN_IF(!node, "UniformNode is null");
-    int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
+    int line = node->range.startLine;
     const Symbol* s = symbols.lookupAt(node->name, line);
     
     if (s && node->defaultValue) {
@@ -75,7 +75,7 @@ void TypeCheckingVisitor::visit(UniformNode* node)
 void TypeCheckingVisitor::visit(FunctionNode* node) 
 {
     GDSHADER_RETURN_IF(!node, "FunctionNode is null");
-    int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
+    int line = node->range.startLine;
     const Symbol* funcSym = symbols.lookupAt(node->name, line);
     if (!funcSym) return;
 
@@ -131,12 +131,14 @@ void TypeCheckingVisitor::visit(ReturnNode* node) {
 void TypeCheckingVisitor::visit(IdentifierNode* node) 
 {
     GDSHADER_RETURN_IF(!node, "IdentifierNode is null");
-    int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
+    int line = node->range.startLine;
     const Symbol* s = symbols.lookupAt(node->name, line);
     
     if (!s) {
         GDSHADER_ERROR_IF(true, "Undefined identifier '{}'", node->name);
         diagnostics.push_back(reportError(node, "Undefined identifier '" + node->name + "'"));
+    } else {
+        node->resolvedSymbol = s;
     }
 }
 
@@ -640,35 +642,32 @@ TypePtr TypeCheckingVisitor::resolveType(const ExpressionNode* node)
 {
     GDSHADER_RETURN_VAL_IF(!node, typeRegistry.getUnknownType(), "ExpressionNode is null in resolveType");
 
+    TypePtr result = typeRegistry.getUnknownType();
+
     if (auto lit = dynamic_cast<const LiteralNode*>(node)) {
-        if (lit->type == TokenType::TOKEN_NUMBER) 
-            return (lit->value.find('.') != std::string::npos) ? typeRegistry.getType("float") : typeRegistry.getType("int");
-        if (lit->type == TokenType::KEYWORD_TRUE || lit->type == TokenType::KEYWORD_FALSE) 
-            return typeRegistry.getType("bool");
-        return typeRegistry.getUnknownType();
+        if (lit->type == TokenType::TOKEN_NUMBER) result = (lit->value.find('.') != std::string::npos) ? typeRegistry.getType("float") : typeRegistry.getType("int");
+        else if (lit->type == TokenType::KEYWORD_TRUE || lit->type == TokenType::KEYWORD_FALSE) result =  typeRegistry.getType("bool");
+        else result = typeRegistry.getUnknownType();
     }
 
     if (auto id = dynamic_cast<const IdentifierNode*>(node)) {
         int line = (id->range.startLine > 0) ? id->range.startLine - 1 : 0;
         const Symbol* s = symbols.lookupAt(id->name, line);
-        if (s) {
-            return s->type ? s->type : typeRegistry.getUnknownType();
-        }
-        return typeRegistry.getUnknownType();
+        result = (s && s->type) ? s->type : typeRegistry.getUnknownType();
     }
 
     if (auto bin = dynamic_cast<const BinaryOpNode*>(node)) {
         TypePtr l = resolveType(bin->left.get());
         TypePtr r = resolveType(bin->right.get());
-        return getBinaryOpResultType(l, r, bin->op);
+        result = getBinaryOpResultType(l, r, bin->op);
     }
 
     if (auto idx = dynamic_cast<const ArrayAccessNode*>(node)) {
         TypePtr base = resolveType(idx->base.get());
-        if (base->kind == TypeKind::ARRAY) return base->baseType;
-        if (base->kind == TypeKind::VECTOR) return base->baseType;
-        if (base->kind == TypeKind::MATRIX) return typeRegistry.getType("vec" + std::to_string(base->componentCount));
-        return typeRegistry.getUnknownType();
+        if (base->kind == TypeKind::ARRAY) result = base->baseType;
+        else if (base->kind == TypeKind::VECTOR) result = base->baseType;
+        else if (base->kind == TypeKind::MATRIX) result = typeRegistry.getType("vec" + std::to_string(base->componentCount));
+        else result = typeRegistry.getUnknownType();
     }
 
     if (auto call = dynamic_cast<const FunctionCallNode*>(node)) 
@@ -687,25 +686,26 @@ TypePtr TypeCheckingVisitor::resolveType(const ExpressionNode* node)
         }
 
         const Symbol* match = findBestOverload(call, argTypes);
-        if (match && match->returnType) return match->returnType;
-        return typeRegistry.getUnknownType();
+        if (match && match->returnType) result = match->returnType;
+        else result = typeRegistry.getUnknownType();
     }
     
     if (auto mem = dynamic_cast<const MemberAccessNode*>(node)) {
         if (mem->member == "length") return typeRegistry.getType("int");
         TypePtr base = resolveType(mem->base.get());
-        return typeRegistry.getMemberType(base, mem->member);
+        result = typeRegistry.getMemberType(base, mem->member);
     }
 
     if (auto un = dynamic_cast<const UnaryOpNode*>(node)) {
-        return resolveType(un->operand.get());
+        result = resolveType(un->operand.get());
     }
 
     if (auto tern = dynamic_cast<const TernaryNode*>(node)) {
-        return resolveType(tern->trueExpr.get());
+        result = resolveType(tern->trueExpr.get());
     }
 
-    return typeRegistry.getUnknownType();
+    const_cast<ExpressionNode*>(node)->evaluatedType = result;
+    return result;
 }
 
 TypePtr TypeCheckingVisitor::getBinaryOpResultType(TypePtr l, TypePtr r, TokenType op) 
