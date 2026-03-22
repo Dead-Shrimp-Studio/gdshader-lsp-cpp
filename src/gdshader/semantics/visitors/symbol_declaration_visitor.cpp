@@ -94,6 +94,10 @@ namespace gdshader_lsp {
         }
 
         TypePtr type = resolveTypeFromNode(node->type.get());
+        if (type->kind == TypeKind::SAMPLER) {
+            diagnostics.push_back(reportError(node, "Samplers must be declared as uniform, cannot be local."));
+        }
+
         Mutability mut = node->isConst ? Mutability::ReadOnly : Mutability::Mutable;
 
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, mut);        
@@ -166,6 +170,10 @@ namespace gdshader_lsp {
         for(const auto& m : node->members) {
             TypePtr memberType = resolveTypeFromNode(m->type.get());
             members.push_back({m->name, memberType});
+
+            if (memberType->kind == TypeKind::UNKNOWN) {
+                diagnostics.push_back(reportError(node, "Undefined type in struct member '" + m->name + "'."));
+            }
         }
 
         typeRegistry.registerStruct(node->name, members);
@@ -219,6 +227,10 @@ namespace gdshader_lsp {
         GDSHADER_RETURN_IF(!node, "UniformNode is null");
         TypePtr type = resolveTypeFromNode(node->type.get());
 
+        if (node->isInstance && type->kind == TypeKind::SAMPLER) {
+            diagnostics.push_back(reportError(node, "Instance uniforms cannot be opaque types (like samplers)."));
+        }
+
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Uniform, node->range, Mutability::ReadOnly);
         s.hint = node->hint;
 
@@ -235,6 +247,12 @@ namespace gdshader_lsp {
     {
         GDSHADER_RETURN_IF(!node, "VaryingNode is null");
         TypePtr type = resolveTypeFromNode(node->type.get());
+        
+        bool isInt = (type == typeRegistry.getType("int") || type == typeRegistry.getType("uint"));
+        if (isInt && node->interpolation != "flat") {
+            diagnostics.push_back(reportError(node, "Integer varyings must use 'flat' interpolation."));
+        }
+
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Varying, node->range, Mutability::ReadOnly);        
         if (!symbols.add(s)) {
             diagnostics.push_back(reportError(node, "Redefinition of varying '" + s.name + "'"));

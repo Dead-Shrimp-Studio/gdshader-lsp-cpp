@@ -140,6 +140,28 @@ void TypeCheckingVisitor::visit(IdentifierNode* node)
     }
 }
 
+void gdshader_lsp::TypeCheckingVisitor::visit(TernaryNode *node)
+{
+    GDSHADER_RETURN_IF(!node, "TernaryNode is null");
+    if (node->condition) {
+        node->condition->accept(*this);
+        TypePtr condT = resolveType(node->condition.get());
+        if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
+            diagnostics.push_back(reportError(node->condition.get(), "Ternary condition must be bool."));
+        }
+    }
+    if (node->trueExpr) node->trueExpr->accept(*this);
+    if (node->falseExpr) node->falseExpr->accept(*this);
+
+    TypePtr tTrue = resolveType(node->trueExpr.get());
+    TypePtr tFalse = resolveType(node->falseExpr.get());
+    
+    // Check if branch types match
+    if (tTrue->kind != TypeKind::UNKNOWN && tFalse->kind != TypeKind::UNKNOWN && *tTrue != *tFalse) {
+        diagnostics.push_back(reportError(node, "Type mismatch in ternary operator branches."));
+    }
+}
+
 void TypeCheckingVisitor::visit(BinaryOpNode* node) 
 {
     GDSHADER_RETURN_IF(!node, "BinaryOpNode is null");
@@ -158,6 +180,14 @@ void TypeCheckingVisitor::visit(BinaryOpNode* node)
     
     if (node->left) node->left->accept(*this);
     if (node->right) node->right->accept(*this);
+
+    if (node->op == TokenType::TOKEN_SLASH) {
+        if (auto lit = dynamic_cast<const LiteralNode*>(node->right.get())) {
+            if (lit->value == "0" || lit->value == "0.0") {
+                diagnostics.push_back(reportError(node->right.get(), "Division by zero."));
+            }
+        }
+    }
 
     TypePtr l = resolveType(node->left.get());
     TypePtr r = resolveType(node->right.get());
@@ -194,7 +224,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
         }
         else {
             GDSHADER_ERROR_IF(true, "Undefined identifier '{}' in assignment", id->name);
-            diagnostics.push_back(reportError(node, "Undefined '" + id->name + "'"));
+            diagnostics.push_back(reportError(node, "Undefined identifier '" + id->name + "'"));
             return;
         }
     } else if (dynamic_cast<const MemberAccessNode*>(node->left.get())) 
@@ -269,7 +299,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
         if (s.length() <= 4) { // Heuristic: it's likely a swizzle
             
             bool isSwizzleChars = true;
-            const std::string validSet = "xyzwrugbstpq"; // Combined sets
+            const std::string validSet = "xyzwrgbastpq"; // Combined sets
             for (char c : s) {
                 if (validSet.find(c) == std::string::npos) {
                     isSwizzleChars = false;
@@ -550,14 +580,16 @@ void TypeCheckingVisitor::visit(MemberAccessNode* node)
             }
 
             if (validSetIndex == -1) {
-                bool hasXYZW = false, hasRGBA = false;
+                bool hasXYZW = false, hasRGBA = false; bool hasSTPQ = false;
                 for (char c : swizzle) {
                     if (std::string("xyzw").find(c) != std::string::npos) hasXYZW = true;
                     if (std::string("rgba").find(c) != std::string::npos) hasRGBA = true;
+                    if (std::string("stpq").find(c) != std::string::npos) hasSTPQ = true;
                 }
-                if (hasXYZW && hasRGBA) {
+                if (hasXYZW && hasRGBA || hasXYZW && hasSTPQ || hasRGBA && hasSTPQ) 
+                {
                     GDSHADER_ERROR_IF(true, "Illegal swizzle '{}', mixed sets", swizzle);
-                    diagnostics.push_back(reportError(node, "Illegal swizzle '" + swizzle + "'. Cannot mix xyzw and rgba sets."));
+                    diagnostics.push_back(reportError(node, "Illegal swizzle '" + swizzle + "'. Cannot mix xyzw, rgba and stpq sets."));
                 } else {
                     GDSHADER_ERROR_IF(true, "Invalid swizzle component in '{}'", swizzle);
                     diagnostics.push_back(reportError(node, "Invalid swizzle component in '" + swizzle + "'."));

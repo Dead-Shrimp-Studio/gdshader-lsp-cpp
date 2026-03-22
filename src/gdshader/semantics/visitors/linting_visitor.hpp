@@ -25,6 +25,8 @@ private:
     ShaderStage currentProcessorFunction = ShaderStage::Global;
     bool currentFunctionHasReturn = false;
 
+    int loopDepth = 0;
+
     // Helpers ported from the old SemanticAnalyzer
     bool allPathsReturn(const ASTNode* node);
 
@@ -40,6 +42,8 @@ public:
     void visit(ReturnNode* node) override;
     void visit(FunctionCallNode* node) override;
     void visit(DiscardNode* node) override;
+    void visit(BreakNode* node) override;
+    void visit(ContinueNode* node) override;
 
     // --- Pass-Throughs (Structural) ---
     void visit(IfNode* node) override;
@@ -65,8 +69,6 @@ public:
     void visit(ParameterNode* node) override {}
     void visit(StructMemberNode* node) override {}
     void visit(CaseNode* node) override {}
-    void visit(BreakNode* node) override {}
-    void visit(ContinueNode* node) override {}
     void visit(DefineNode* node) override {}
     void visit(IncludeNode* node) override {}
     void visit(ShaderTypeNode* node) override {}

@@ -17,6 +17,29 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
         if (match(TokenType::KEYWORD_RENDER_MODE))      return parseRenderMode();
         if (match(TokenType::KEYWORD_GROUP_UNIFORMS))   return parseGroupUniform();
         if (match(TokenType::KEYWORD_UNIFORM))          return parseUniform();
+        if (match(TokenType::KEYWORD_INSTANCE)) {
+            consume(TokenType::KEYWORD_UNIFORM, "Expected 'uniform' after 'instance'");
+            auto node = parseUniform();
+            if (auto* uniNode = dynamic_cast<UniformNode*>(node.get())) {
+                uniNode->isInstance = true; 
+            }
+            return node;
+        }
+
+        if (match(TokenType::KEYWORD_FLAT) || match(TokenType::KEYWORD_SMOOTH)) {
+            std::string interp = previous_token.value;
+            consume(TokenType::KEYWORD_VARYING, "Expected 'varying' after interpolation qualifier");
+            auto node = parseVarying();
+            if (auto* varNode = dynamic_cast<VaryingNode*>(node.get())) {
+                varNode->interpolation = interp; 
+            }
+            return node;
+        }
+        
+        if (match(TokenType::KEYWORD_IN) || match(TokenType::KEYWORD_OUT) || match(TokenType::KEYWORD_INOUT)) {
+            reportError("Expected return type for function declaration.");
+            return nullptr;
+        }
         if (match(TokenType::KEYWORD_VARYING))          return parseVarying();
         if (match(TokenType::KEYWORD_CONST))            return parseConst();
         if (match(TokenType::KEYWORD_STRUCT))           return parseStruct();
@@ -130,6 +153,8 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
             if (!node->hint.empty()) {
                 node->hint += ", ";
             }
+
+            std::string hint_name = current_token.value;
             node->hint += current_token.value;
             advance();
 
@@ -138,6 +163,9 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
                 node->hint += "(";
                 int depth = 1;
                 
+                std::vector<std::string> args;
+                std::string current_arg = "";
+
                 // Track depth to safely allow nested parentheses
                 while (depth > 0 && !check(TokenType::TOKEN_EOF)) {
                     
@@ -155,23 +183,33 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
 
                     // Add a little formatting for readability in the hover text
                     if (check(TokenType::TOKEN_COMMA)) {
+                        args.push_back(current_arg);
+                        current_arg = "";
                         node->hint += ", ";
                     } else {
+                        current_arg += current_token.value;
                         node->hint += current_token.value;
                     }
                     advance();
                 }
                 
+                if (!current_arg.empty()) args.push_back(current_arg);
                 consume(TokenType::TOKEN_RPAREN, "Expected ')' after hint arguments");
                 node->hint += ")";
+
+                if (hint_name == "hint_range" && args.size() >= 2) {
+                    try {
+                        float min_val = std::stof(args[0]);
+                        float max_val = std::stof(args[1]);
+                        if (min_val > max_val) {
+                            reportError("hint_range min value must not be greater than max value.");
+                        }
+                    } catch (...) {} // Ignore parsing failures if they aren't numbers
+                }
             }
 
-            // Check if there is another hint chained after a comma
-            if (match(TokenType::TOKEN_COMMA)) {
-                continue;
-            } else {
-                break;
-            }
+            if (match(TokenType::TOKEN_COMMA)) continue;
+            else break;
         }
     }
 
@@ -302,8 +340,22 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl()
         nameRange.startCol = current_token.column;
         nameRange.endLine = current_token.line;
         nameRange.endCol = current_token.column + current_token.length;
-
         advance();
+
+        while (match(TokenType::TOKEN_LBRACKET)) {
+            if (match(TokenType::TOKEN_NUMBER)) {
+                try {
+                    int size = std::stoi(previous_token.value);
+                    if (size <= 0) reportError("Array size must be greater than 0.");
+                } catch (...) {
+                    reportError("Array size must be a valid integer.");
+                }
+            } else {
+                reportError("Expected array size.");
+            }
+            consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
+        }
+
     } else {
         reportError("Expected identifier after type");
         return nullptr;

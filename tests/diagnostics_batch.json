@@ -419,7 +419,7 @@
             "    vec2 v2 = v.xg;",
             "}"
         ],
-        "expected_error": "Cannot mix xyzw and rgba sets"
+        "expected_error": "Illegal swizzle 'xg'. Cannot mix xyzw, rgba and stpq sets."
     },
     {
         "name": "struct_constructor_arity",
@@ -914,5 +914,162 @@
             "void fragment() {}"
         ],
         "expected_error": "Expected '(' after defined"
+    },
+    {
+        "name": "break_outside_loop",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    break;",
+            "}"
+        ],
+        "expected_error": "outside"
+    },
+    {
+        "name": "continue_outside_loop",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    continue;",
+            "}"
+        ],
+        "expected_error": "outside"
+    },
+    {
+        "name": "include_missing_path",
+        "code": [
+            "shader_type spatial;",
+            "#include",
+            "void fragment() {}"
+        ],
+        "expected_error": "Expected string literal"
+    },
+    {
+        "name": "array_size_zero",
+        "code": [
+            "shader_type spatial;",
+            "float my_array[0];",
+            "void fragment() {}"
+        ],
+        "expected_error": "greater than 0"
+    },
+    {
+        "name": "global_uniform_write",
+        "code": [
+            "shader_type spatial;",
+            "global uniform float g_val;",
+            "void fragment() {",
+            "    g_val = 1.0;",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "instance_uniform_sampler",
+        "code": [
+            "shader_type spatial;",
+            "instance uniform sampler2D tex;",
+            "void fragment() {}"
+        ],
+        "expected_error": "opaque"
+    },
+    {
+        "name": "canvas_item_albedo",
+        "code": [
+            "shader_type canvas_item;",
+            "void fragment() {",
+            "    ALBEDO = vec3(1.0);",
+            "}"
+        ],
+        "expected_error": "Undefined identifier"
+    },
+    {
+        "name": "light_discard",
+        "code": [
+            "shader_type spatial;",
+            "void light() {",
+            "    discard;",
+            "}"
+        ],
+        "expected_error": "light processor"
+    },
+    {
+        "name": "flat_varying_int",
+        "code": [
+            "shader_type spatial;",
+            "varying int my_int;",
+            "void fragment() {}"
+        ],
+        "expected_error": "flat"
+    },
+    {
+        "name": "write_varying_in_light",
+        "code": [
+            "shader_type spatial;",
+            "varying vec3 my_var;",
+            "void light() {",
+            "    my_var = vec3(1.0);",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "sampler_local_variable",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    sampler2D my_tex;",
+            "}"
+        ],
+        "expected_error": "local"
+    },
+    {
+        "name": "ternary_type_mismatch",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = true ? 1.0 : vec2(1.0);",
+            "}"
+        ],
+        "expected_error": "mismatch"
+    },
+    {
+        "name": "division_by_zero",
+        "code": [
+            "shader_type spatial;",
+            "void fragment() {",
+            "    float x = 1.0 / 0.0;",
+            "}"
+        ],
+        "expected_error": "zero"
+    },
+    {
+        "name": "invalid_hint_range_bounds",
+        "code": [
+            "shader_type spatial;",
+            "uniform float x : hint_range(1.0, 0.0);",
+            "void fragment() {}"
+        ],
+        "expected_error": "greater than"
+    },
+    {
+        "name": "recursive_struct",
+        "code": [
+            "shader_type spatial;",
+            "struct Node {",
+            "    Node next;",
+            "};",
+            "void fragment() {}"
+        ],
+        "expected_error": "Undefined"
+    },
+    {
+        "name": "invalid_function_qualifier",
+        "code": [
+            "shader_type spatial;",
+            "inout void my_func() {}",
+            "void fragment() {}"
+        ],
+        "expected_error": "Expected return type"
     }
 ]

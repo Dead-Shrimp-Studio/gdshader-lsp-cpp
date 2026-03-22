@@ -121,10 +121,20 @@ void LintingVisitor::visit(ReturnNode* node)
 void LintingVisitor::visit(DiscardNode* node) 
 {
     GDSHADER_RETURN_IF(!node, "DiscardNode is null");
-    if (currentProcessorFunction == ShaderStage::Vertex) {
-        GDSHADER_ERROR_IF(true, "Invalid discard in vertex processor");
-        diagnostics.push_back(reportError(node, "'discard' cannot be used in the vertex processor."));
+    if (currentProcessorFunction == ShaderStage::Vertex || currentProcessorFunction == ShaderStage::Light) {
+        GDSHADER_ERROR_IF(true, "Invalid discard in vertex/light processor");
+        diagnostics.push_back(reportError(node, "'discard' cannot be used in the vertex or light processor."));
     }
+}
+
+void gdshader_lsp::LintingVisitor::visit(BreakNode *node)
+{
+    if (loopDepth == 0) diagnostics.push_back(reportError(node, "Break statement outside of loop."));
+}
+
+void LintingVisitor::visit(ContinueNode* node) 
+{
+    if (loopDepth == 0) diagnostics.push_back(reportError(node, "Continue statement outside of loop."));
 }
 
 void LintingVisitor::visit(FunctionCallNode* node) 
@@ -173,7 +183,9 @@ void LintingVisitor::visit(WhileNode* node)
 
     if (node->body)
     {
+        loopDepth++;
         node->body->accept(*this);
+        loopDepth--;
     } else 
     {
         GDSHADER_ERROR_IF(true, "While statement missing body");
@@ -191,7 +203,9 @@ void LintingVisitor::visit(ForNode* node)
 
     if (node->body) 
     {
+        loopDepth++;
         node->body->accept(*this);
+        loopDepth--;
     } else 
     {
         GDSHADER_ERROR_IF(true, "For statement missing body");
@@ -207,7 +221,9 @@ void LintingVisitor::visit(DoWhileNode* node)
     
     if (node->body) 
     {
+        loopDepth++;
         node->body->accept(*this);
+        loopDepth--;
     } else
     {
         GDSHADER_ERROR_IF(true, "Do-while statement missing body");
