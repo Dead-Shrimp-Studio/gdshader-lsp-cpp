@@ -54,6 +54,9 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
                 }
 
                 return node;
+            } else {
+                reportError("Expected string literal after #include");
+                return nullptr;
             }
         }
 

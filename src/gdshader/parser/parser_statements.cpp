@@ -56,8 +56,23 @@ std::unique_ptr<StatementNode> Parser::parseVarDecl()
         node->nameRange.startCol = current_token.column;
         node->nameRange.endLine = current_token.line;
         node->nameRange.endCol = current_token.column + current_token.length;
-
         advance();
+
+        while (match(TokenType::TOKEN_LBRACKET)) {
+            if (match(TokenType::TOKEN_NUMBER)) {
+                try {
+                    int size = std::stoi(previous_token.value);
+                    if (size <= 0) reportError("Array size must be greater than 0.");
+                    node->type->arraySizes.push_back(size);
+                } catch (...) {
+                    reportError("Array size must be a valid integer.");
+                }
+            } else {
+                reportError("Expected array size.");
+            }
+            consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
+        }
+
     } else {
         reportError("Expected variable name, got '" + current_token.value + "'");
 

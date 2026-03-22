@@ -65,6 +65,7 @@ public:
     void visit(DiscardNode* node) override {};
 
     // Expressions
+    void visit(TernaryNode* node) override;
     void visit(BinaryOpNode* node) override;
     void visit(UnaryOpNode* node) override;
     void visit(FunctionCallNode* node) override;
@@ -75,7 +76,6 @@ public:
     // Ignored in this pass
     void visit(TypeNode* node) override {}
     void visit(LiteralNode* node) override {}
-    void visit(TernaryNode* node) override { /* Add logic if needed */ }
     void visit(ConstructorNode* node) override {}
     void visit(ParameterNode* node) override {}
     void visit(StructMemberNode* node) override {}

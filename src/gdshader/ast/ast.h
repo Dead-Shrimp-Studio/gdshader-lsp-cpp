@@ -255,6 +255,7 @@ struct UniformNode : public ASTNode {
     Range nameRange;
     std::string hint; // Null/Empty if none
     std::unique_ptr<ExpressionNode> defaultValue;
+    bool isInstance = false;
 };
 
 // varying vec3 normal;
