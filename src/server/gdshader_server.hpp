@@ -63,9 +63,6 @@ private:
 
     size_t positionToOffset(const std::string& text, int line, int character);
     void collectFoldingRanges(const ASTNode* node, std::vector<lsp::FoldingRange>& ranges);
-    std::pair<std::string, int> getFunctionCallContext(const std::string& source, int line, int col);
-    std::string getWordAtPosition(const std::string& source, int line, int col);
-    std::string getWordBeforeDot(const std::string& lineText, int dotPos);
     std::string getLine(const std::string& source, int targetLine);
 
     std::vector<lsp::DocumentSymbol> getDocumentSymbols(const ASTNode* node);

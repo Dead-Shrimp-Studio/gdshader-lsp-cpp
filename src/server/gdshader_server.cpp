@@ -2,6 +2,9 @@
 #include "server/gdshader_server.hpp"
 
 #include "gdshader/semantics/semantic_analyzer.hpp"
+#include "gdshader/semantics/visitors/node_finder_visitor.hpp"
+#include "gdshader/semantics/visitors/call_finder_visitor.hpp"
+
 #include "server/project_manager.hpp"
 #include "gdshader/ast/ast.h"
 #include "utils/logger.hpp"
@@ -193,74 +196,66 @@ void GdShaderServer::registerHandlers() {
                 return hover;                
             }
 
-            int line = params.position.line;
-            int col = params.position.character;
+            int line = params.position.line + 1;
+            int col = params.position.character + 1;
 
-            std::string word = getWordAtPosition(su->source_code, line, col);
-            if (word.empty()) return hover;
+            NodeFinderVisitor finder(line, col);
+            su->ast->accept(finder);
+            const ASTNode* target = finder.deepestNode;
 
-            std::string lineText = getLine(su->source_code, line);
-    
-            // Calculate where the word starts so we can look BEFORE it
-            // (Simple heuristic: move back from cursor until we hit non-identifier)
-            int wordStart = col;
-            while (wordStart > 0 && (isalnum(lineText[wordStart - 1]) || lineText[wordStart - 1] == '_')) {
-                wordStart--;
+            if (!target) {
+                su->unitMutex.unlock();
+                return hover;
             }
 
-            // 3. Check if this is a member access (preceded by '.')
-            bool isMember = (wordStart > 0 && lineText[wordStart - 1] == '.');
+            std::string content = "";
 
-            if (isMember) {
-                // We found a dot at 'wordStart - 1'. 
-                // We want the word before that dot.
-                std::string baseName = getWordBeforeDot(lineText, wordStart - 1); 
-
-                // Look up base (e.g. "my_instance")
-                const Symbol* baseSym = su->symbols->lookupAt(baseName, line);
-                if (baseSym && baseSym->type) {
-                    // Look up member in the base type
-                    TypePtr memberT = su->types.getMemberType(baseSym->type, word);
-                    
-                    // Validate the member actually exists
-                    if (memberT && memberT->kind != TypeKind::UNKNOWN) {
-                        std::string content = "**" + word + "** (Member of " + baseSym->name + ")\n\n";
-                        content += "Type: `" + memberT->toString() + "`\n";
-                        
-                        hover.contents = {
-                            lsp::MarkupContent {
-                                .kind = lsp::MarkupKind::Markdown,
-                                .value = content
-                            }
-                        };
+            if (auto id = dynamic_cast<const IdentifierNode*>(target)) 
+            {
+                if (id->resolvedSymbol) {
+                    content = "**" + id->name + "**\n\n";
+                    if (id->resolvedSymbol->category == SymbolType::Function) {
+                        content += "Return Type: `" + id->resolvedSymbol->returnType->toString() + "`\n";
+                    } else if (id->evaluatedType) {
+                        content += "Type: `" + id->evaluatedType->toString() + "`\n";
                     }
+                    if (!id->resolvedSymbol->doc_string.empty()) content += "\n" + id->resolvedSymbol->doc_string;
                 }
-            } else {
+            } 
 
-                const Symbol* sym = su->symbols->lookupAt(word, line);
-
-                if (sym) {
-                    
-                    std::string content = "**" + sym->name + "**\n\n";
-                    
-                    if (sym->category == SymbolType::Function || sym->category == SymbolType::Builtin) {
-                        content += "Return Type: `" + (sym->returnType ? sym->returnType->toString() : "void") + "`\n";
-                    } else {
-                        content += "Type: `" + (sym->type ? sym->type->toString() : "unknown") + "`\n";
-                    }
-                    
-                    if (!sym->doc_string.empty()) {
-                        content += "\n" + sym->doc_string;
-                    }
-                    
-                    hover.contents = {
-                        lsp::MarkupContent {
-                            .kind = lsp::MarkupKind::Markdown,
-                            .value = content
-                        }
-                    };
+            else if (auto call = dynamic_cast<const FunctionCallNode*>(target)) 
+            {
+                std::vector<const Symbol*> overloads = su->symbols->lookupFunctions(call->functionName);
+                if (!overloads.empty()) {
+                    const Symbol* sym = overloads[0]; // Display the base function doc
+                    content = "**" + sym->name + "**\n\n";
+                    content += "Return Type: `" + (sym->returnType ? sym->returnType->toString() : "void") + "`\n";
+                    if (!sym->doc_string.empty()) content += "\n" + sym->doc_string;
                 }
             }
+
+            else if (auto mem = dynamic_cast<const MemberAccessNode*>(target)) 
+            {
+                if (mem->evaluatedType) {
+                    content = "**" + mem->member + "**\n\n";
+                    content += "Type: `" + mem->evaluatedType->toString() + "`";
+                }
+            }
+
+            else if (auto typeNode = dynamic_cast<const TypeNode*>(target)) 
+            {
+                content = "**Type**\n\n`" + typeNode->toString() + "`";
+            }
+
+            if (!content.empty()) {
+                hover.contents = {
+                    lsp::MarkupContent {
+                        .kind = lsp::MarkupKind::Markdown,
+                        .value = content
+                    }
+                };
+            }
+
             su->unitMutex.unlock();
             return hover;
         }
@@ -282,7 +277,7 @@ void GdShaderServer::registerHandlers() {
             auto su = pm->getUnit(path);
 
             su->unitMutex.lock();
-            if (!su->symbols) {
+            if (!su->symbols || !su->ast) {
                 su->unitMutex.unlock();
                 return result;                
             }
@@ -290,30 +285,62 @@ void GdShaderServer::registerHandlers() {
             int line = params.position.line;
             int col = params.position.character;
 
-            // 1. Get context (Line content)
+            // We still use the text buffer just to check if the trigger was a '.'
             std::string lineText = getLine(su->source_code, line);
             if (col > (int)lineText.length()) col = lineText.length();
             
-            // Check trigger char
-            bool isDotTrigger = false;
-            if (col > 0 && lineText[col-1] == '.') isDotTrigger = true;
+            bool isDotTrigger = (col > 0 && lineText[col-1] == '.');
 
-            // --- CASE A: DOT COMPLETION ---
+            // --- CASE A: DOT COMPLETION (Semantic) ---
             if (isDotTrigger) 
             {
-                std::string varName = getWordBeforeDot(lineText, col-1);
-                const Symbol* sym = su->symbols->lookupAt(varName, line);
+                int targetCol = col - 2;
+                if (targetCol < 0) targetCol = 0;
 
-                if (sym && sym->type) {
-                    TypePtr t = sym->type;
-                    
-                    // 1. Vector Swizzling (Basic)
+                NodeFinderVisitor finder(line + 1, targetCol + 1);
+                su->ast->accept(finder);
+
+                TypePtr t = nullptr;
+
+                if (auto expr = dynamic_cast<const ExpressionNode*>(finder.deepestNode)) 
+                {
+                    if (expr->evaluatedType && expr->evaluatedType->kind != TypeKind::UNKNOWN) {
+                        t = expr->evaluatedType;
+                    }
+                }
+                
+                // FALLBACK: If AST bounds were broken or type checker failed, extract string manually
+                if (!t) {
+                    std::string varName = "";
+                    int i = col - 2;
+                    while (i >= 0 && (std::isalnum(lineText[i]) || lineText[i] == '_')) {
+                        varName = lineText[i] + varName;
+                        i--;
+                    }
+                    if (!varName.empty()) {
+                        const Symbol* sym = su->symbols->lookupAt(varName, line + 1); // Use 1-indexed line!
+                        if (!sym) sym = su->symbols->lookupAt(varName, 99999); // Ultimate global fallback
+                        if (sym && sym->type) t = sym->type;
+                    }
+                }
+
+                // If the node before the dot is an expression, we already know its exact type!
+                if (t && t->kind != TypeKind::UNKNOWN) 
+                {
+                    // 1. Vector Swizzling
                     if (t->kind == TypeKind::VECTOR) {
-                        std::vector<std::string> swizzles = {"x", "y", "z", "w", "r", "g", "b", "a"};
-                        for(int i=0; i<t->componentCount * 2; ++i) { // Crude limit to valid comps
-                            if (i >= (int)swizzles.size()) break;
-                             result.items.push_back(lsp::CompletionItem{
+                        std::vector<std::string> swizzles = {"x", "y", "z", "w", "r", "g", "b", "a", "s", "t", "p", "q"};
+                        
+                        // Provide valid single-character swizzles for this vector size
+                        for(int i = 0; i < t->componentCount; ++i) { 
+                            result.items.push_back(lsp::CompletionItem{
                                 .label = swizzles[i],
+                                .kind = lsp::CompletionItemKind::Field,
+                                .detail = "float"
+                            });
+                            // Add rgba/stpq equivalents
+                            result.items.push_back(lsp::CompletionItem{
+                                .label = swizzles[i + 4],
                                 .kind = lsp::CompletionItemKind::Field,
                                 .detail = "float"
                             });
@@ -330,9 +357,13 @@ void GdShaderServer::registerHandlers() {
                         }
                     }
                 }
+                
+                su->unitMutex.unlock();
                 return result;
             }
 
+            // --- CASE B: GLOBAL COMPLETION ---
+            
             std::vector<Symbol> visible = su->symbols->getVisibleSymbolsAt(line);
             std::unordered_set<std::string> seen_functions; 
 
@@ -340,9 +371,7 @@ void GdShaderServer::registerHandlers() {
                 
                 // DEDUPLICATION CHECK
                 if (s.category == SymbolType::Function || s.category == SymbolType::Builtin) {
-                    if (seen_functions.count(s.name)) {
-                        continue; // We already added 'max', don't add 'max' again
-                    }
+                    if (seen_functions.count(s.name)) continue; 
                     seen_functions.insert(s.name);
                 }
 
@@ -351,8 +380,6 @@ void GdShaderServer::registerHandlers() {
                 
                 if (s.category == SymbolType::Function || s.category == SymbolType::Builtin) {
                     item.kind = lsp::CompletionItemKind::Function;
-                    
-                    // Indicate overloading in the detail text ?
                     item.detail = s.returnType ? s.returnType->toString() : "void";
                     
                     item.insertTextFormat = lsp::InsertTextFormat::Snippet;
@@ -360,7 +387,7 @@ void GdShaderServer::registerHandlers() {
                     
                     for(size_t i=0; i<s.parameterTypes.size(); ++i) {
                         if (i > 0) insertionText += ", ";
-                        insertionText += "${" + std::to_string(i+1) + ":" + s.parameterTypes[i]->toString() + "}";
+                        insertionText += "${" + std::to_string(i+1) + ":" + s.parameterNames[i] + "}";
                     }
                     insertionText += ")";
                     item.insertText = insertionText;
@@ -370,7 +397,10 @@ void GdShaderServer::registerHandlers() {
                     item.insertText = s.name; 
                 }
                 else {
-                    item.kind = lsp::CompletionItemKind::Variable;
+                    item.kind = (s.category == SymbolType::Uniform || s.mutability == Mutability::ReadOnly)
+                                ? lsp::CompletionItemKind::Constant 
+                                : lsp::CompletionItemKind::Variable;
+                                
                     item.detail = s.type ? s.type->toString() : "unknown";
                     item.insertText = s.name;
                 }
@@ -402,26 +432,28 @@ void GdShaderServer::registerHandlers() {
                 return loc;                
             }
 
-            int line = params.position.line;
-            int col = params.position.character;
+            NodeFinderVisitor finder(params.position.line + 1, params.position.character + 1);
+            su->ast->accept(finder);
 
-            std::string word = getWordAtPosition(su->source_code, line, col);
-            if (word.empty()) return nullptr;
+            if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
+            {
+                const Symbol* sym = id->resolvedSymbol;
 
-            const Symbol* sym = su->symbols->lookupAt(word, line);
+                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line + 1);
+                if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
 
-            // If found and it's not a built-in (line -1)
-            if (sym && sym->definition.startLine >= 0) {
-                loc.uri = params.textDocument.uri;
+                // If found and it's not a built-in (startLine >= 0)
+                if (sym && sym->definition.startLine >= 0) {
+                    loc.uri = params.textDocument.uri;
 
-                int lspLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
-                
-                loc.range.start.line = lspLine;
-                loc.range.start.character = 0; // TODO: Store column in Symbol
-                loc.range.start = lsp::Position{(unsigned)sym->definition.startLine + 1, (unsigned)sym->definition.startCol};
-                loc.range.end   = lsp::Position{(unsigned)sym->definition.endLine + 1, (unsigned)sym->definition.endCol};
-                
-                return loc;
+                    int lspLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
+                    
+                    loc.range.start = lsp::Position{(unsigned)lspLine, (unsigned)sym->definition.startCol};
+                    loc.range.end   = lsp::Position{(unsigned)lspLine, (unsigned)sym->definition.endCol};
+                    
+                    su->unitMutex.unlock();
+                    return loc;
+                }
             }
 
             su->unitMutex.unlock();
@@ -451,71 +483,120 @@ void GdShaderServer::registerHandlers() {
             int line = params.position.line;
             int col = params.position.character;
 
-            // 1. Find Context (Name + Arg Index)
-            auto [funcName, argIndex] = getFunctionCallContext(su->source_code, line, col);
-            
-            if (funcName.empty()) return nullptr;
+            CallFinderVisitor finder(line, col);
+            su->ast->accept(finder);
 
-            // 2. Lookup Overloads
-            std::vector<const Symbol*> overloads = su->symbols->lookupFunctions(funcName);
-            
-            if (overloads.empty()) return nullptr;
+            if (!finder.activeCall && !finder.activeConstructor) {
+                su->unitMutex.unlock();
+                return nullptr;
+            }
 
-            // 3. Construct LSP Result
-            help.activeParameter = argIndex;
-            help.activeSignature = 0; // Default to first, or try to match best fit based on arg count
+            std::string funcName = "";
+            const std::vector<std::unique_ptr<ExpressionNode>>* args = nullptr;
 
-            // Optional: Try to set activeSignature to the one with matching arg count
-            // (If multiple have same count, we just pick the first one)
-            for (size_t i = 0; i < overloads.size(); ++i) {
-                if ((int)overloads[i]->parameterTypes.size() > argIndex) {
-                    help.activeSignature = i;
-                    // Don't break, sometimes we want the *closest* fit, but this is a simple heuristic
-                    // For exact match we'd need to analyze types of previous args, which is hard here.
-                    break; 
+            if (finder.activeCall) {
+                funcName = finder.activeCall->functionName;
+                args = &finder.activeCall->arguments;
+            } else if (finder.activeConstructor) {
+                funcName = finder.activeConstructor->typeName;
+                args = &finder.activeConstructor->arguments;
+            }
+
+            // 2. Calculate Active Argument Index semantically
+            int argIndex = 0;
+            if (args) {
+                for (size_t i = 0; i < args->size(); i++) {
+                    const auto& arg = (*args)[i];
+                    if (!arg) continue;
+                    
+                    // If the cursor is before or inside this argument's end bound
+                    if (line < arg->range.endLine || (line == arg->range.endLine && col <= arg->range.endCol)) {
+                        argIndex = i;
+                        break;
+                    }
+                    // Default to the next argument if we have passed this one
+                    argIndex = i + 1; 
                 }
             }
 
-            for (const auto* sym : overloads) {
-                lsp::SignatureInformation sigInfo;
-                
-                std::string returnStr = sym->returnType ? sym->returnType->toString() : "void";
-                std::string label = returnStr + " " + sym->name + "(";
-                
-                std::vector<lsp::ParameterInformation> paramsInfo;
-                
-                for (size_t i = 0; i < sym->parameterTypes.size(); ++i) {
-                    TypePtr pType = sym->parameterTypes[i];
-                    
-                    // Construct param label: "float arg1"
-                    // Since Builtins don't store arg names in SymbolTable (yet?), we generate generic ones
-                    // or use the type as the label.
-                    std::string paramLabel = pType->toString(); 
-                    
-                    // Add comma for display label
-                    if (i > 0) label += ", ";
-                    
-                    // We need to record the start/end index of this parameter within the 'label' string
-                    // so the client can highlight it. 
-                    // Simple approach: Store the string representation.
-                    lsp::ParameterInformation pInfo;
-                    pInfo.label = paramLabel; 
-                    paramsInfo.push_back(pInfo);
-                    
-                    label += paramLabel;
-                }
-                label += ")";
+            help.activeParameter = argIndex;
+            help.activeSignature = 0; 
 
-                sigInfo.label = label;
-                if (!sym->doc_string.empty()) {
-                    sigInfo.documentation = lsp::MarkupContent{
-                        .kind = lsp::MarkupKind::Markdown,
-                        .value = sym->doc_string
-                    };
+            // 3A. Handle Standard Function Calls
+            if (finder.activeCall) 
+            {
+                std::vector<const Symbol*> overloads = su->symbols->lookupFunctions(funcName);
+                if (overloads.empty()) {
+                    su->unitMutex.unlock();
+                    return nullptr;
                 }
-                sigInfo.parameters = paramsInfo;
-                
-                help.signatures.push_back(sigInfo);
+
+                // Best-fit heuristic based on argument count
+                for (size_t i = 0; i < overloads.size(); ++i) {
+                    if ((int)overloads[i]->parameterTypes.size() > argIndex) {
+                        help.activeSignature = i;
+                        break; 
+                    }
+                }
+
+                for (const auto* sym : overloads) {
+                    lsp::SignatureInformation sigInfo;
+                    
+                    std::string returnStr = sym->returnType ? sym->returnType->toString() : "void";
+                    std::string label = returnStr + " " + sym->name + "(";
+                    
+                    std::vector<lsp::ParameterInformation> paramsInfo;
+                    
+                    for (size_t i = 0; i < sym->parameterTypes.size(); ++i) {
+                        std::string pType = sym->parameterTypes[i]->toString();
+                        
+                        // Use actual parsed argument names, fallback to arg0, arg1
+                        std::string pName = (i < sym->parameterNames.size()) ? sym->parameterNames[i] : ("arg" + std::to_string(i));
+                        std::string paramLabel = pType + " " + pName;
+                        
+                        if (i > 0) label += ", ";
+                        
+                        paramsInfo.push_back(lsp::ParameterInformation{ .label = paramLabel });
+                        label += paramLabel;
+                    }
+                    label += ")";
+
+                    sigInfo.label = label;
+                    if (!sym->doc_string.empty()) {
+                        sigInfo.documentation = lsp::MarkupContent{
+                            .kind = lsp::MarkupKind::Markdown,
+                            .value = sym->doc_string
+                        };
+                    }
+                    sigInfo.parameters = paramsInfo;
+                    help.signatures.push_back(sigInfo);
+                }
+            }
+
+            else if (finder.activeConstructor) 
+            {
+                TypePtr t = su->types.getType(funcName);
+                if (t->kind == TypeKind::STRUCT) {
+                    lsp::SignatureInformation sigInfo;
+                    std::string label = funcName + "(";
+                    std::vector<lsp::ParameterInformation> paramsInfo;
+
+                    for (size_t i = 0; i < t->members.size(); ++i) {
+                        std::string pName = t->members[i].first;
+                        std::string pType = t->members[i].second->toString();
+                        std::string paramLabel = pType + " " + pName;
+
+                        if (i > 0) label += ", ";
+                        
+                        paramsInfo.push_back(lsp::ParameterInformation{ .label = paramLabel });
+                        label += paramLabel;
+                    }
+                    label += ")";
+                    
+                    sigInfo.label = label;
+                    sigInfo.parameters = paramsInfo;
+                    help.signatures.push_back(sigInfo);
+                }
             }
 
             su->unitMutex.unlock();
@@ -592,34 +673,38 @@ void GdShaderServer::registerHandlers() {
                 return result;                
             }
 
-            int line = params.position.line;
-            int column = params.position.character;
+            NodeFinderVisitor finder(params.position.line + 1, params.position.character + 1);
+            su->ast->accept(finder);
 
-            std::string name = getWordAtPosition(su->source_code, line, column);
-            if (name.empty()) return result;
+            if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
+            {
+                const Symbol* sym = id->resolvedSymbol;
 
-            const Symbol* sym = su->symbols->lookupAt(name, line);
+                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line + 1);
+                if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
 
-            if (sym) {
+                if (sym) {
+                    if (sym->definition.startLine >= 0) {
+                        int defLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
+                        result.push_back(lsp::DocumentHighlight{
+                            .range = lsp::Range{
+                                .start = { (unsigned)defLine, (unsigned)sym->definition.startCol },
+                                .end   = { (unsigned)defLine, (unsigned)(sym->definition.endCol) }
+                            },
+                            .kind = lsp::DocumentHighlightKind::Text
+                        });
+                    }
 
-                if (sym->definition.startLine >= 0) {
-                    result.push_back(lsp::DocumentHighlight{
-                        .range = lsp::Range{
-                            .start = { (unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol },
-                            .end   = { (unsigned)sym->definition.endLine, (unsigned)(sym->definition.endCol) }
-                        },
-                        .kind = lsp::DocumentHighlightKind::Text
-                    });
-                }
-
-                for (const auto& usage : sym->references) {
-                    result.push_back(lsp::DocumentHighlight{
-                        .range = lsp::Range{
-                            .start = { (unsigned)usage.startLine, (unsigned)usage.startCol },
-                            .end   = { (unsigned)usage.endLine, (unsigned)(usage.endCol) }
-                        },
-                        .kind = lsp::DocumentHighlightKind::Read
-                    });
+                    for (const auto& usage : sym->references) {
+                        int useLine = (usage.startLine > 0) ? usage.startLine - 1 : 0;
+                        result.push_back(lsp::DocumentHighlight{
+                            .range = lsp::Range{
+                                .start = { (unsigned)useLine, (unsigned)usage.startCol },
+                                .end   = { (unsigned)useLine, (unsigned)(usage.endCol) }
+                            },
+                            .kind = lsp::DocumentHighlightKind::Read
+                        });
+                    }
                 }
             }
 
@@ -648,48 +733,52 @@ void GdShaderServer::registerHandlers() {
                 return result;                
             }
 
-            int line = params.position.line; 
-            int col = params.position.character;
+            NodeFinderVisitor finder(params.position.line + 1, params.position.character + 1);
+            su->ast->accept(finder);
 
-            std::string name = getWordAtPosition(su->source_code, line, col);
-            if (name.empty()) return result;
+            if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
+            {
+                const Symbol* sym = id->resolvedSymbol;
 
-            const Symbol* sym = su->symbols->lookupAt(name, line);
+                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line + 1);
+                if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
 
-            if (sym) {
-                // Safety: Don't rename built-ins (like 'sin' or 'ALBEDO')
-                if (sym->category == SymbolType::Builtin) {
-                    SPDLOG_WARN("Cannot rename builtins!");
-                    return result;
+                if (sym) {
+                    // Safety: Don't rename built-ins
+                    if (sym->category == SymbolType::Builtin) {
+                        SPDLOG_WARN("Cannot rename builtins!");
+                        su->unitMutex.unlock();
+                        return result;
+                    }
+
+                    std::vector<lsp::TextEdit> edits;
+
+                    if (sym->definition.startLine >= 0) {
+                        int defLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
+                        edits.push_back(lsp::TextEdit{
+                            .range = lsp::Range{
+                                .start = { (unsigned)defLine, (unsigned)sym->definition.startCol },
+                                .end   = { (unsigned)defLine, (unsigned)(sym->definition.endCol) }
+                            },
+                            .newText = params.newName
+                        });
+                    }
+
+                    for (const auto& usage : sym->references) {
+                        int useLine = (usage.startLine > 0) ? usage.startLine - 1 : 0;
+                        edits.push_back(lsp::TextEdit{
+                            .range = lsp::Range{
+                                .start = { (unsigned)useLine, (unsigned)usage.startCol },
+                                .end   = { (unsigned)useLine, (unsigned)(usage.endCol) }
+                            },
+                            .newText = params.newName
+                        });
+                    }
+
+                    result.changes = {
+                        { params.textDocument.uri, edits }
+                    };
                 }
-
-                std::vector<lsp::TextEdit> edits;
-
-                // 1. Rename the Definition (if in this file)
-                if (sym->definition.startLine >= 0) {
-                    edits.push_back(lsp::TextEdit{
-                        .range = lsp::Range{
-                            .start = { (unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol },
-                            .end   = { (unsigned)sym->definition.endLine, (unsigned)(sym->definition.endCol) }
-                        },
-                        .newText = params.newName
-                    });
-                }
-
-                // 2. Rename all Usages
-                for (const auto& usage : sym->references) {
-                    edits.push_back(lsp::TextEdit{
-                        .range = lsp::Range{
-                            .start = { (unsigned)usage.startLine, (unsigned)usage.startCol },
-                            .end   = { (unsigned)usage.endLine, (unsigned)(usage.endCol) }
-                        },
-                        .newText = params.newName
-                    });
-                }
-
-                result.changes = {
-                    { params.textDocument.uri, edits }
-                };
             }
 
             su->unitMutex.unlock();
@@ -717,35 +806,41 @@ void GdShaderServer::registerHandlers() {
                 return result;                
             }
 
-            int line = params.position.line;
-            int col = params.position.character;
+            NodeFinderVisitor finder(params.position.line + 1, params.position.character + 1);
+            su->ast->accept(finder);
 
-            std::string name = getWordAtPosition(su->source_code, line, col);
-            if (name.empty()) return result;
+            if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
+            {
+                const Symbol* sym = id->resolvedSymbol;
 
-            const Symbol* sym = su->symbols->lookupAt(name, line);
+                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line + 1);
+                if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
 
-            if (sym) {
-                // 1. Add Definition (if requested context includes it)
-                if (params.context.includeDeclaration && sym->definition.startLine >= 0) {
-                    result.push_back(lsp::Location{
-                        .uri = params.textDocument.uri,
-                        .range = lsp::Range{
-                            .start = { (unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol },
-                            .end   = { (unsigned)sym->definition.endLine, (unsigned)(sym->definition.endCol) }
-                        }
-                    });
-                }
+                if (sym) {
 
-                // 2. Add Usages
-                for (const auto& usage : sym->references) {
-                    result.push_back(lsp::Location{
-                        .uri = params.textDocument.uri, // Currently current-file only
-                        .range = lsp::Range{
-                            .start = { (unsigned)usage.startLine, (unsigned)usage.startCol },
-                            .end   = { (unsigned)usage.endLine, (unsigned)(usage.endCol) }
-                        }
-                    });
+                    // 1. Add Definition
+                    if (params.context.includeDeclaration && sym->definition.startLine >= 0) {
+                        int defLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
+                        result.push_back(lsp::Location{
+                            .uri = params.textDocument.uri,
+                            .range = lsp::Range{
+                                .start = { (unsigned)defLine, (unsigned)sym->definition.startCol },
+                                .end   = { (unsigned)defLine, (unsigned)(sym->definition.endCol) }
+                            }
+                        });
+                    }
+
+                    // 2. Add Usages
+                    for (const auto& usage : sym->references) {
+                        int useLine = (usage.startLine > 0) ? usage.startLine - 1 : 0;
+                        result.push_back(lsp::Location{
+                            .uri = params.textDocument.uri,
+                            .range = lsp::Range{
+                                .start = { (unsigned)useLine, (unsigned)usage.startCol },
+                                .end   = { (unsigned)useLine, (unsigned)(usage.endCol) }
+                            }
+                        });
+                    }
                 }
             }
 
@@ -1024,114 +1119,6 @@ void gdshader_lsp::GdShaderServer::collectFoldingRanges(const ASTNode* node, std
     else if (auto doNode = dynamic_cast<const DoWhileNode*>(node)) {
         if (doNode->body) collectFoldingRanges(doNode->body.get(), ranges);
     }
-}
-
-std::pair<std::string, int> gdshader_lsp::GdShaderServer::getFunctionCallContext(const std::string &source, int line, int col)
-{
-    std::string lineText = getLine(source, line);
-    
-    // Safety check
-    if (col > (int)lineText.length()) col = lineText.length();
-
-    int balance = 0; // Parenthesis balance
-    int argIndex = 0;
-    
-    // Scan backwards from cursor
-    for (int i = col - 1; i >= 0; i--) {
-        char c = lineText[i];
-
-        if (c == ')') {
-            balance++;
-        }
-        else if (c == '(') {
-            if (balance > 0) {
-                balance--;
-            } else {
-                // Found the opening parenthesis for OUR function!
-                // The word immediately before this index is the function name.
-                return { getWordBeforeDot(lineText, i), argIndex };
-            }
-        }
-        else if (c == ',' && balance == 0) {
-            // Comma at the current level means we moved to the next argument
-            argIndex++;
-        }
-    }
-
-    return { "", -1 }; // Not inside a function call
-}
-
-std::string gdshader_lsp::GdShaderServer::getWordAtPosition(const std::string &source, int line, int col)
-{
-    size_t currentLine = 0;
-    size_t start = 0;
-    size_t end = source.find('\n');
-    
-    while (currentLine < (size_t)line && end != std::string::npos) {
-        start = end + 1;
-        end = source.find('\n', start);
-        currentLine++;
-    }
-    
-    if (currentLine != (size_t)line) return "";
-
-    std::string lineText = source.substr(start, end - start);
-    
-    // 2. Expand outwards from col to find start/end of identifier
-    if ((size_t)col >= lineText.size()) return "";
-
-    // Check if cursor is on a valid identifier char
-    auto isIdChar = [](char c) { return isalnum(c) || c == '_'; };
-    
-    if (!isIdChar(lineText[col])) return "";
-
-    int wordStart = col;
-    while (wordStart > 0 && isIdChar(lineText[wordStart - 1])) {
-        wordStart--;
-    }
-
-    int wordEnd = col;
-    while ((size_t)wordEnd < lineText.size() && isIdChar(lineText[wordEnd])) {
-        wordEnd++;
-    }
-
-    return lineText.substr(wordStart, wordEnd - wordStart);
-}
-
-std::string gdshader_lsp::GdShaderServer::getWordBeforeDot(const std::string& lineText, int dotPos) 
-{
-    // Safety check
-    if (dotPos <= 0 || (size_t)dotPos >= lineText.size()) return "";
-
-    // Start looking immediately before the dot
-    int i = dotPos - 1;
-
-    // 1. Skip optional whitespace (handle "test . x")
-    while (i >= 0 && std::isspace(lineText[i])) {
-        i--;
-    }
-
-    if (i < 0) return ""; // Found nothing before the dot
-
-    // 2. Mark the end of the identifier
-    int end = i;
-
-    // 3. Scan backwards capturing valid identifier chars (alnum + _)
-    while (i >= 0) {
-        char c = lineText[i];
-        if (std::isalnum(c) || c == '_') {
-            i--;
-        } else {
-            // Hit a non-identifier char (space, operator, etc.)
-            break;
-        }
-    }
-
-    // 'i' is now at the character *before* the word.
-    int start = i + 1;
-    if (start > end) return "";
-
-    return lineText.substr(start, end - start + 1);
 }
 
 std::string gdshader_lsp::GdShaderServer::getLine(const std::string &source, int targetLine)

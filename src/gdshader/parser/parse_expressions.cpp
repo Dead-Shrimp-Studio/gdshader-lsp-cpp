@@ -338,11 +338,15 @@ std::unique_ptr<ExpressionNode> Parser::parseMemberAccess(std::unique_ptr<Expres
     
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         dotNode->member = current_token.value;
+        advance();
+
         dotNode->range.endLine = previous_token.line;
         dotNode->range.endCol  = previous_token.column + previous_token.length;
-        advance();
     } else {
         reportError("Expected property name after '.'");
+
+        dotNode->range.endLine = previous_token.line;
+        dotNode->range.endCol  = previous_token.column + previous_token.length;
     }
     return dotNode;
 }

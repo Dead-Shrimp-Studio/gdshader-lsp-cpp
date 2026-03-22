@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-03-22
+
+Major improvements to performance, autocomplete, and stability. Closing the last few edge cases on syntax.
+
+### Added
+
+- More cases to the test suite
+
+- Performance optimizations
+  - AST decoration used for frontend requests diminishing the amount of string manipulations needed
+
+### Changed
+
+- AST information is now better used in the frontend server requests
+
+### Fixed
+
+- Several bugs regarding wrong order of top-level parsing when using 'instance' and 'flat' markers
+- Missing checks for structs containing themselves
+- Several missing checks for array acces in nested arrays
+- A missing range for DotNodes in MemberAccess resulting in broken hover tips
+- Several misalignments of AST line indexes
+
 ## [0.2.3] - 2026-03-11
 
 ### Added
