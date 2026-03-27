@@ -4,6 +4,9 @@
 #include "gdshader/semantics/semantic_analyzer.hpp"
 #include "gdshader/semantics/visitors/node_finder_visitor.hpp"
 #include "gdshader/semantics/visitors/call_finder_visitor.hpp"
+#include "gdshader/semantics/visitors/inlay_hint_visitor.hpp"
+#include "gdshader/semantics/visitors/color_visitor.hpp"
+#include "gdshader/semantics/visitors/semantic_token_visitor.hpp"
 
 #include "server/project_manager.hpp"
 #include "gdshader/ast/ast.h"
@@ -74,8 +77,8 @@ void GdShaderServer::registerHandlers() {
             // Semantic Tokens
             lsp::SemanticTokensOptions semOps;
             semOps.legend = lsp::SemanticTokensLegend{
-                .tokenTypes = { "variable", "function", "struct", "macro", "type", "parameter", "property" },
-                .tokenModifiers = { "declaration", "readonly", "static" }
+                .tokenTypes = { "type", "struct", "parameter", "variable", "property", "function", "keyword", "number", "macro", "enumMember" },
+                .tokenModifiers = { "declaration", "readonly" }
             };
             semOps.full = true;
             caps.semanticTokensProvider = semOps;
@@ -85,6 +88,7 @@ void GdShaderServer::registerHandlers() {
             caps.renameProvider = true;
             caps.foldingRangeProvider = true;
             caps.inlayHintProvider = true;
+            caps.colorProvider = true;
 
             return lsp::requests::Initialize::Result{
                 .capabilities = caps,
@@ -670,7 +674,8 @@ void GdShaderServer::registerHandlers() {
     handler.add<lsp::requests::TextDocument_SemanticTokens_Full>(
         [this](lsp::requests::TextDocument_SemanticTokens_Full::Params&& params) -> lsp::requests::TextDocument_SemanticTokens_Full::Result 
         {
-            lsp::SemanticTokens result;
+            lsp::requests::TextDocument_SemanticTokens_Full::Result result;
+            
             std::string path = std::string(params.textDocument.uri.path());
             #ifdef _WIN32
             if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
@@ -678,14 +683,47 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
-            
+
             su->unitMutex.lock();
-            if (!su->tokens.empty()) {
+            if (!su->ast) {
                 su->unitMutex.unlock();
                 return result;                
             }
 
-            result.data = encodeTokens(su->tokens); 
+            // 1. Traverse AST to collect context-aware tokens
+            SemanticTokenVisitor visitor;
+            su->ast->accept(visitor);
+
+            // 2. Sort tokens by position (LSP requires strict ordering)
+            std::sort(visitor.tokens.begin(), visitor.tokens.end());
+
+            // 3. Compute Line & Char Deltas
+            std::vector<unsigned int> data;
+            int prevLine = 0;
+            int prevCol = 0;
+
+            for (const auto& token : visitor.tokens) {
+                int deltaLine = token.line - prevLine;
+                int deltaCol = deltaLine == 0 ? token.col - prevCol : token.col;
+                
+                // Safety check: LSP will crash the editor if deltas are negative
+                if (deltaLine < 0 || deltaCol < 0) continue; 
+
+                data.push_back(deltaLine);
+                data.push_back(deltaCol);
+                data.push_back(token.length);
+                data.push_back(token.type);
+                data.push_back(token.modifiers);
+
+                prevLine = token.line;
+                prevCol = token.col;
+            }
+
+            lsp::SemanticTokens semantic_tokens_obj;
+            semantic_tokens_obj.data = data;
+
+            result = semantic_tokens_obj;
+            
             su->unitMutex.unlock();
             return result;
         }
@@ -930,10 +968,75 @@ void GdShaderServer::registerHandlers() {
                 su->unitMutex.unlock();
                 return hints;
             }
-            // collectInlayHints(su->ast.get(), su->symbols.get(), params.range, hints);
+
+            InlayHintVisitor visitor(hints, su->symbols.get(), &su->types, params.range);
+            su->ast->accept(visitor);
+
             su->unitMutex.unlock();
 
             return hints;
+        }
+    );
+
+    handler.add<lsp::requests::TextDocument_DocumentColor>(
+        [this](lsp::requests::TextDocument_DocumentColor::Params&& params) -> lsp::requests::TextDocument_DocumentColor::Result
+        {
+            std::vector<lsp::ColorInformation> colors;
+            
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            su->unitMutex.lock();
+            if (!su->ast) {
+                su->unitMutex.unlock();
+                return colors;
+            }
+
+            ColorVisitor visitor(colors);
+            su->ast->accept(visitor);
+            
+            su->unitMutex.unlock();
+            return colors;
+        }
+    );
+
+    // --- FEATURE: COLOR PRESENTATION ---
+    handler.add<lsp::requests::TextDocument_ColorPresentation>(
+        [this](lsp::requests::TextDocument_ColorPresentation::Params&& params) -> lsp::requests::TextDocument_ColorPresentation::Result
+        {
+            std::vector<lsp::ColorPresentation> presentations;
+            
+            // Format the floats
+            std::string r = std::to_string(params.color.red);
+            std::string g = std::to_string(params.color.green);
+            std::string b = std::to_string(params.color.blue);
+            std::string a = std::to_string(params.color.alpha);
+
+            // Helper to strip trailing zeros, but keep the decimal (e.g., 1.0)
+            auto trim = [](std::string& s) {
+                s.erase(s.find_last_not_of('0') + 1, std::string::npos);
+                if (s.back() == '.') s += "0";
+            };
+            trim(r); trim(g); trim(b); trim(a);
+
+            // Suggest both vec3 and vec4 formats. The editor will let the user pick, 
+            // or default to the first one depending on the client.
+            lsp::ColorPresentation vec4Pres;
+            vec4Pres.label = "vec4(" + r + ", " + g + ", " + b + ", " + a + ")";
+            vec4Pres.textEdit = lsp::TextEdit{params.range, vec4Pres.label};
+            presentations.push_back(vec4Pres);
+
+            lsp::ColorPresentation vec3Pres;
+            vec3Pres.label = "vec3(" + r + ", " + g + ", " + b + ")";
+            vec3Pres.textEdit = lsp::TextEdit{params.range, vec3Pres.label};
+            presentations.push_back(vec3Pres);
+
+            return presentations;
         }
     );
 
@@ -1205,31 +1308,6 @@ lsp::DocumentSymbol GdShaderServer::createSymbol(const std::string& name, lsp::S
     
     sym.children = children;
     return sym;
-}
-
-std::vector<unsigned int> gdshader_lsp::GdShaderServer::encodeTokens(std::vector<RawToken> &raw)
-{
-    std::sort(raw.begin(), raw.end());
-
-    std::vector<unsigned int> encoded;
-    unsigned int prevLine = 0;
-    unsigned int prevCol = 0;
-
-    for (const auto& t : raw) {
-        unsigned int deltaLine = t.line - prevLine;
-        unsigned int deltaCol = (deltaLine == 0) ? (t.col - prevCol) : t.col;
-
-        encoded.push_back(deltaLine);
-        encoded.push_back(deltaCol);
-        encoded.push_back(t.length);
-        encoded.push_back(t.type);
-        encoded.push_back(t.modifiers);
-
-        prevLine = t.line;
-        prevCol = t.col;
-    }
-
-    return encoded;
 }
 
 std::vector<lsp::DocumentSymbol> GdShaderServer::getDocumentSymbols(const ASTNode* node) 
