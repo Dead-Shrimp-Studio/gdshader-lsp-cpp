@@ -13,8 +13,9 @@ Major improvements to performance, autocomplete, and stability. Closing the last
 
 - More cases to the test suite
 
-- Performance optimizations
+- Performance improvements
   - AST decoration used for frontend requests diminishing the amount of string manipulations needed
+  - AST improvements for range tracking and lookup
 
 ### Changed
 
@@ -26,7 +27,7 @@ Major improvements to performance, autocomplete, and stability. Closing the last
 - Missing checks for structs containing themselves
 - Several missing checks for array acces in nested arrays
 - A missing range for DotNodes in MemberAccess resulting in broken hover tips
-- Several misalignments of AST line indexes
+- Several misalignments of AST line indexes and ranges
 
 ## [0.2.3] - 2026-03-11
 

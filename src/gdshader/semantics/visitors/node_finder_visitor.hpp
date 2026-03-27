@@ -30,11 +30,7 @@ namespace gdshader_lsp
         // -------------------------------------------------------------------------
         // ROOT AND TOP LEVEL NODES
         // -------------------------------------------------------------------------
-        void visit(ProgramNode* node) override {
-            if (isInside(node)) {
-                for (auto& n : node->nodes) if (n) n->accept(*this);
-            }
-        }
+        void visit(ProgramNode* node) override { for (auto& n : node->nodes) if (n) n->accept(*this); }
         void visit(ShaderTypeNode* node) override { isInside(node); }
         void visit(RenderModeNode* node) override { isInside(node); }
         void visit(GroupUniformsNode* node) override { isInside(node); }
@@ -86,66 +82,57 @@ namespace gdshader_lsp
 
         // -------------------------------------------------------------------------
         // STATEMENTS
+        // We cannot if-guard here due to the parser being slightly incorrect when it comes to range tracking...
         // -------------------------------------------------------------------------
         void visit(BlockNode* node) override {
-            if (isInside(node)) {
-                for (auto& stmt : node->statements) if (stmt) stmt->accept(*this);
-            }
+            isInside(node);
+            for (auto& stmt : node->statements) if (stmt) stmt->accept(*this);
         }
         void visit(ExpressionStatementNode* node) override {
-            if (isInside(node)) {
-                if (node->expr) node->expr->accept(*this);
-            }
+            isInside(node);
+            if (node->expr) node->expr->accept(*this);
         }
         void visit(VariableDeclNode* node) override {
-            if (isInside(node)) {
-                if (node->type) node->type->accept(*this);
-                if (node->initializer) node->initializer->accept(*this);
-            }
+            isInside(node);
+            if (node->type) node->type->accept(*this);
+            if (node->initializer) node->initializer->accept(*this);
         }
         void visit(IfNode* node) override {
-            if (isInside(node)) {
-                if (node->condition) node->condition->accept(*this);
-                if (node->thenBranch) node->thenBranch->accept(*this);
-                if (node->elseBranch) node->elseBranch->accept(*this);
-            }
+            isInside(node);
+            if (node->condition) node->condition->accept(*this);
+            if (node->thenBranch) node->thenBranch->accept(*this);
+            if (node->elseBranch) node->elseBranch->accept(*this);
         }
         void visit(WhileNode* node) override {
-            if (isInside(node)) {
-                if (node->condition) node->condition->accept(*this);
-                if (node->body) node->body->accept(*this);
-            }
+            isInside(node);
+            if (node->condition) node->condition->accept(*this);
+            if (node->body) node->body->accept(*this);
         }
         void visit(DoWhileNode* node) override {
-            if (isInside(node)) {
-                if (node->body) node->body->accept(*this);
-                if (node->condition) node->condition->accept(*this);
-            }
+            isInside(node);
+            if (node->body) node->body->accept(*this);
+            if (node->condition) node->condition->accept(*this);
         }
         void visit(ForNode* node) override {
-            if (isInside(node)) {
-                if (node->init) node->init->accept(*this);
-                if (node->condition) node->condition->accept(*this);
-                if (node->increment) node->increment->accept(*this);
-                if (node->body) node->body->accept(*this);
-            }
+            isInside(node);
+            if (node->init) node->init->accept(*this);
+            if (node->condition) node->condition->accept(*this);
+            if (node->increment) node->increment->accept(*this);
+            if (node->body) node->body->accept(*this);
         }
         void visit(ReturnNode* node) override {
-            if (isInside(node)) {
-                if (node->value) node->value->accept(*this);
-            }
+            isInside(node);
+            if (node->value) node->value->accept(*this);
         }
         void visit(SwitchNode* node) override {
-            if (isInside(node)) {
-                if (node->expression) node->expression->accept(*this);
-                for (auto& c : node->cases) if (c) c->accept(*this);
-            }
+            isInside(node);
+            if (node->expression) node->expression->accept(*this);
+            for (auto& c : node->cases) if (c) c->accept(*this);
         }
         void visit(CaseNode* node) override {
-            if (isInside(node)) {
-                if (node->value) node->value->accept(*this);
-                for (auto& stmt : node->statements) if (stmt) stmt->accept(*this);
-            }
+            isInside(node);
+            if (node->value) node->value->accept(*this);
+            for (auto& stmt : node->statements) if (stmt) stmt->accept(*this);
         }
         void visit(DiscardNode* node) override { isInside(node); }
         void visit(BreakNode* node) override { isInside(node); }

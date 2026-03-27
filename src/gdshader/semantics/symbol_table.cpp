@@ -254,8 +254,8 @@ Symbol SymbolTable::createSymbol(const std::string& name, TypePtr type, SymbolTy
     s.mutability = mutability;
     
     s.definition = nodeRange;
-    s.definition.startLine = (nodeRange.startLine > 0) ? nodeRange.startLine - 1 : 0;
-    s.definition.endLine = (nodeRange.endLine > 0) ? nodeRange.endLine - 1 : 0;
+    s.definition.startLine = nodeRange.startLine;
+    s.definition.endLine = nodeRange.endLine;
     
     s.returnType = returnType;
     s.parameterTypes = paramterTypes;

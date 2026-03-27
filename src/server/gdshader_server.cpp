@@ -196,8 +196,8 @@ void GdShaderServer::registerHandlers() {
                 return hover;                
             }
 
-            int line = params.position.line + 1;
-            int col = params.position.character + 1;
+            int line = params.position.line;
+            int col = params.position.character;
 
             NodeFinderVisitor finder(line, col);
             su->ast->accept(finder);
@@ -245,6 +245,24 @@ void GdShaderServer::registerHandlers() {
             else if (auto typeNode = dynamic_cast<const TypeNode*>(target)) 
             {
                 content = "**Type**\n\n`" + typeNode->toString() + "`";
+            }
+
+            else
+            {
+                // FALLBACK: If we hovered over a Literal (like 1.0) or an operator, 
+                // check if we are inside a function call's arguments
+                CallFinderVisitor callFinder(line, col);
+                su->ast->accept(callFinder);
+
+                if (callFinder.activeCall) {
+                    std::vector<const Symbol*> overloads = su->symbols->lookupFunctions(callFinder.activeCall->functionName);
+                    if (!overloads.empty()) {
+                        const Symbol* sym = overloads[0]; 
+                        content = "**" + sym->name + "**\n\n";
+                        content += "Return Type: `" + (sym->returnType ? sym->returnType->toString() : "void") + "`\n";
+                        if (!sym->doc_string.empty()) content += "\n" + sym->doc_string;
+                    }
+                }
             }
 
             if (!content.empty()) {
@@ -297,7 +315,7 @@ void GdShaderServer::registerHandlers() {
                 int targetCol = col - 2;
                 if (targetCol < 0) targetCol = 0;
 
-                NodeFinderVisitor finder(line + 1, targetCol + 1);
+                NodeFinderVisitor finder(line, targetCol);
                 su->ast->accept(finder);
 
                 TypePtr t = nullptr;
@@ -318,8 +336,8 @@ void GdShaderServer::registerHandlers() {
                         i--;
                     }
                     if (!varName.empty()) {
-                        const Symbol* sym = su->symbols->lookupAt(varName, line + 1); // Use 1-indexed line!
-                        if (!sym) sym = su->symbols->lookupAt(varName, 99999); // Ultimate global fallback
+                        const Symbol* sym = su->symbols->lookupAt(varName, line);
+                        if (!sym) sym = su->symbols->lookupAt(varName, 99999);
                         if (sym && sym->type) t = sym->type;
                     }
                 }
@@ -332,7 +350,7 @@ void GdShaderServer::registerHandlers() {
                         std::vector<std::string> swizzles = {"x", "y", "z", "w", "r", "g", "b", "a", "s", "t", "p", "q"};
                         
                         // Provide valid single-character swizzles for this vector size
-                        for(int i = 0; i < t->componentCount; ++i) { 
+                        for(int i = 0; i < t->componentCount; ++i) {
                             result.items.push_back(lsp::CompletionItem{
                                 .label = swizzles[i],
                                 .kind = lsp::CompletionItemKind::Field,
@@ -432,28 +450,47 @@ void GdShaderServer::registerHandlers() {
                 return loc;                
             }
 
-            NodeFinderVisitor finder(params.position.line + 1, params.position.character + 1);
+            NodeFinderVisitor finder(params.position.line, params.position.character);
             su->ast->accept(finder);
 
             if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
             {
                 const Symbol* sym = id->resolvedSymbol;
 
-                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line + 1);
+                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line);
                 if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
 
-                // If found and it's not a built-in (startLine >= 0)
-                if (sym && sym->definition.startLine >= 0) {
-                    loc.uri = params.textDocument.uri;
+                if (sym) {
 
-                    int lspLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
-                    
-                    loc.range.start = lsp::Position{(unsigned)lspLine, (unsigned)sym->definition.startCol};
-                    loc.range.end   = lsp::Position{(unsigned)lspLine, (unsigned)sym->definition.endCol};
+                    loc.uri = params.textDocument.uri;
+                    loc.range.start = lsp::Position{(unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol};
+                    loc.range.end   = lsp::Position{(unsigned)sym->definition.startLine, (unsigned)sym->definition.endCol};
                     
                     su->unitMutex.unlock();
                     return loc;
                 }
+            }
+
+            else if (auto call = dynamic_cast<const FunctionCallNode*>(finder.deepestNode)) 
+            {
+                const Symbol* sym = su->symbols->lookupAt(call->functionName, params.position.line);
+                if (!sym) sym = su->symbols->lookupAt(call->functionName, 99999);
+
+                if (sym && sym->definition.startLine >= 0) {
+                    loc.uri = params.textDocument.uri;
+                    loc.range.start = lsp::Position{(unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol};
+                    loc.range.end   = lsp::Position{(unsigned)sym->definition.endLine, (unsigned)sym->definition.endCol};
+                    su->unitMutex.unlock();
+                    return loc;
+                }
+            }
+
+            else if (auto varDecl = dynamic_cast<const VariableDeclNode*>(finder.deepestNode)) {
+                loc.uri = params.textDocument.uri;
+                loc.range.start = lsp::Position{(unsigned)varDecl->nameRange.startLine, (unsigned)varDecl->nameRange.startCol};
+                loc.range.end   = lsp::Position{(unsigned)varDecl->nameRange.endLine, (unsigned)varDecl->nameRange.endCol};
+                su->unitMutex.unlock();
+                return loc;
             }
 
             su->unitMutex.unlock();
@@ -673,19 +710,19 @@ void GdShaderServer::registerHandlers() {
                 return result;                
             }
 
-            NodeFinderVisitor finder(params.position.line + 1, params.position.character + 1);
+            NodeFinderVisitor finder(params.position.line, params.position.character);
             su->ast->accept(finder);
 
             if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
             {
                 const Symbol* sym = id->resolvedSymbol;
 
-                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line + 1);
+                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line);
                 if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
 
                 if (sym) {
                     if (sym->definition.startLine >= 0) {
-                        int defLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
+                        int defLine = sym->definition.startLine;
                         result.push_back(lsp::DocumentHighlight{
                             .range = lsp::Range{
                                 .start = { (unsigned)defLine, (unsigned)sym->definition.startCol },
@@ -696,7 +733,7 @@ void GdShaderServer::registerHandlers() {
                     }
 
                     for (const auto& usage : sym->references) {
-                        int useLine = (usage.startLine > 0) ? usage.startLine - 1 : 0;
+                        int useLine = usage.startLine;
                         result.push_back(lsp::DocumentHighlight{
                             .range = lsp::Range{
                                 .start = { (unsigned)useLine, (unsigned)usage.startCol },
@@ -733,14 +770,14 @@ void GdShaderServer::registerHandlers() {
                 return result;                
             }
 
-            NodeFinderVisitor finder(params.position.line + 1, params.position.character + 1);
+            NodeFinderVisitor finder(params.position.line, params.position.character);
             su->ast->accept(finder);
 
             if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
             {
                 const Symbol* sym = id->resolvedSymbol;
 
-                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line + 1);
+                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line);
                 if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
 
                 if (sym) {
@@ -754,7 +791,7 @@ void GdShaderServer::registerHandlers() {
                     std::vector<lsp::TextEdit> edits;
 
                     if (sym->definition.startLine >= 0) {
-                        int defLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
+                        int defLine = sym->definition.startLine;
                         edits.push_back(lsp::TextEdit{
                             .range = lsp::Range{
                                 .start = { (unsigned)defLine, (unsigned)sym->definition.startCol },
@@ -765,7 +802,7 @@ void GdShaderServer::registerHandlers() {
                     }
 
                     for (const auto& usage : sym->references) {
-                        int useLine = (usage.startLine > 0) ? usage.startLine - 1 : 0;
+                        int useLine = usage.startLine;
                         edits.push_back(lsp::TextEdit{
                             .range = lsp::Range{
                                 .start = { (unsigned)useLine, (unsigned)usage.startCol },
@@ -806,21 +843,21 @@ void GdShaderServer::registerHandlers() {
                 return result;                
             }
 
-            NodeFinderVisitor finder(params.position.line + 1, params.position.character + 1);
+            NodeFinderVisitor finder(params.position.line, params.position.character);
             su->ast->accept(finder);
 
             if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
             {
                 const Symbol* sym = id->resolvedSymbol;
 
-                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line + 1);
+                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line);
                 if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
 
                 if (sym) {
 
                     // 1. Add Definition
                     if (params.context.includeDeclaration && sym->definition.startLine >= 0) {
-                        int defLine = (sym->definition.startLine > 0) ? sym->definition.startLine - 1 : 0;
+                        int defLine = sym->definition.startLine;
                         result.push_back(lsp::Location{
                             .uri = params.textDocument.uri,
                             .range = lsp::Range{
@@ -832,7 +869,7 @@ void GdShaderServer::registerHandlers() {
 
                     // 2. Add Usages
                     for (const auto& usage : sym->references) {
-                        int useLine = (usage.startLine > 0) ? usage.startLine - 1 : 0;
+                        int useLine = usage.startLine;
                         result.push_back(lsp::Location{
                             .uri = params.textDocument.uri,
                             .range = lsp::Range{
@@ -1043,9 +1080,9 @@ void gdshader_lsp::GdShaderServer::collectFoldingRanges(const ASTNode* node, std
     if (auto block = dynamic_cast<const BlockNode*>(node)) {
         if (block->range.endLine > block->range.startLine) {
             lsp::FoldingRange fr;
-            fr.startLine = block->range.startLine + 1;
+            fr.startLine = block->range.startLine;
             fr.startCharacter = block->range.startCol;
-            fr.endLine = block->range.endLine + 1;
+            fr.endLine = block->range.endLine;
             fr.endCharacter = block->range.endCol;
             fr.kind = lsp::FoldingRangeKind::Region;
             ranges.push_back(fr);
@@ -1059,9 +1096,9 @@ void gdshader_lsp::GdShaderServer::collectFoldingRanges(const ASTNode* node, std
     else if (auto str = dynamic_cast<const StructNode*>(node)) {
         if (str->range.endLine > str->range.startLine) {
             lsp::FoldingRange fr;
-            fr.startLine = str->range.startLine + 1;
+            fr.startLine = str->range.startLine;
             fr.startCharacter = str->range.startCol;
-            fr.endLine = str->range.endLine + 1;
+            fr.endLine = str->range.endLine;
             fr.endCharacter = str->range.endCol;
             fr.kind = lsp::FoldingRangeKind::Region;
             ranges.push_back(fr);
@@ -1073,9 +1110,9 @@ void gdshader_lsp::GdShaderServer::collectFoldingRanges(const ASTNode* node, std
     else if (auto sw = dynamic_cast<const SwitchNode*>(node)) {
         if (sw->range.endLine > sw->range.startLine) {
             lsp::FoldingRange fr;
-            fr.startLine = sw->range.startLine + 1;
+            fr.startLine = sw->range.startLine;
             fr.startCharacter = sw->range.startCol;
-            fr.endLine = sw->range.endLine + 1;
+            fr.endLine = sw->range.endLine;
             fr.endCharacter = sw->range.endCol;
             fr.kind = lsp::FoldingRangeKind::Region;
             ranges.push_back(fr);
@@ -1088,9 +1125,9 @@ void gdshader_lsp::GdShaderServer::collectFoldingRanges(const ASTNode* node, std
     else if (auto c = dynamic_cast<const CaseNode*>(node)) {
         if (c->range.endLine > c->range.startLine) {
             lsp::FoldingRange fr;
-            fr.startLine = c->range.startLine + 1;
+            fr.startLine = c->range.startLine;
             fr.startCharacter = c->range.startCol;
-            fr.endLine = c->range.endLine + 1;
+            fr.endLine = c->range.endLine;
             fr.endCharacter = c->range.endCol;
             fr.kind = lsp::FoldingRangeKind::Region;
             ranges.push_back(fr);
@@ -1158,7 +1195,7 @@ lsp::DocumentSymbol GdShaderServer::createSymbol(const std::string& name, lsp::S
     sym.kind = kind;
     sym.detail = detail;
 
-    int lspLine = (line > 0) ? line - 1 : 0;
+    int lspLine = line;
 
     sym.range = lsp::Range{
         .start = lsp::Position{(unsigned)lspLine, 0},
