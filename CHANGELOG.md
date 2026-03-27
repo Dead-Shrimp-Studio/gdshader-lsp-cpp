@@ -11,7 +11,8 @@ Major improvements to performance, autocomplete, and stability. Closing the last
 
 ### Added
 
-- More cases to the test suite
+- Feature tests in the test suite & more cases to the test suite (100 diagnostic tests now)
+- Semantic tokens are back
 
 - Performance improvements
   - AST decoration used for frontend requests diminishing the amount of string manipulations needed
@@ -19,6 +20,7 @@ Major improvements to performance, autocomplete, and stability. Closing the last
 
 ### Changed
 
+- Cleaned up the fragmented test files
 - AST information is now better used in the frontend server requests
 
 ### Fixed
