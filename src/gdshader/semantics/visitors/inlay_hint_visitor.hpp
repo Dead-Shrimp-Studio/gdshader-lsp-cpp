@@ -19,7 +19,7 @@ namespace gdshader_lsp {
             : hints(h), symbols(s), types(t), targetRange(r) {}
 
         bool isOverlapping(const Range& r) {
-            if ((u_int)r.endLine < targetRange.start.line || (u_int)r.startLine > targetRange.end.line) return false;
+            if ((unsigned int)r.endLine < targetRange.start.line || (unsigned int)r.startLine > targetRange.end.line) return false;
             return true;
         }
 
