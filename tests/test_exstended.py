@@ -37,8 +37,10 @@ def test_hover_builtin(lsp):
     assert result is not None
     
     contents = result["contents"]
+    assert contents is not None
     value = contents["value"] if isinstance(contents, dict) else contents
-    
+    assert value is not None
+
     assert "sin" in value or "sine" in value.lower()
 
 # -------------------------------------------------------------------------
