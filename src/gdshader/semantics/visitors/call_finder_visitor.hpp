@@ -27,25 +27,25 @@ namespace gdshader_lsp
         }
 
         // Structural traversals
-        void visit(ProgramNode* n) override { if(isInside(n->range)) for(auto& c:n->nodes) if(c) c->accept(*this); }
-        void visit(BlockNode* n) override { if(isInside(n->range)) for(auto& s:n->statements) if(s) s->accept(*this); }
-        void visit(FunctionNode* n) override { if(isInside(n->range) && n->body) n->body->accept(*this); }
-        void visit(ExpressionStatementNode* n) override { if(isInside(n->range) && n->expr) n->expr->accept(*this); }
-        void visit(VariableDeclNode* n) override { if(isInside(n->range) && n->initializer) n->initializer->accept(*this); }
-        void visit(UniformNode* n) override { if(isInside(n->range) && n->defaultValue) n->defaultValue->accept(*this); }
-        void visit(ConstNode* n) override { if(isInside(n->range) && n->value) n->value->accept(*this); }
-        void visit(IfNode* n) override { if(isInside(n->range)) { if(n->condition) n->condition->accept(*this); if(n->thenBranch) n->thenBranch->accept(*this); if(n->elseBranch) n->elseBranch->accept(*this); } }
-        void visit(WhileNode* n) override { if(isInside(n->range)) { if(n->condition) n->condition->accept(*this); if(n->body) n->body->accept(*this); } }
-        void visit(DoWhileNode* n) override { if(isInside(n->range)) { if(n->condition) n->condition->accept(*this); if(n->body) n->body->accept(*this); } }
-        void visit(ForNode* n) override { if(isInside(n->range)) { if(n->init) n->init->accept(*this); if(n->condition) n->condition->accept(*this); if(n->increment) n->increment->accept(*this); if(n->body) n->body->accept(*this); } }
-        void visit(ReturnNode* n) override { if(isInside(n->range) && n->value) n->value->accept(*this); }
-        void visit(BinaryOpNode* n) override { if(isInside(n->range)) { if(n->left) n->left->accept(*this); if(n->right) n->right->accept(*this); } }
-        void visit(UnaryOpNode* n) override { if(isInside(n->range) && n->operand) n->operand->accept(*this); }
-        void visit(TernaryNode* n) override { if(isInside(n->range)) { if(n->condition) n->condition->accept(*this); if(n->trueExpr) n->trueExpr->accept(*this); if(n->falseExpr) n->falseExpr->accept(*this); } }
-        void visit(ArrayAccessNode* n) override { if(isInside(n->range)) { if(n->base) n->base->accept(*this); if(n->index) n->index->accept(*this); } }
-        void visit(MemberAccessNode* n) override { if(isInside(n->range) && n->base) n->base->accept(*this); }
-        void visit(SwitchNode* n) override { if(isInside(n->range)) { if(n->expression) n->expression->accept(*this); for(auto& c:n->cases) if(c) c->accept(*this); } }
-        void visit(CaseNode* n) override { if(isInside(n->range)) { if(n->value) n->value->accept(*this); for(auto& s:n->statements) if(s) s->accept(*this); } }
+        void visit(ProgramNode* n) override { for(auto& c:n->nodes) if(c) c->accept(*this); }
+        void visit(BlockNode* n) override { isInside(n->range); for(auto& s:n->statements) if(s) s->accept(*this); }
+        void visit(FunctionNode* n) override { isInside(n->range); if(n->body) n->body->accept(*this); }
+        void visit(ExpressionStatementNode* n) override { isInside(n->range); if(n->expr) n->expr->accept(*this); }
+        void visit(VariableDeclNode* n) override { isInside(n->range); if(n->initializer) n->initializer->accept(*this); }
+        void visit(UniformNode* n) override { isInside(n->range); if(n->defaultValue) n->defaultValue->accept(*this); }
+        void visit(ConstNode* n) override { isInside(n->range); if(n->value) n->value->accept(*this); }
+        void visit(IfNode* n) override { isInside(n->range); if(n->condition) n->condition->accept(*this); if(n->thenBranch) n->thenBranch->accept(*this); if(n->elseBranch) n->elseBranch->accept(*this); }
+        void visit(WhileNode* n) override { isInside(n->range); if(n->condition) n->condition->accept(*this); if(n->body) n->body->accept(*this); }
+        void visit(DoWhileNode* n) override { isInside(n->range); if(n->condition) n->condition->accept(*this); if(n->body) n->body->accept(*this); }
+        void visit(ForNode* n) override { isInside(n->range); if(n->init) n->init->accept(*this); if(n->condition) n->condition->accept(*this); if(n->increment) n->increment->accept(*this); if(n->body) n->body->accept(*this); }
+        void visit(ReturnNode* n) override { isInside(n->range); if(n->value) n->value->accept(*this); }
+        void visit(BinaryOpNode* n) override { isInside(n->range); if(n->left) n->left->accept(*this); if(n->right) n->right->accept(*this); }
+        void visit(UnaryOpNode* n) override { isInside(n->range); if(n->operand) n->operand->accept(*this); }
+        void visit(TernaryNode* n) override { isInside(n->range); if(n->condition) n->condition->accept(*this); if(n->trueExpr) n->trueExpr->accept(*this); if(n->falseExpr) n->falseExpr->accept(*this); }
+        void visit(ArrayAccessNode* n) override { isInside(n->range); if(n->base) n->base->accept(*this); if(n->index) n->index->accept(*this); }
+        void visit(MemberAccessNode* n) override { isInside(n->range); if(n->base) n->base->accept(*this); }
+        void visit(SwitchNode* n) override { isInside(n->range); if(n->expression) n->expression->accept(*this); for(auto& c:n->cases) if(c) c->accept(*this); }
+        void visit(CaseNode* n) override { isInside(n->range); if(n->value) n->value->accept(*this); for(auto& s:n->statements) if(s) s->accept(*this); }
         
         // Target Nodes
         void visit(FunctionCallNode* n) override {

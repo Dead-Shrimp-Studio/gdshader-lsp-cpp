@@ -62,7 +62,7 @@ namespace gdshader_lsp {
     void SymbolDeclarationVisitor::visit(BlockNode* node) 
     {
         GDSHADER_RETURN_IF(!node, "BlockNode is null");
-        int startLine = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
+        int startLine = node->range.startLine;
         symbols.pushScope(startLine); 
 
         for (const auto& stmt : node->statements) {
@@ -75,7 +75,7 @@ namespace gdshader_lsp {
     void SymbolDeclarationVisitor::visit(ForNode* node) 
     {
         GDSHADER_RETURN_IF(!node, "ForNode is null");
-        int startLine = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
+        int startLine = node->range.startLine;
         symbols.pushScope(startLine); 
 
         if (node->init) node->init->accept(*this);
@@ -100,7 +100,7 @@ namespace gdshader_lsp {
 
         Mutability mut = node->isConst ? Mutability::ReadOnly : Mutability::Mutable;
 
-        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, mut);        
+        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, mut);
 
         if (symbols.lookup(node->name)) {
             if (symbols.add(s)) {

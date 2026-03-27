@@ -139,6 +139,7 @@ void TypeCheckingVisitor::visit(IdentifierNode* node)
         diagnostics.push_back(reportError(node, "Undefined identifier '" + node->name + "'"));
     } else {
         node->resolvedSymbol = s;
+        symbols.addReference(const_cast<Symbol*>(s), node->range);
     }
 }
 
@@ -207,11 +208,9 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
 {
     GDSHADER_RETURN_IF(!node, "BinaryOpNode (Assignment) is null");
     if (node->right) node->right->accept(*this);
+    GDSHADER_RETURN_IF(!node->left, "BinaryOpNode (Assignment) has no left side.");
 
-    if (!node->left) {
-        SPDLOG_TRACE("Left node of binaryOpNode is empty.");
-        return; 
-    }
+    if (node->left) node->left->accept(*this);
 
     const Symbol* s = getRootSymbol(node->left.get());
     TypePtr lType = typeRegistry.getUnknownType();
@@ -229,6 +228,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
             diagnostics.push_back(reportError(node, "Undefined identifier '" + id->name + "'"));
             return;
         }
+        
     } else if (dynamic_cast<const MemberAccessNode*>(node->left.get())) 
     {
         node->left->accept(*this);
@@ -330,7 +330,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
 
 void TypeCheckingVisitor::visit(ConstNode* node) {
     GDSHADER_RETURN_IF(!node, "ConstNode is null");
-    int line = (node->range.startLine > 0) ? node->range.startLine - 1 : 0;
+    int line = node->range.startLine;
     const Symbol* s = symbols.lookupAt(node->name, line);
     
     if (s && node->value) {
@@ -651,7 +651,7 @@ TypePtr TypeCheckingVisitor::resolveType(const ExpressionNode* node)
     }
 
     if (auto id = dynamic_cast<const IdentifierNode*>(node)) {
-        int line = (id->range.startLine > 0) ? id->range.startLine - 1 : 0;
+        int line = id->range.startLine;
         const Symbol* s = symbols.lookupAt(id->name, line);
         result = (s && s->type) ? s->type : typeRegistry.getUnknownType();
     }
@@ -788,7 +788,7 @@ const Symbol* TypeCheckingVisitor::getRootSymbol(const ExpressionNode* node)
     GDSHADER_RETURN_VAL_IF(!node, nullptr, "ExpressionNode is null in getRootSymbol");
 
     if (auto id = dynamic_cast<const IdentifierNode*>(node)) {
-        int line = (id->range.startLine > 0) ? id->range.startLine - 1 : 0;
+        int line = id->range.startLine;
         return symbols.lookupAt(id->name, line);
     }
     

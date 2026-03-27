@@ -32,6 +32,10 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
                 if (current_token.line == startLine) {
                     node->value = parseExpression();
                 }
+
+                node->range.endLine = previous_token.line;
+                node->range.endCol = previous_token.column + previous_token.length;
+
                 return node;
             }
         }
@@ -42,6 +46,8 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
                 auto node = std::make_unique<IncludeNode>();
                 node->range.startLine = startLine;
                 node->path = previous_token.value;
+                node->range.endLine = previous_token.line;
+                node->range.endCol = previous_token.column + previous_token.length;
 
                 auto pm = ProjectManager::get_singleton();
                 std::string absPath = pm->resolvePath(currentPath, node->path);

@@ -294,6 +294,11 @@ std::unique_ptr<ExpressionNode> Parser::parseTernary(std::unique_ptr<ExpressionN
     // Ternary is also usually right-associative
     node->falseExpr = parsePrecedence(static_cast<Precedence>(PREC_TERNARY));
     
+    if (node->falseExpr) {
+        node->range.endLine = node->falseExpr->range.endLine;
+        node->range.endCol  = node->falseExpr->range.endCol;
+    }
+    
     return node;
 }
 
