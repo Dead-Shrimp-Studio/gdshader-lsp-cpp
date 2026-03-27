@@ -33,7 +33,7 @@ def test_definition_and_references(lsp):
     
     res = lsp.read_message()
     assert res["id"] == msg_id
-    
+
     result = res["result"]
     if result is None:
         pytest.fail("Server returned null for definition lookup")
