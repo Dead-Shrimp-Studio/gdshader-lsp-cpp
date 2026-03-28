@@ -112,7 +112,7 @@ using BuiltinFuncList = std::vector<BuiltinFunction>;
 namespace gdshader_lsp 
 {
 static const BuiltinList EMTPY_LIST = {};
-static inline const BuiltinList& get_builtins(ShaderType type, ShaderStage scope) 
+static inline const BuiltinList& get_nonglobal_builtins(ShaderType type, ShaderStage scope) 
 {
     if (type == ShaderType::Spatial) {
         if (scope == ShaderStage::Vertex) return gdshader_lsp::generated::SPATIAL_VERTEX;
@@ -133,6 +133,26 @@ static inline const BuiltinList& get_builtins(ShaderType type, ShaderStage scope
     }
     else if (type == ShaderType::Fog) {
         if (scope == ShaderStage::Fog) return gdshader_lsp::generated::FOG;
+    }
+    return EMTPY_LIST;
+}
+
+static inline const BuiltinList& get_global_builtins(ShaderType type)
+{
+    if (type == ShaderType::Spatial) {
+        return gdshader_lsp::generated::SPATIAL_GLOBAL;
+    }
+    else if (type == ShaderType::CanvasItem) {
+        return gdshader_lsp::generated::CANVAS_GLOBAL;
+    }
+    else if (type == ShaderType::Particles) {
+        return gdshader_lsp::generated::PARTICLE_GLOBAL;
+    }
+    else if (type == ShaderType::Sky) {   
+        return gdshader_lsp::generated::SKY_GLOBAL;
+    }
+    else if (type == ShaderType::Fog) {
+        return gdshader_lsp::generated::FOG_GLOBAL;
     }
     return EMTPY_LIST;
 }

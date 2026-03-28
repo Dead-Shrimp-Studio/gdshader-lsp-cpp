@@ -1071,5 +1071,55 @@
             "void fragment() {}"
         ],
         "expected_error": "Expected return type"
+    },
+    {
+        "name": "canvas_item_global_time_readonly",
+        "code": [
+            "shader_type canvas_item;",
+            "void my_custom_function() {",
+            "    TIME = 10.0;",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "spatial_global_srgb_readonly",
+        "code": [
+            "shader_type spatial;",
+            "void my_custom_function() {",
+            "    OUTPUT_IS_SRGB = false;",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "particles_global_tau_mismatch",
+        "code": [
+            "shader_type particles;",
+            "void my_custom_function() {",
+            "    vec3 my_vec = TAU;",
+            "}"
+        ],
+        "expected_error": "Type mismatch"
+    },
+    {
+        "name": "sky_global_position_readonly",
+        "code": [
+            "shader_type sky;",
+            "void my_custom_function() {",
+            "    POSITION = vec3(0.0, 0.0, 0.0);",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "fog_global_e_mismatch",
+        "code": [
+            "shader_type fog;",
+            "void my_custom_function() {",
+            "    mat4 my_matrix = E;",
+            "}"
+        ],
+        "expected_error": "Type mismatch"
     }
 ]

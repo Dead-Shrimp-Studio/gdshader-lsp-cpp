@@ -13,7 +13,7 @@
 namespace gdshader_lsp 
 {
     class ASTVisitor;
-    class Symbol;
+    struct Symbol;
 }
 
 namespace gdshader_lsp {

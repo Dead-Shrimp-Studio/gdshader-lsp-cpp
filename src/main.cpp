@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
 {
     gdshader_lsp::Logger::init();
 
-    int port = 6005;
+    int port = 6007;
     
     // Simple argument parsing for port
     if (argc > 1 && std::string(argv[1]).rfind("--port=", 0) == 0) {

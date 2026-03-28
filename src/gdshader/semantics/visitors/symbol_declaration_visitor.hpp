@@ -17,6 +17,7 @@ namespace gdshader_lsp
 
         ShaderType currentShaderType = ShaderType::Unknown;
         void loadBuiltinsForFunction(const std::string& funcName);
+        void loadGlobalVariables();
 
         // Helper carried over from your old analyzer
         TypePtr resolveTypeFromNode(const TypeNode* node);
