@@ -4,6 +4,9 @@
 #include <memory>
 #include <vector>
 
+#include <lsp/io/standardio.h>
+#include <lsp/connection.h>
+
 #include "utils/logger.hpp"
 #include "server/gdshader_server.hpp"
 
@@ -12,29 +15,43 @@ int main(int argc, char* argv[])
     gdshader_lsp::Logger::init();
 
     int port = 6007;
+    bool use_stdio = false;
     
-    // Simple argument parsing for port
-    if (argc > 1 && std::string(argv[1]).rfind("--port=", 0) == 0) {
-        port = std::stoi(std::string(argv[1]).substr(7));
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg.rfind("--port=", 0) == 0) {
+            port = std::stoi(arg.substr(7));
+        }
+        else if (arg == "--stdio") {
+            use_stdio = true;
+        }
     }
 
-    SPDLOG_INFO("Starting gdshader lsp on port {}.", port);
-
     try {
-        auto listener = lsp::io::SocketListener(port);
 
-        while (listener.isReady()) 
-        {
-            auto socket = listener.listen();
-            if (!socket.isOpen()) break;
+        if (use_stdio) {
+            SPDLOG_INFO("Starting gdshader lsp via STDIO.");
+            auto connection = std::make_unique<lsp::Connection>(lsp::io::standardIO());
+            gdshader_lsp::GdShaderServer server(std::move(connection));
+            server.run(); // Blocks on the main thread, handling stdin/stdout
+        } 
+        else {
+            SPDLOG_INFO("Starting gdshader lsp on port {}.", port);
+            auto listener = lsp::io::SocketListener(port);
 
-            SPDLOG_INFO("Client connected!");
+            while (listener.isReady())
+            {
+                auto socket = listener.listen();
+                if (!socket.isOpen()) break;
 
-            // Spawn a thread to handle this connection independently
-            std::thread([socket = std::move(socket)]() mutable {
-                gdshader_lsp::GdShaderServer server(std::move(socket));
-                server.run();
-            }).detach();
+                SPDLOG_INFO("Client connected!");
+
+                std::thread([socket = std::move(socket)]() mutable {
+                    auto connection = std::make_unique<lsp::Connection>(socket);
+                    gdshader_lsp::GdShaderServer server(std::move(connection));
+                    server.run();
+                }).detach();
+            }
         }
 
     } catch (const std::exception& e) {

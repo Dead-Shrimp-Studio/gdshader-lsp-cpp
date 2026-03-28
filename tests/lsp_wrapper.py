@@ -4,14 +4,19 @@ import time
 import sys
 
 class LSPClient:
-    def __init__(self, port=6005):
+    def __init__(self, port=6005, process=None, mode="tcp"):
         self.port = port
+        self.process = process
+        self.mode = mode
         self.sock = None
         self.request_id = 0
-        self.buffer = b""  # Internal buffer for handling TCP fragmentation
+        self.buffer = b""  # Internal buffer for handling TCP/Pipe fragmentation
 
     def connect(self):
-        """Attempts to connect to the server with retries."""
+        """Attempts to connect to the server with retries (TCP only)."""
+        if self.mode == "stdio":
+            return
+
         attempts = 0
         while attempts < 10:
             try:
@@ -41,17 +46,20 @@ class LSPClient:
         body_bytes = json_str.encode('utf-8')
         header = f"Content-Length: {len(body_bytes)}\r\n\r\n"
         
-        # Send everything at once
         full_msg = header.encode('utf-8') + body_bytes
-        self.sock.sendall(full_msg)
         
+        if self.mode == "tcp":
+            self.sock.sendall(full_msg)
+        elif self.mode == "stdio":
+            self.process.stdin.write(full_msg)
+            self.process.stdin.flush()
+            
         return payload.get("id")
 
     def _recv_exact(self, num_bytes):
-        """Helper to read exactly n bytes from the socket/buffer."""
+        """Helper to read exactly n bytes from the socket/pipe/buffer."""
         result = b""
         
-        # First, drain our internal python buffer
         if len(self.buffer) >= num_bytes:
             result = self.buffer[:num_bytes]
             self.buffer = self.buffer[num_bytes:]
@@ -61,11 +69,14 @@ class LSPClient:
             self.buffer = b""
             num_bytes -= len(result)
 
-        # Then read from the socket
         while num_bytes > 0:
-            chunk = self.sock.recv(min(4096, num_bytes))
+            if self.mode == "tcp":
+                chunk = self.sock.recv(min(4096, num_bytes))
+            elif self.mode == "stdio":
+                chunk = self.process.stdout.read(min(4096, num_bytes))
+                
             if not chunk:
-                raise EOFError("Socket closed unexpectedly")
+                raise EOFError("Connection closed unexpectedly")
             result += chunk
             num_bytes -= len(chunk)
             
@@ -74,21 +85,25 @@ class LSPClient:
     def _read_line(self):
         """Reads until \r\n, handling internal buffering."""
         while b"\r\n" not in self.buffer:
-            chunk = self.sock.recv(4096)
+            if self.mode == "tcp":
+                chunk = self.sock.recv(4096)
+            elif self.mode == "stdio":
+                # Read 1 byte at a time for headers to avoid blocking past the \r\n
+                chunk = self.process.stdout.read(1)
+                
             if not chunk:
-                if not self.buffer: raise EOFError("Socket closed")
+                if not self.buffer: raise EOFError("Connection closed")
                 break
             self.buffer += chunk
             
         line, sep, rest = self.buffer.partition(b"\r\n")
-        self.buffer = rest + sep[2:] # Keep 'rest' minus the \r\n? No, partition keeps sep.
-        # Logic fix: partition returns (head, sep, tail)
-        # We want to return head, and keep tail in buffer
         self.buffer = rest
         return line.decode('utf-8')
 
     def read_message(self, timeout=5.0):
-        self.sock.settimeout(timeout)
+        if self.mode == "tcp" and self.sock:
+            self.sock.settimeout(timeout)
+            
         try:
             # 1. Read Headers until \r\n\r\n (Empty line)
             content_length = 0
@@ -110,5 +125,8 @@ class LSPClient:
             raise TimeoutError("Socket timed out waiting for response")
 
     def close(self):
-        if self.sock:
+        if self.mode == "tcp" and self.sock:
             self.sock.close()
+        elif self.mode == "stdio" and self.process:
+            self.process.stdin.close()
+            self.process.stdout.close()
