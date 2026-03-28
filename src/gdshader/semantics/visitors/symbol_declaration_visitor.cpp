@@ -20,7 +20,7 @@ namespace gdshader_lsp {
 
         if (scope != ShaderStage::Global)
         {
-            const auto& builtins = get_builtins(currentShaderType, scope); //
+            const auto& builtins = get_nonglobal_builtins(currentShaderType, scope); //
             for (const auto& b : builtins) 
             {
                 TypePtr t = typeRegistry.getType(b.type);
@@ -34,6 +34,27 @@ namespace gdshader_lsp {
                 Symbol s = symbols.createSymbol(b.name, t, SymbolType::Variable, {0,0,0,0}, m);
                 symbols.add(s);
             }
+        }
+    }
+
+    void gdshader_lsp::SymbolDeclarationVisitor::loadGlobalVariables()
+    {
+        GDSHADER_RETURN_IF(currentShaderType == ShaderType::Unknown, "Cannot load global variables for unknown shader type.");
+        const auto& builtins = get_global_builtins(currentShaderType);
+        GDSHADER_RETURN_IF(builtins.size() <= 0, "Global builtins for shader type are emtpy");
+
+        for (const auto& b : builtins)
+        {
+            TypePtr t = typeRegistry.getType(b.type);
+
+            if (t->kind == TypeKind::UNKNOWN) {
+                GDSHADER_WARN_IF(t->kind == TypeKind::UNKNOWN, "Registering global builtin '{}' failed: unknown type '{}'", b.name, b.type);
+                continue;
+            }
+
+            Mutability mutability = b.qualifier == "in" ? Mutability::ReadOnly : Mutability::Mutable;
+            Symbol s = symbols.createSymbol(b.name, t, SymbolType::Variable, {0,0,0,0}, mutability);
+            symbols.add(s);
         }
     }
 
@@ -196,6 +217,7 @@ namespace gdshader_lsp {
             GDSHADER_ERROR_IF(true, "Unknown shader type encountered: {}", node->shaderType);
             diagnostics.push_back(reportError(node, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
         }
+        loadGlobalVariables();
     }
 
     void gdshader_lsp::SymbolDeclarationVisitor::visit(RenderModeNode *node)

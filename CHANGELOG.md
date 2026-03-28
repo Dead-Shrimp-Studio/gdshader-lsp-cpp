@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.4] - 2026-03-22
+## [0.2.4.1] - 2026-03-28
+
+A patch for all the immediate bugfixes.
+
+### Added 
+
+- Test cases for all the fixed problems below
+
+### Changed
+
+- The default port for the lsp is now 6007
+
+### Fixed
+
+- Wrong global level built-ins registering for all shader types
+- This lsp no longer overlaps with the default Godot language lsp port 6005
+
+## [0.2.4] - 2026-03-28
 
 Major improvements to performance, autocomplete, and stability. Closing the last few edge cases on syntax.
 

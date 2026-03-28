@@ -5,10 +5,6 @@
 namespace gdshader_lsp::generated {
 
 const BuiltinList CANVAS_FRAGMENT = {
-    {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
-    {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
-    {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
-    {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
     {"FRAGCOORD", "vec4", "Coordinate of pixel center. In screen space. xy specifies position in viewport. Upper-left of the viewport is the origin, (0.0, 0.0).", "in"},
     {"SCREEN_PIXEL_SIZE", "vec2", "Size of individual pixels. Equal to inverse of resolution.", "in"},
     {"REGION_RECT", "vec4", "Visible area of the sprite region in format(x, y, width, height). Varies according to Sprite2D's region_enabled property.", "in"},
@@ -31,11 +27,14 @@ const BuiltinList CANVAS_FRAGMENT = {
     {"COLOR", "vec4", "COLOR from the vertex() function multiplied by the TEXTURE color. Also output color value.", "inout"},
 };
 
-const BuiltinList CANVAS_LIGHT = {
+const BuiltinList CANVAS_GLOBAL = {
     {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
     {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
     {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
     {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
+};
+
+const BuiltinList CANVAS_LIGHT = {
     {"FRAGCOORD", "vec4", "Coordinate of pixel center. In screen space. xy specifies position in viewport. Upper-left of the viewport is the origin, (0.0, 0.0).", "in"},
     {"NORMAL", "vec3", "Input normal.", "in"},
     {"COLOR", "vec4", "Input color. This is the output of the fragment() function.", "in"},
@@ -56,10 +55,6 @@ const BuiltinList CANVAS_LIGHT = {
 };
 
 const BuiltinList CANVAS_VERTEX = {
-    {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
-    {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
-    {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
-    {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
     {"MODEL_MATRIX", "mat4", "Local space to world space transform. World space is the coordinates you normally use in the editor.", "in"},
     {"CANVAS_MATRIX", "mat4", "World space to canvas space transform. In canvas space the origin is the upper-left corner of the screen and coordinates ranging from (0.0, 0.0) to viewport size.", "in"},
     {"SCREEN_MATRIX", "mat4", "Canvas space to clip space. In clip space coordinates ranging from (-1.0, -1.0) to (1.0, 1.0).", "in"},
@@ -77,10 +72,6 @@ const BuiltinList CANVAS_VERTEX = {
 };
 
 const BuiltinList FOG = {
-    {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
-    {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
-    {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
-    {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
     {"WORLD_POSITION", "vec3", "Position of current froxel cell in world space.", "in"},
     {"OBJECT_POSITION", "vec3", "Position of the center of the current FogVolume in world space.", "in"},
     {"UVW", "vec3", "3-dimensional UV, used to map a 3D texture to the current FogVolume.", "in"},
@@ -89,6 +80,13 @@ const BuiltinList FOG = {
     {"ALBEDO", "vec3", "Output base color value, interacts with light to produce final color. Only written to fog volume if used.", "out"},
     {"DENSITY", "float", "Output density value. Can be negative to allow subtracting one volume from another. Density must be used for fog shader to write anything at all.", "out"},
     {"EMISSION", "vec3", "Output emission color value, added to color during light pass to produce final color. Only written to fog volume if used.", "out"},
+};
+
+const BuiltinList FOG_GLOBAL = {
+    {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
+    {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
+    {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
+    {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
 };
 
 const BuiltinFuncList GLOBAL_FUNCTIONS = {
@@ -208,11 +206,14 @@ const BuiltinFuncList GLOBAL_FUNCTIONS = {
     {"frexp", {"vec_type", "The significand of `x`. docs.godotengine.org/en/4.5/tutorials/shaders/shader_reference/ User-contributed notes godotengine/godot-docs-user-notes/discussions/1> before submitting a comment./ docs.godotengine.org/en/4.5/tutorials/shaders/shader_reference/ © Copyright 2014-present Juan Linietsky, Ariel Manzur and the Godot community (CC BY 3.0). github.com/readthedocs/sphinx_rtd_theme> provided by Read the Docs Read the Docs v: 4.5 Languages Versions On Read the Docs shader_reference/null> Search utm_source=&utm_content=flyout>"}, {{"x", "vec_type", "The value from which significand and exponent are to be extracted."}, {"exp", "vec_int_type", "The variable into which to place the exponent of `x`."}}, "Extracts `x` into a floating-point significand in the range `[0.5, 1.0)` and in integral exponent of two, such that: x = significand * 2 ^ exponent Copy to clipboard For a floating-point value of zero, the significand and exponent are both zero. Warning For a floating-point value that is an infinity or a floating-point NaN, the results are undefined."},
 };
 
-const BuiltinList PARTICLE_PROCESS = {
+const BuiltinList PARTICLE_GLOBAL = {
     {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
     {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
     {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
     {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
+};
+
+const BuiltinList PARTICLE_PROCESS = {
     {"LIFETIME", "float", "Particle lifetime.", "in"},
     {"DELTA", "float", "Delta process time.", "in"},
     {"NUMBER", "uint", "Unique number since emission start.", "in"},
@@ -247,10 +248,6 @@ const BuiltinList PARTICLE_PROCESS = {
 };
 
 const BuiltinList PARTICLE_START = {
-    {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
-    {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
-    {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
-    {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
     {"LIFETIME", "float", "Particle lifetime.", "in"},
     {"DELTA", "float", "Delta process time.", "in"},
     {"NUMBER", "uint", "Unique number since emission start.", "in"},
@@ -285,6 +282,17 @@ const BuiltinList PARTICLE_START = {
 };
 
 const BuiltinList SKY = {
+    {"EYEDIR", "vec3", "Normalized direction of current pixel. Use this as your basic direction for procedural effects.", "in"},
+    {"SCREEN_UV", "vec2", "Screen UV coordinate for current pixel. Used to map a texture to the full screen.", "in"},
+    {"SKY_COORDS", "vec2", "Sphere UV. Used to map a panorama texture to the sky.", "in"},
+    {"HALF_RES_COLOR", "vec4", "Color value of corresponding pixel from half resolution pass. Uses linear filter.", "in"},
+    {"QUARTER_RES_COLOR", "vec4", "Color value of corresponding pixel from quarter resolution pass. Uses linear filter.", "in"},
+    {"COLOR", "vec3", "Output color.", "out"},
+    {"ALPHA", "float", "Output alpha value, can only be used in subpasses.", "out"},
+    {"FOG", "vec4", "", "out"},
+};
+
+const BuiltinList SKY_GLOBAL = {
     {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
     {"POSITION", "vec3", "Camera position, in world space.", "in"},
     {"RADIANCE", "samplerCube", "Radiance cubemap. Can only be read from during background pass. Check !AT_CUBEMAP_PASS before using.", "in"},
@@ -314,23 +322,9 @@ const BuiltinList SKY = {
     {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
     {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
     {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
-    {"EYEDIR", "vec3", "Normalized direction of current pixel. Use this as your basic direction for procedural effects.", "in"},
-    {"SCREEN_UV", "vec2", "Screen UV coordinate for current pixel. Used to map a texture to the full screen.", "in"},
-    {"SKY_COORDS", "vec2", "Sphere UV. Used to map a panorama texture to the sky.", "in"},
-    {"HALF_RES_COLOR", "vec4", "Color value of corresponding pixel from half resolution pass. Uses linear filter.", "in"},
-    {"QUARTER_RES_COLOR", "vec4", "Color value of corresponding pixel from quarter resolution pass. Uses linear filter.", "in"},
-    {"COLOR", "vec3", "Output color.", "out"},
-    {"ALPHA", "float", "Output alpha value, can only be used in subpasses.", "out"},
-    {"FOG", "vec4", "", "out"},
 };
 
 const BuiltinList SPATIAL_FRAGMENT = {
-    {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
-    {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
-    {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
-    {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
-    {"OUTPUT_IS_SRGB", "bool", "true when output is in sRGB color space (this is true in the Compatibility renderer, false in Forward+ and Mobile).", "in"},
-    {"CLIP_SPACE_FAR", "float", "Clip space far z value. In the Forward+ or Mobile renderers, it's 0.0. In the Compatibility renderer, it's -1.0.", "in"},
     {"VIEWPORT_SIZE", "vec2", "Size of viewport (in pixels).", "in"},
     {"FRAGCOORD", "vec4", "Coordinate of pixel center in screen space. xy specifies position in window. Origin is lower left. z specifies fragment depth. It is also used as the output value for the fragment depth unless DEPTH is written to.", "in"},
     {"FRONT_FACING", "bool", "true if current face is front facing, false otherwise.", "in"},
@@ -394,13 +388,16 @@ const BuiltinList SPATIAL_FRAGMENT = {
     {"IRRADIANCE", "vec4", "If written to, blends environment map irradiance with IRRADIANCE.rgb based on IRRADIANCE.a.", "out"},
 };
 
-const BuiltinList SPATIAL_LIGHT = {
+const BuiltinList SPATIAL_GLOBAL = {
     {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
     {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
     {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
     {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
     {"OUTPUT_IS_SRGB", "bool", "true when output is in sRGB color space (this is true in the Compatibility renderer, false in Forward+ and Mobile).", "in"},
     {"CLIP_SPACE_FAR", "float", "Clip space far z value. In the Forward+ or Mobile renderers, it's 0.0. In the Compatibility renderer, it's -1.0.", "in"},
+};
+
+const BuiltinList SPATIAL_LIGHT = {
     {"VIEWPORT_SIZE", "vec2", "Size of viewport (in pixels).", "in"},
     {"FRAGCOORD", "vec4", "Coordinate of pixel center in screen space. xy specifies position in window, z specifies fragment depth if DEPTH is not used. Origin is lower-left.", "in"},
     {"MODEL_MATRIX", "mat4", "Model/local space to world space transform.", "in"},
@@ -428,12 +425,6 @@ const BuiltinList SPATIAL_LIGHT = {
 };
 
 const BuiltinList SPATIAL_VERTEX = {
-    {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
-    {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
-    {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
-    {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
-    {"OUTPUT_IS_SRGB", "bool", "true when output is in sRGB color space (this is true in the Compatibility renderer, false in Forward+ and Mobile).", "in"},
-    {"CLIP_SPACE_FAR", "float", "Clip space far z value. In the Forward+ or Mobile renderers, it's 0.0. In the Compatibility renderer, it's -1.0.", "in"},
     {"VIEWPORT_SIZE", "vec2", "Size of viewport (in pixels).", "in"},
     {"VIEW_MATRIX", "mat4", "World space to view space transform.", "in"},
     {"INV_VIEW_MATRIX", "mat4", "View space to world space transform.", "in"},
