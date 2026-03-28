@@ -17,7 +17,7 @@
 
 using namespace gdshader_lsp;
 
-GdShaderServer::GdShaderServer(lsp::io::Socket s) : socket(std::move(s)), connection(socket), handler(connection)
+GdShaderServer::GdShaderServer(std::unique_ptr<lsp::Connection> conn) : connection(std::move(conn)), handler(*connection)
 {
     registerHandlers();
     compilerThread = std::thread(&GdShaderServer::compilerLoop, this);
@@ -35,7 +35,7 @@ GdShaderServer::~GdShaderServer()
 void GdShaderServer::run() 
 {
     try {
-        while (socket.isOpen()) {
+        while (running) {
             handler.processIncomingMessages();
         }
     } catch (const std::exception& e) {

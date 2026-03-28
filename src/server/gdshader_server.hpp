@@ -37,10 +37,20 @@ struct Document {
 
 class GdShaderServer {
 
+public:
+
+    GdShaderServer(std::unique_ptr<lsp::Connection> conn);
+    ~GdShaderServer();
+
+    void run();
+
 private:
 
     // Threading
 
+    std::unique_ptr<lsp::Connection> connection;
+    lsp::MessageHandler handler;
+    
     std::atomic<bool> running{true};
     std::thread compilerThread;
     std::mutex debounceMutex;
@@ -49,12 +59,6 @@ private:
     std::unordered_map<std::string, std::chrono::steady_clock::time_point> dirtyFiles;
 
     void compilerLoop();
-
-    // LSP
-
-    lsp::io::Socket socket;
-    lsp::Connection connection;
-    lsp::MessageHandler handler;
 
     void registerHandlers();
     void compileAndPublish(const lsp::DocumentUri& uri, const std::string& code);
@@ -67,13 +71,6 @@ private:
 
     std::vector<lsp::DocumentSymbol> getDocumentSymbols(const ASTNode* node);
     lsp::DocumentSymbol createSymbol(const std::string& name, lsp::SymbolKind kind, int line, const std::string& detail, const std::vector<lsp::DocumentSymbol>& children);
-
-public:
-
-    GdShaderServer(lsp::io::Socket s);
-    ~GdShaderServer();
-
-    void run();
 
 };
 
