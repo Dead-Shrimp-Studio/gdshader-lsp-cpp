@@ -15,6 +15,8 @@ namespace gdshader_lsp
         TypeRegistry& typeRegistry;
         std::vector<Diagnostic>& diagnostics;
 
+        std::string currentFilePath;
+
         ShaderType currentShaderType = ShaderType::Unknown;
         void loadBuiltinsForFunction(const std::string& funcName);
         void loadGlobalVariables();
@@ -24,8 +26,8 @@ namespace gdshader_lsp
 
     public:
 
-        SymbolDeclarationVisitor(SymbolTable& syms, TypeRegistry& types, std::vector<Diagnostic>& diags)
-            : symbols(syms), typeRegistry(types), diagnostics(diags) {}
+        SymbolDeclarationVisitor(SymbolTable& syms, TypeRegistry& types, std::vector<Diagnostic>& diags, const std::string& filePath)
+            : symbols(syms), typeRegistry(types), diagnostics(diags), currentFilePath(filePath) {}
 
         void visit(TypeNode* node) override {};
         void visit(LiteralNode* node) override {};

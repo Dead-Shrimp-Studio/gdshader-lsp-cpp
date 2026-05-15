@@ -41,7 +41,7 @@ public:
 
     std::shared_ptr<ShaderUnit> getUnit(const std::string& uri);
     std::shared_ptr<SymbolTable> getExports(const std::string& uri);
-    std::vector<std::string> getAffectedFiles(const std::string& uri);
+    std::vector<std::string> getDependentFiles(const std::string& uri);
 };
 
 } // namespace gdshader_lsp

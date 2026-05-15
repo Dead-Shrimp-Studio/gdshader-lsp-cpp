@@ -79,28 +79,53 @@ bool SymbolTable::add(const Symbol& symbol)
 
     if (!store.empty()) 
     {
+        // 1. Non-Functions do not support overloading or forward declarations. 
+        // Any existing symbol in this exact scope is a strict redefinition.
+        if (symbol.category != SymbolType::Function) 
+        {
+            return false; 
+        }
+
+        // 2. If it IS a function, check existing symbols in this scope
         for (Symbol& storeSymbol : store)
         {
-            GDSHADER_ASSERT(symbol.name == storeSymbol.name, 
-                "Symbol store broken. Expected '{}', found '{}'", symbol.name, storeSymbol.name);
-
-            if (symbol.is_function_definition && storeSymbol.is_function_definition)
+            // Cannot overload a non-function symbol (e.g., naming a function the same as a struct)
+            if (storeSymbol.category != SymbolType::Function) 
             {
-                GDSHADER_RETURN_VAL_IF(
-                    signaturesMatch(symbol.parameterTypes, storeSymbol.parameterTypes), 
-                    false, 
-                    "[SymTable] Error: Body of function '{}' already defined.", symbol.name
-                );
+                return false;
+            }
 
-                SPDLOG_TRACE("[SymTable] Added Overload for '{}'.", symbol.name);
-
-            } else if (symbol.is_function_definition && !storeSymbol.is_function_definition){
-                auto oldUsages = storeSymbol.references;
-                storeSymbol = symbol; 
-                storeSymbol.references = oldUsages;
+            if (signaturesMatch(symbol.parameterTypes, storeSymbol.parameterTypes))
+            {
+                // Signatures match. Determine if we are updating a forward declaration or redefining.
+                if (symbol.is_function_definition && storeSymbol.is_function_definition)
+                {
+                    GDSHADER_RETURN_VAL_IF(true, false, 
+                        "[SymTable] Error: Body of function '{}' already defined.", symbol.name);
+                } 
+                else if (symbol.is_function_definition && !storeSymbol.is_function_definition)
+                {
+                    // Upgrading a forward declaration to an actual definition
+                    auto oldUsages = storeSymbol.references;
+                    storeSymbol = symbol; 
+                    storeSymbol.references = oldUsages;
+                    SPDLOG_TRACE("[SymTable] Updated declaration to definition for '{}'.", symbol.name);
+                    return true; // Merged safely, don't push_back a duplicate
+                }
+                else if (!symbol.is_function_definition)
+                {
+                    // Duplicate forward declaration, or a declaration placed after a definition.
+                    // Safely absorb it without returning a redefinition error.
+                    return true;
+                }
             }
         }
+        
+        // If we reach here, it's a Function and no signatures matched. 
+        // It will fall through to be added as a valid overload.
+        SPDLOG_TRACE("[SymTable] Added Overload for '{}'.", symbol.name);
     }
+
     store.push_back(symbol);
     return true;
 }
@@ -243,12 +268,16 @@ const std::vector<Symbol> SymbolTable::getAllSymbols()
 }
 
 Symbol SymbolTable::createSymbol(const std::string& name, TypePtr type, SymbolType category, const Range& nodeRange, 
-                                            Mutability mutability, TypePtr returnType, const std::vector<TypePtr>& paramterTypes, const std::vector<std::string>& paramterNames, bool is_func_def) 
+                                Mutability mutability, TypePtr returnType, const std::vector<TypePtr>& paramterTypes, const std::vector<std::string>& paramterNames, bool is_func_def,
+                                const std::string& source_file)
 {
     GDSHADER_WARN_IF(name.empty(), "Creating a symbol with an empty name!");
+    GDSHADER_WARN_IF(source_file.empty(), "Creating a symbol with no source file.");
 
     Symbol s;
     s.name = name;
+    s.source_path = source_file;
+
     s.type = type;
     s.category = category;
     s.mutability = mutability;

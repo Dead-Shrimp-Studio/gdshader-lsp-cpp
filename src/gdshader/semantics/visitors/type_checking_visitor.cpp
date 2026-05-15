@@ -33,7 +33,16 @@ void TypeCheckingVisitor::visit(VariableDeclNode* node)
         // We use lookupAt to get the type we registered in Pass 1
         int line = node->range.startLine;
         const Symbol* s = symbols.lookupAt(node->name, line);
-        
+
+        if (s && s->type && s->type->kind == TypeKind::STRUCT) {
+            const Symbol* structSym = symbols.lookupAt(s->type->name, node->range.startLine);
+            if (structSym) {
+                Range typeRange = node->range;
+                typeRange.endCol = typeRange.startCol + s->type->name.length();
+                symbols.addReference(const_cast<Symbol*>(structSym), typeRange);
+            }
+        }
+
         if (s) {
             TypePtr initType = resolveType(node->initializer.get());
             
@@ -541,6 +550,10 @@ void TypeCheckingVisitor::visit(FunctionCallNode* node)
                 }
             }
         }
+    } else {
+        Range nameRange = node->range;
+        nameRange.endCol = nameRange.startCol + node->functionName.length();
+        symbols.addReference(const_cast<Symbol*>(bestMatch), nameRange);
     }
 }
 
@@ -855,6 +868,14 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
     TypePtr target = typeRegistry.getType(typeName);
     
     if (target->kind == TypeKind::STRUCT) {
+
+        const Symbol* structSym = symbols.lookupAt(typeName, node->range.startLine);
+        if (structSym && structSym->category == SymbolType::Struct) {
+            Range nameRange = node->range;
+            nameRange.endCol = nameRange.startCol + typeName.length();
+            symbols.addReference(const_cast<Symbol*>(structSym), nameRange);
+        }
+
         if (node->arguments.size() != target->members.size()) {
             GDSHADER_ERROR_IF(true, "Struct constructor arg mismatch for '{}'", typeName);
             diagnostics.push_back(reportError(node, "Constructor for '" + typeName + "' expects " + 

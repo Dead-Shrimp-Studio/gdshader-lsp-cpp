@@ -25,7 +25,7 @@ AnalysisResult SemanticAnalyzer::analyze(const ProgramNode* ast)
         PreprocessorVisitor prepVisitor(symbols, typeRegistry, diagnostics, currentFilePath, processedFiles);
         const_cast<ProgramNode*>(ast)->accept(prepVisitor);
 
-        SymbolDeclarationVisitor declVisitor(symbols, typeRegistry, diagnostics);
+        SymbolDeclarationVisitor declVisitor(symbols, typeRegistry, diagnostics, currentFilePath);
         const_cast<ProgramNode*>(ast)->accept(declVisitor);
 
         TypeCheckingVisitor typeVisitor(symbols, typeRegistry, diagnostics, tokens);
@@ -99,8 +99,9 @@ void SemanticAnalyzer::registerGlobalFunctions()
             argNames.push_back(a.name);
         }
 
-        Symbol s = symbols.createSymbol(name, typeRegistry.getUnknownType(), SymbolType::Function, {0,0,0,0}, Mutability::ReadOnly, returnType, argTypes, argNames, true);
+        Symbol s = symbols.createSymbol(name, typeRegistry.getUnknownType(), SymbolType::Function, {0,0,0,0}, Mutability::ReadOnly, returnType, argTypes, argNames, true, "builtin");
         s.doc_string = doc;
+
         symbols.add(s);
     };
 

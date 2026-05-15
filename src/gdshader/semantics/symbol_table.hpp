@@ -87,7 +87,8 @@ public:
 
     const std::vector<Symbol> getAllSymbols();
     Symbol createSymbol(const std::string& name, TypePtr type, SymbolType category, const Range& nodeRange, 
-        Mutability mutability = Mutability::Mutable, TypePtr returnType = nullptr, const std::vector<TypePtr>& paramterTypes = {}, const std::vector<std::string>& paramterNames = {}, bool is_func_def = true);
+        Mutability mutability = Mutability::Mutable, TypePtr returnType = nullptr, const std::vector<TypePtr>& paramterTypes = {}, const std::vector<std::string>& paramterNames = {}, bool is_func_def = true,
+        const std::string& source_file = std::string());
 
 private:
    
