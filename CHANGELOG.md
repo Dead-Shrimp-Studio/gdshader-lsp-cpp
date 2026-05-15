@@ -7,18 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.5] - 2026-05-15
 
-New feature: Code formatting, cross-file symbol renaming, and more!
+New features: Code formatting, cross-file symbol renaming, and more!
 
 ### Added 
 
 - Features:
   - Cross-file symbol renaming
   - Code formatting
+  - Improved support for windows named pipes as communication protocol
 
 ### Changed
 
 - Standard port for the lps is now 6010
-- Named pipes are currently disabled for windows as communication method for this lsp
 
 ### Fixed
 
@@ -27,6 +27,8 @@ New feature: Code formatting, cross-file symbol renaming, and more!
 - Registering global functions & environment shader variables into the "builtin" file scope now
 - Wrong registering of some symbols as function definition in symbol declaration visitor
 - To narrow type checking in Textdocument_Rename
+- Parser bug when initializing uniforms after hint_range with '= ...'
+- Range identification for many nodes
 
 ## [0.2.4.1] - 2026-03-28
 

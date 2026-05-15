@@ -46,15 +46,14 @@ void Lexer::advance()
 Token Lexer::parseComment(int startLine, int startCol) 
 {
     std::string comment_text;
-
     GDSHADER_ASSERT(current_char == '/', "skipComment called but current character is '{}'", current_char);
+    
     if (current_char == '/' && peek() == '/') {
-        // Single-line comment: Skip until newline
         while (current_char != '\n' && current_char != '\0') {
+            comment_text += current_char;
             advance();
         }
-    } 
-    else if (current_char == '/' && peek() == '*') {
+    } else if (current_char == '/' && peek() == '*') {
         // Multi-line comment
         comment_text += current_char; advance(); // '/'
         comment_text += current_char; advance(); // '*'

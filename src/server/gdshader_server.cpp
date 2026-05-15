@@ -2,6 +2,8 @@
 #include "server/gdshader_server.hpp"
 
 #include "gdshader/semantics/semantic_analyzer.hpp"
+
+#include "gdshader/semantics/visitors/formatter_visitor.hpp"
 #include "gdshader/semantics/visitors/node_finder_visitor.hpp"
 #include "gdshader/semantics/visitors/call_finder_visitor.hpp"
 #include "gdshader/semantics/visitors/inlay_hint_visitor.hpp"
@@ -1078,6 +1080,55 @@ void GdShaderServer::registerHandlers() {
             presentations.push_back(vec3Pres);
 
             return presentations;
+        }
+    );
+
+    // --- FEATURE: TEXTDOCUMENT_FORMATTING ---
+    handler.add<lsp::requests::TextDocument_Formatting>(
+        [this](lsp::requests::TextDocument_Formatting::Params&& params) -> lsp::requests::TextDocument_Formatting::Result
+        {
+            std::vector<lsp::TextEdit> result;
+            
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+            
+            std::lock_guard<std::mutex> lock(su->unitMutex);
+
+            // We only format if we have a valid AST!
+            if (su->ast) {
+                // 1. Convert LSP options to our struct
+                FormattingOptions opts;
+                opts.tabSize = params.options.tabSize;
+                opts.insertSpaces = params.options.insertSpaces;
+
+                // 2. Run the formatter
+                FormatterVisitor formatter(opts);
+                su->ast->accept(formatter);
+                
+                std::string formatted_code = formatter.getFormattedCode();
+
+                // 3. Count original lines to create a full document replacement range
+                int lastLine = 0;
+                for (char c : su->source_code) {
+                    if (c == '\n') lastLine++;
+                }
+
+                // 4. Return a single edit that replaces the entire file content
+                result.push_back(lsp::TextEdit{
+                    .range = lsp::Range{
+                        .start = {0, 0},
+                        .end = {(unsigned)lastLine + 1, 0}
+                    },
+                    .newText = formatted_code
+                });
+            }
+            
+            return result;
         }
     );
 

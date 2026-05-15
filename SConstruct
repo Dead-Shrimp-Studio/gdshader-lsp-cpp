@@ -21,7 +21,7 @@ if (os.path.exists('src/generated/builtins_data.cpp')):
 
 generated_nodes = env.Command(
     target=['src/generated/builtins_data.hpp', 'src/generated/builtins_data.cpp'],
-    source=Glob('src/gdshader/data/*.json'),
+    source=env.Glob('src/gdshader/data/*.json'),
     # SCons automatically replaces $SOURCES and $TARGETS with the file paths
     action=f'{sys.executable} scripts/generate_builtin_functions.py $SOURCES $TARGETS'
 )

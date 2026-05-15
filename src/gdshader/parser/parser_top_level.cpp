@@ -17,21 +17,30 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
         if (match(TokenType::KEYWORD_RENDER_MODE))      return parseRenderMode();
         if (match(TokenType::KEYWORD_GROUP_UNIFORMS))   return parseGroupUniform();
         if (match(TokenType::KEYWORD_UNIFORM))          return parseUniform();
+
         if (match(TokenType::KEYWORD_INSTANCE)) {
+            Token start = previous_token; // Capture 'instance'
             consume(TokenType::KEYWORD_UNIFORM, "Expected 'uniform' after 'instance'");
             auto node = parseUniform();
             if (auto* uniNode = dynamic_cast<UniformNode*>(node.get())) {
                 uniNode->isInstance = true; 
+                // Expand range backwards to include 'instance'
+                uniNode->range.startLine = start.line;
+                uniNode->range.startCol = start.column;
             }
             return node;
         }
 
         if (match(TokenType::KEYWORD_FLAT) || match(TokenType::KEYWORD_SMOOTH)) {
+            Token start = previous_token; // Capture 'flat'/'smooth'
             std::string interp = previous_token.value;
             consume(TokenType::KEYWORD_VARYING, "Expected 'varying' after interpolation qualifier");
             auto node = parseVarying();
             if (auto* varNode = dynamic_cast<VaryingNode*>(node.get())) {
                 varNode->interpolation = interp; 
+                // Expand range backwards to include modifier
+                varNode->range.startLine = start.line;
+                varNode->range.startCol = start.column;
             }
             return node;
         }
@@ -60,7 +69,7 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
 
 std::unique_ptr<ASTNode> Parser::parseShaderType() 
 {
-    Token start = current_token;
+    Token start = previous_token;
     auto node = std::make_unique<ShaderTypeNode>();
 
     if (current_token.type == TokenType::TOKEN_IDENTIFIER) {
@@ -77,7 +86,7 @@ std::unique_ptr<ASTNode> Parser::parseShaderType()
 
 std::unique_ptr<ASTNode> Parser::parseRenderMode() 
 {
-    Token start = current_token;
+    Token start = previous_token;
     auto node = std::make_unique<RenderModeNode>();
 
     do {
@@ -128,10 +137,13 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
 {
     SPDLOG_TRACE("[Parser] Parsing Uniform decl");
 
-    Token start = current_token;
+    Token start = previous_token;
     auto node = std::make_unique<UniformNode>();
 
     node->type = parseType();
+
+    node->leadingComments = std::move(node->type->leadingComments);
+    node->type->leadingComments.clear();
 
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         node->name = current_token.value;
@@ -226,7 +238,7 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
 
 std::unique_ptr<ASTNode> Parser::parseVarying() 
 {
-    Token start = current_token;
+    Token start = previous_token;
     auto node = std::make_unique<VaryingNode>();
     
     node->type = parseType();
@@ -249,7 +261,7 @@ std::unique_ptr<ASTNode> Parser::parseVarying()
 
 std::unique_ptr<ASTNode> Parser::parseConst() 
 {
-    Token start = current_token;
+    Token start = previous_token;
     auto node = std::make_unique<ConstNode>();
 
     node->type = parseType();
@@ -278,8 +290,18 @@ std::unique_ptr<ASTNode> Parser::parseStruct()
 {
     SPDLOG_TRACE("[Parser] Parsing Struct decl");
 
-    Token start = current_token;
+    Token start = previous_token;
     auto node = std::make_unique<StructNode>();
+
+    auto it = commentBuffer.begin();
+    while (it != commentBuffer.end()) {
+        if (it->line < start.line || (it->line == start.line && it->column < start.column)) {
+            node->leadingComments.push_back(*it);
+            it = commentBuffer.erase(it);
+        } else {
+            ++it;
+        }
+    }
 
     if (check(TokenType::TOKEN_IDENTIFIER)) {
         node->name = current_token.value;
@@ -330,6 +352,9 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl()
     Token start = current_token;
     std::unique_ptr<TypeNode> typeNode = parseType();
 
+    auto rescuedComments = std::move(typeNode->leadingComments);
+    typeNode->leadingComments.clear();
+
     std::string name;
     Range nameRange;
 
@@ -365,6 +390,7 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl()
     if (check(TokenType::TOKEN_LPAREN)) {
         auto funcNode = parseFunction(std::move(typeNode), name);
         funcNode->nameRange = nameRange;
+        funcNode->leadingComments.insert(funcNode->leadingComments.begin(), rescuedComments.begin(), rescuedComments.end());
         return funcNode;
     } else {
         // Global Variable
@@ -373,6 +399,8 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl()
         varNode->name = name;
         varNode->nameRange = nameRange;
         varNode->isConst = false;
+
+        varNode->leadingComments.insert(varNode->leadingComments.begin(), rescuedComments.begin(), rescuedComments.end());
 
         if (match(TokenType::TOKEN_EQUAL)) {
             varNode->initializer = parseExpression();
@@ -399,6 +427,16 @@ std::unique_ptr<FunctionNode> Parser::parseFunction(std::unique_ptr<TypeNode> re
     Token startToken; 
     startToken.line = node->returnType->range.startLine;
     startToken.column = node->returnType->range.startCol;
+
+    auto it = commentBuffer.begin();
+    while (it != commentBuffer.end()) {
+        if (it->line < startToken.line || (it->line == startToken.line && it->column < startToken.column)) {
+            node->leadingComments.push_back(*it);
+            it = commentBuffer.erase(it);
+        } else {
+            ++it;
+        }
+    }
 
     consume(TokenType::TOKEN_LPAREN, "Expected '('");
 
@@ -452,6 +490,16 @@ std::unique_ptr<BlockNode> Parser::parseBlock()
     Token start = current_token; // Snapshot '{'
     auto node = std::make_unique<BlockNode>();
     
+    auto it = commentBuffer.begin();
+    while (it != commentBuffer.end()) {
+        if (it->line < start.line || (it->line == start.line && it->column < start.column)) {
+            node->leadingComments.push_back(*it);
+            it = commentBuffer.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
     consume(TokenType::TOKEN_LBRACE, "Expected '{'");
     
     while (!check(TokenType::TOKEN_RBRACE) && !check(TokenType::TOKEN_EOF)) 

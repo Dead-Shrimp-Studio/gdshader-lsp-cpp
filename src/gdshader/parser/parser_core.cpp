@@ -229,6 +229,11 @@ void gdshader_lsp::Parser::setRange(ASTNode *node, const Token &start, const Tok
     node->range.endLine   = end.line;
     node->range.endCol    = end.column + end.length;
 
+    if (dynamic_cast<TypeNode*>(node) != nullptr || 
+        dynamic_cast<ExpressionNode*>(node) != nullptr) {
+        return; 
+    }
+
     auto it = commentBuffer.begin();
     while (it != commentBuffer.end()) {
         

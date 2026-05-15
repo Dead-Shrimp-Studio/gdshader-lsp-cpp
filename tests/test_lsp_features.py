@@ -337,3 +337,67 @@ def test_document_colors(lsp):
     # The client should be offered standard string formats to inject back into the code
     assert any("vec4(0.0, 1.0, 0.0, 1.0)" in label for label in labels) or \
            any("vec3(0.0, 1.0, 0.0)" in label for label in labels)
+
+def test_document_formatting(lsp):
+    # Setup horribly formatted code
+    unformatted_code = (
+        "shader_type  spatial;\n"
+        "uniform float my_val : hint_range(0.0, 1.0) = 0.5;\n"
+        "// My Function Comment\n"
+        "void fragment( ){\n"
+        "if(my_val>0.0){\n"
+        "ALBEDO=vec3(1.0,0.0,0.0);\n"
+        "}else{\n"
+        "  ALBEDO=vec3(0.0);\n"
+        "}\n"
+        "}\n"
+    )
+    
+    # What the FormatterVisitor SHOULD output
+    expected_code = (
+        "shader_type spatial;\n"
+        "\n"
+        "uniform float my_val : hint_range(0.0, 1.0) = 0.5;\n"
+        "\n"
+        "// My Function Comment\n"
+        "void fragment() {\n"
+        "    if (my_val > 0.0) {\n"
+        "        ALBEDO = vec3(1.0, 0.0, 0.0);\n"
+        "    } else {\n"
+        "        ALBEDO = vec3(0.0);\n"
+        "    }\n"
+        "}\n"
+    )
+
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {
+            "uri": "file:///format_test.gdshader",
+            "languageId": "gdshader",
+            "version": 1,
+            "text": unformatted_code
+        }
+    }, is_notification=True)
+    
+    # Consume the compile diagnostics
+    lsp.read_message()
+
+    # Trigger Formatting Request
+    msg_id = lsp.send_message("textDocument/formatting", {
+        "textDocument": {"uri": "file:///format_test.gdshader"},
+        "options": {
+            "tabSize": 4,
+            "insertSpaces": True
+        }
+    })
+
+    # Read and Verify Response
+    response = lsp.read_message()
+    assert response["id"] == msg_id
+    
+    result = response.get("result")
+    assert result is not None, "Formatting request returned None."
+    assert len(result) == 1, "Expected exactly 1 text edit (full document replacement)."
+    
+    # Check if the output perfectly matches
+    actual_code = result[0]["newText"]
+    assert actual_code.strip() == expected_code.strip(), f"Formatting failed! \nExpected:\n{expected_code}\n\nGot:\n{actual_code}"
