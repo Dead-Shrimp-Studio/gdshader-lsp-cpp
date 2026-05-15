@@ -22,10 +22,14 @@ namespace gdshader_lsp {
 // BASE NODE
 // -------------------------------------------------------------------------
 struct ASTNode 
-{
+{    
+    Range range;
+
+    std::vector<Token> leadingComments;
+    std::vector<Token> trailingComments;
+
     virtual ~ASTNode() = default;
     virtual void accept(ASTVisitor& visitor) = 0;
-    Range range;
 };
 
 struct TypeNode : public ASTNode 

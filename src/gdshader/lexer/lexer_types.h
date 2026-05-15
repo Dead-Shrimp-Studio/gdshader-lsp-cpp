@@ -15,6 +15,7 @@ enum class TokenType {
     TOKEN_NUMBER,     
     TOKEN_STRING,     
     TOKEN_PREPROCESSOR,
+    TOKEN_COMMENT,
 
     // -------------------------------------------------------------------------
     // OPERATORS & PUNCTUATION
@@ -151,6 +152,7 @@ inline std::string tokenTypeToString(TokenType t) {
         case TokenType::TOKEN_NUMBER:         return "TOKEN_NUMBER";
         case TokenType::TOKEN_STRING:         return "TOKEN_STRING";
         case TokenType::TOKEN_PREPROCESSOR:   return "TOKEN_PREPROCESSOR";
+        case TokenType::TOKEN_COMMENT:        return "TOKEN_COMMENT";
 
         // ---------------------------------------------------------------------
         // OPERATORS & PUNCTUATION

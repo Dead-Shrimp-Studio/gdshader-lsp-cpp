@@ -24,6 +24,12 @@ std::unique_ptr<ProgramNode> Parser::parse()
             program->nodes.push_back(std::move(node));
         }
     }
+
+    for (const auto& comment : commentBuffer) {
+        program->trailingComments.push_back(comment);
+    }
+    commentBuffer.clear();
+
     return program;
 }
 
@@ -34,6 +40,12 @@ void Parser::advance()
     // Skip ERROR tokens from lexer loop if necessary, or just report them
     while (true) {
         current_token = lexer.getNextToken();
+        
+        if (current_token.type == TokenType::TOKEN_COMMENT) {
+            commentBuffer.push_back(current_token);
+            continue;
+        }
+
         if (current_token.type != TokenType::TOKEN_ERROR) break;
         reportErrorAt(current_token, "Lexical error: " + current_token.value);
     }
@@ -216,6 +228,24 @@ void gdshader_lsp::Parser::setRange(ASTNode *node, const Token &start, const Tok
     node->range.startCol  = start.column;
     node->range.endLine   = end.line;
     node->range.endCol    = end.column + end.length;
+
+    auto it = commentBuffer.begin();
+    while (it != commentBuffer.end()) {
+        
+        // Leading comments: appear before this node started
+        if (it->line < start.line || (it->line == start.line && it->column < start.column)) {
+            node->leadingComments.push_back(*it);
+            it = commentBuffer.erase(it);
+        }
+        // Trailing comments: appear on the exact same line AFTER this node ends
+        else if (it->line == end.line && it->column >= end.column) {
+            node->trailingComments.push_back(*it);
+            it = commentBuffer.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
 }
 
 bool Parser::isTypeStart() 

@@ -35,6 +35,7 @@ namespace gdshader_lsp
         Lexer& lexer;
         Token current_token {};
         Token previous_token {}; // Useful for getting locations of consumed tokens
+        std::vector<Token> commentBuffer; // Add this to your Parser state
         
         std::vector<Diagnostic> diagnostics {};
         bool panicMode = false;
