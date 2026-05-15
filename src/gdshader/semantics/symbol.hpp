@@ -35,6 +35,7 @@ namespace gdshader_lsp
 
         Range definition;
         mutable std::vector<Range> references;
+        std::string source_path;
 
         // Function related
 

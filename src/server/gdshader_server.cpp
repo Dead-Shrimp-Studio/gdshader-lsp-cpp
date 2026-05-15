@@ -811,14 +811,29 @@ void GdShaderServer::registerHandlers() {
             NodeFinderVisitor finder(params.position.line, params.position.character);
             su->ast->accept(finder);
 
-            if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) 
-            {
-                const Symbol* sym = id->resolvedSymbol;
+            std::string search_name = "";
+            const Symbol* sym = nullptr;
 
-                if (!sym) sym = su->symbols->lookupAt(id->name, params.position.line);
-                if (!sym) sym = su->symbols->lookupAt(id->name, 99999);
+            if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) {
+                sym = id->resolvedSymbol;
+                search_name = id->name;
+            } else if (auto call = dynamic_cast<const FunctionCallNode*>(finder.deepestNode)) {
+                search_name = call->functionName;
+            } else if (auto func = dynamic_cast<const FunctionNode*>(finder.deepestNode)) {
+                search_name = func->name;
+            } else if (auto varDecl = dynamic_cast<const VariableDeclNode*>(finder.deepestNode)) {
+                search_name = varDecl->name;
+            }
+
+            if (!sym && !search_name.empty()) {
+                sym = su->symbols->lookupAt(search_name, params.position.line);
+                if (!sym) sym = su->symbols->lookupAt(search_name, 99999);
+            }
+
+            if (sym) {
 
                 if (sym) {
+
                     // Safety: Don't rename built-ins
                     if (sym->category == SymbolType::Builtin) {
                         SPDLOG_WARN("Cannot rename builtins!");
@@ -826,36 +841,62 @@ void GdShaderServer::registerHandlers() {
                         return result;
                     }
 
-                    std::vector<lsp::TextEdit> edits;
+                    std::string origin_path = sym->source_path.empty() ? path : sym->source_path;
+                    
+                    std::vector<std::string> affected_files = pm->getDependentFiles(origin_path);
+                    affected_files.push_back(origin_path);
+                    
+                    // Unlock the current unit, we are about to iterate over multiple units
+                    su->unitMutex.unlock();
+                    result.changes.emplace();
 
-                    if (sym->definition.startLine >= 0) {
-                        int defLine = sym->definition.startLine;
-                        edits.push_back(lsp::TextEdit{
-                            .range = lsp::Range{
-                                .start = { (unsigned)defLine, (unsigned)sym->definition.startCol },
-                                .end   = { (unsigned)defLine, (unsigned)(sym->definition.endCol) }
-                            },
-                            .newText = params.newName
-                        });
+                    for (const std::string& target_path : affected_files) 
+                    {
+                        auto target_unit = pm->getUnit(target_path);
+                        
+                        std::lock_guard<std::mutex> lock(target_unit->unitMutex);
+                        if (!target_unit->symbols) continue;
+
+                        const Symbol* local_sym = target_unit->symbols->lookupAt(sym->name, 99999);
+                        if (!local_sym) continue;
+
+                        std::vector<lsp::TextEdit> file_edits;
+                    
+                        if (target_path == origin_path && local_sym->definition.startLine >= 0) {
+                            std::string line_text = getLine(target_unit->source_code, local_sym->definition.startLine);
+                            size_t name_pos = line_text.find(local_sym->name);
+                            
+                            if (name_pos != std::string::npos) {
+                                file_edits.push_back(lsp::TextEdit{
+                                    .range = lsp::Range{
+                                        .start = { (unsigned)local_sym->definition.startLine, (unsigned)name_pos },
+                                        .end   = { (unsigned)local_sym->definition.startLine, (unsigned)(name_pos + local_sym->name.length()) }
+                                    },
+                                    .newText = params.newName
+                                });
+                            }
+                        }
+
+                        // Apply usages normally
+                        for (const auto& usage : local_sym->references) {
+                            file_edits.push_back(lsp::TextEdit{
+                                .range = lsp::Range{
+                                    .start = { (unsigned)usage.startLine, (unsigned)usage.startCol },
+                                    .end   = { (unsigned)usage.startLine, (unsigned)usage.endCol }
+                                },
+                                .newText = params.newName
+                            });
+                        }
+
+                        if (!file_edits.empty()) {
+                            lsp::DocumentUri target_uri = lsp::DocumentUri::fromPath(target_path);
+                            (*result.changes)[target_uri] = file_edits;
+                        }
                     }
-
-                    for (const auto& usage : sym->references) {
-                        int useLine = usage.startLine;
-                        edits.push_back(lsp::TextEdit{
-                            .range = lsp::Range{
-                                .start = { (unsigned)useLine, (unsigned)usage.startCol },
-                                .end   = { (unsigned)useLine, (unsigned)(usage.endCol) }
-                            },
-                            .newText = params.newName
-                        });
-                    }
-
-                    result.changes = {
-                        { params.textDocument.uri, edits }
-                    };
+                    
+                    return result; // Early return since we handled everything
                 }
             }
-
             su->unitMutex.unlock();
             return result;
         }

@@ -31,7 +31,7 @@ namespace gdshader_lsp {
                 }
 
                 Mutability m = (b.qualifier == "in" || b.qualifier == "const") ? Mutability::ReadOnly : Mutability::Mutable;
-                Symbol s = symbols.createSymbol(b.name, t, SymbolType::Variable, {0,0,0,0}, m);
+                Symbol s = symbols.createSymbol(b.name, t, SymbolType::Builtin, {0,0,0,0}, m, nullptr, {}, {}, false, "builtin");
                 symbols.add(s);
             }
         }
@@ -53,7 +53,7 @@ namespace gdshader_lsp {
             }
 
             Mutability mutability = b.qualifier == "in" ? Mutability::ReadOnly : Mutability::Mutable;
-            Symbol s = symbols.createSymbol(b.name, t, SymbolType::Variable, {0,0,0,0}, mutability);
+            Symbol s = symbols.createSymbol(b.name, t, SymbolType::Builtin, {0,0,0,0}, mutability, nullptr, {}, {}, false, "builtin");
             symbols.add(s);
         }
     }
@@ -121,7 +121,7 @@ namespace gdshader_lsp {
 
         Mutability mut = node->isConst ? Mutability::ReadOnly : Mutability::Mutable;
 
-        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, mut);
+        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, mut, nullptr, {}, {}, false, currentFilePath);
 
         if (symbols.lookup(node->name)) {
             if (symbols.add(s)) {
@@ -149,11 +149,7 @@ namespace gdshader_lsp {
             paramNames.push_back(param->name);
         }
 
-        Symbol s = symbols.createSymbol(node->name, {}, SymbolType::Function, node->range);
-        s.is_function_definition = node->is_function_definition;
-        s.parameterTypes = paramTypes;
-        s.parameterNames = paramNames;
-        s.returnType = returnType;
+        Symbol s = symbols.createSymbol(node->name, {}, SymbolType::Function, node->range, Mutability::ReadOnly, returnType, paramTypes, paramNames, node->is_function_definition, currentFilePath);
 
         if (!symbols.add(s)) 
         {
@@ -173,7 +169,7 @@ namespace gdshader_lsp {
             const auto& param = node->parameters[i];
             TypePtr t = paramTypes[i];
             
-            Symbol argSym = symbols.createSymbol(param->name, t, SymbolType::Variable, param->range, Mutability::Mutable);
+            Symbol argSym = symbols.createSymbol(param->name, t, SymbolType::Variable, param->range, Mutability::Mutable, nullptr, {}, {}, false, currentFilePath);
             symbols.add(argSym);
         }
 
@@ -200,7 +196,7 @@ namespace gdshader_lsp {
         typeRegistry.registerStruct(node->name, members);
         TypePtr structType = typeRegistry.getType(node->name);
 
-        Symbol s = symbols.createSymbol(node->name, structType, SymbolType::Struct, node->range, Mutability::Mutable);        
+        Symbol s = symbols.createSymbol(node->name, structType, SymbolType::Struct, node->range, Mutability::Mutable, nullptr, {}, {}, false, currentFilePath);
         if (!symbols.add(s)) diagnostics.push_back(reportError(node, "Redefinition of struct '" + s.name + "'"));
     }
 
@@ -253,7 +249,7 @@ namespace gdshader_lsp {
             diagnostics.push_back(reportError(node, "Instance uniforms cannot be opaque types (like samplers)."));
         }
 
-        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Uniform, node->range, Mutability::ReadOnly);
+        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Uniform, node->range, Mutability::ReadOnly, nullptr, {}, {}, false, currentFilePath);
         s.hint = node->hint;
 
         if (!symbols.add(s)) {
@@ -275,7 +271,7 @@ namespace gdshader_lsp {
             diagnostics.push_back(reportError(node, "Integer varyings must use 'flat' interpolation."));
         }
 
-        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Varying, node->range, Mutability::ReadOnly);        
+        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Varying, node->range, Mutability::ReadOnly, nullptr, {}, {}, false, currentFilePath);        
         if (!symbols.add(s)) {
             diagnostics.push_back(reportError(node, "Redefinition of varying '" + s.name + "'"));
         }
@@ -285,7 +281,8 @@ namespace gdshader_lsp {
     {
         GDSHADER_RETURN_IF(!node, "ConstNode is null");
         TypePtr type = resolveTypeFromNode(node->type.get());
-        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, Mutability::ReadOnly);         
+        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, Mutability::ReadOnly, nullptr, {}, {}, false, currentFilePath);
+        
         if (!symbols.add(s)) {
             diagnostics.push_back(reportError(node, "Redefinition of const '" + s.name + "'"));
         }

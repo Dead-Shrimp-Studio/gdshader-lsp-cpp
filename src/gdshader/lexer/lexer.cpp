@@ -244,9 +244,8 @@ Token Lexer::createToken()
     int startLine = line;
     int startCol = column;
     
-    auto traceToken = [&](TokenType type, std::string text, std::string category = "Op") {
-        // This only compiles into the binary if SPDLOG_ACTIVE_LEVEL <= TRACE
-        SPDLOG_TRACE("Token: [{}] '{}' ({}:{})", category, text, startLine, startCol);
+    auto traceToken = [&](TokenType type, std::string text) {
+        SPDLOG_TRACE("Token: '{}' ({}:{})", text, startLine, startCol);
         return Token{type, text, startLine, startCol, (int)text.length()};
     };
 
@@ -260,13 +259,13 @@ Token Lexer::createToken()
     // --- PREPROCESSOR ---
     if (current == '#') {
         advance();
-        return traceToken(TokenType::TOKEN_PREPROCESSOR, "#", "Preprocessor");
+        return traceToken(TokenType::TOKEN_PREPROCESSOR, "#");
     }
 
     // --- DOT ACCESS ---
     if (current == '.') {
         advance();
-        return traceToken(TokenType::TOKEN_DOT, ".", "Symbol");
+        return traceToken(TokenType::TOKEN_DOT, ".");
     }
 
     // --- NUMBERS ---
@@ -368,17 +367,17 @@ Token Lexer::createToken()
     // --- SINGLE CHARACTERS ---
     // Using the lambda makes this section much cleaner than copy-pasting lines
     
-    if (current == ':') { advance(); return traceToken(TokenType::TOKEN_COLON, ":", "Symbol"); }
-    if (current == ';') { advance(); return traceToken(TokenType::TOKEN_SEMI, ";", "Symbol"); }
-    if (current == '(') { advance(); return traceToken(TokenType::TOKEN_LPAREN, "(", "Symbol"); }
-    if (current == ')') { advance(); return traceToken(TokenType::TOKEN_RPAREN, ")", "Symbol"); }
-    if (current == '{') { advance(); return traceToken(TokenType::TOKEN_LBRACE, "{", "Symbol"); }
-    if (current == '}') { advance(); return traceToken(TokenType::TOKEN_RBRACE, "}", "Symbol"); }
-    if (current == '[') { advance(); return traceToken(TokenType::TOKEN_LBRACKET, "[", "Symbol"); }
-    if (current == ']') { advance(); return traceToken(TokenType::TOKEN_RBRACKET, "]", "Symbol"); }
-    if (current == ',') { advance(); return traceToken(TokenType::TOKEN_COMMA, ",", "Symbol"); }
-    if (current == '?') { advance(); return traceToken(TokenType::TOKEN_QUESTION, "?", "Symbol"); }
-    if (current == '~') { advance(); return traceToken(TokenType::TOKEN_TILDE, "~", "Symbol"); }
+    if (current == ':') { advance(); return traceToken(TokenType::TOKEN_COLON, ":"); }
+    if (current == ';') { advance(); return traceToken(TokenType::TOKEN_SEMI, ";"); }
+    if (current == '(') { advance(); return traceToken(TokenType::TOKEN_LPAREN, "("); }
+    if (current == ')') { advance(); return traceToken(TokenType::TOKEN_RPAREN, ")"); }
+    if (current == '{') { advance(); return traceToken(TokenType::TOKEN_LBRACE, "{"); }
+    if (current == '}') { advance(); return traceToken(TokenType::TOKEN_RBRACE, "}"); }
+    if (current == '[') { advance(); return traceToken(TokenType::TOKEN_LBRACKET, "["); }
+    if (current == ']') { advance(); return traceToken(TokenType::TOKEN_RBRACKET, "]"); }
+    if (current == ',') { advance(); return traceToken(TokenType::TOKEN_COMMA, ","); }
+    if (current == '?') { advance(); return traceToken(TokenType::TOKEN_QUESTION, "?"); }
+    if (current == '~') { advance(); return traceToken(TokenType::TOKEN_TILDE, "~"); }
 
     // Fallback
     advance();

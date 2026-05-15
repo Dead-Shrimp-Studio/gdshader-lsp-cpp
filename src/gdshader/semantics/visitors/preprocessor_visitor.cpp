@@ -37,6 +37,19 @@ void PreprocessorVisitor::visit(IncludeNode* node)
     }
     processedFiles.insert(absPath);
 
+    auto current_unit = pm->getUnit(currentFilePath);
+    auto included_unit = pm->getUnit(absPath);
+
+    // Add the included file to the current file's includes
+    if (std::find(current_unit->includedPaths.begin(), current_unit->includedPaths.end(), absPath) == current_unit->includedPaths.end()) {
+        current_unit->includedPaths.push_back(absPath);
+    }
+
+    // Add the current file to the included file's "imported by" list
+    if (std::find(included_unit->importedBy.begin(), included_unit->importedBy.end(), currentFilePath) == included_unit->importedBy.end()) {
+        included_unit->importedBy.push_back(currentFilePath);
+    }
+
     auto exportedSymbols = pm->getExports(absPath);
 
     if (!exportedSymbols) {
@@ -48,7 +61,7 @@ void PreprocessorVisitor::visit(IncludeNode* node)
     for (const auto& [name, overloadList] : exportedSymbols->getGlobals()) {
         for (const auto& sym : overloadList) {
             
-            if (sym.category == SymbolType::Builtin) continue;
+            if (sym.category == SymbolType::Builtin || sym.source_path == "builtin" || sym.source_path.empty()) continue;
 
             if (!symbols.add(sym)) {
                 diagnostics.push_back(reportError(node, "Symbol '" + name + "' imported from " + node->path + " conflicts with existing symbol."));

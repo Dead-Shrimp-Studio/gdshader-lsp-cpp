@@ -7,7 +7,7 @@ namespace gdshader_lsp
 {
     struct ServerConfig {
         std::string pipe_name = "";
-        int port = 6007;
+        int port = 6010;
         bool use_stdio = false;
         bool show_help = false;
     };

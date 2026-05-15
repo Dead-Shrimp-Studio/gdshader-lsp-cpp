@@ -162,3 +162,78 @@ def test_incremental_sync_symbol_update(lsp):
     labels = [item["label"] for item in items]
     assert "x" in labels
     assert "y" in labels
+
+def test_cross_file_rename(lsp):
+    # 1. Setup Origin File (The included file)
+    utils_code = (
+        "shader_type spatial;\n"
+        "float calculate_lighting(float x) {\n"
+        "    return x * 2.0;\n"
+        "}\n"
+    )
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {
+            "uri": "file:///utils.gdshaderinc",
+            "languageId": "gdshader",
+            "version": 1,
+            "text": utils_code
+        }
+    }, is_notification=True)
+    
+    # Consume diagnostics for utils
+    lsp.read_message()
+
+    # 2. Setup Dependent File (The main shader)
+    main_code = (
+        "shader_type spatial;\n"
+        "#include \"utils.gdshaderinc\"\n"
+        "void fragment() {\n"
+        "    float final_light = calculate_lighting(1.0);\n"
+        "}\n"
+    )
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {
+            "uri": "file:///main.gdshader",
+            "languageId": "gdshader",
+            "version": 1,
+            "text": main_code
+        }
+    }, is_notification=True)
+    
+    # Consume diagnostics for main
+    lsp.read_message()
+
+    # 3. Trigger Rename from the Dependent file
+    # 'calculate_lighting' on Line 3 starts at character 24.
+    # We place the cursor inside the function name (e.g., character 26).
+    msg_id = lsp.send_message("textDocument/rename", {
+        "textDocument": {"uri": "file:///main.gdshader"},
+        "position": {"line": 3, "character": 26},
+        "newName": "compute_lighting"
+    })
+
+    # 4. Read and Verify Response
+    response = lsp.read_message()
+    assert response["id"] == msg_id
+    
+    result = response.get("result")
+    assert result is not None, "Rename request returned None. Symbol lookup might have failed."
+    assert "changes" in result, "Result does not contain a 'changes' map."
+    
+    changes = result["changes"]
+    
+    # Verify that edits were mapped to BOTH files
+    assert "file:///utils.gdshaderinc" in changes, "Edits missing for the origin file."
+    assert "file:///main.gdshader" in changes, "Edits missing for the dependent file."
+
+    # Verify origin file edits (Declaration)
+    utils_edits = changes["file:///utils.gdshaderinc"]
+    assert len(utils_edits) == 1, "Expected exactly 1 edit in the origin file."
+    assert utils_edits[0]["newText"] == "compute_lighting"
+    assert utils_edits[0]["range"]["start"]["line"] == 1 # Line 0 in utils.gdshaderinc
+
+    # Verify dependent file edits (Usage)
+    main_edits = changes["file:///main.gdshader"]
+    assert len(main_edits) == 1, "Expected exactly 1 edit in the dependent file."
+    assert main_edits[0]["newText"] == "compute_lighting"
+    assert main_edits[0]["range"]["start"]["line"] == 3 # Line 3 in main.gdshader

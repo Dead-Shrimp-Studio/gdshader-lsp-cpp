@@ -113,3 +113,29 @@ std::shared_ptr<SymbolTable> ProjectManager::getExports(const std::string& path)
     includeStack.pop_back();
     return unit->symbols;
 }
+
+std::vector<std::string> ProjectManager::getDependentFiles(const std::string& origin_path) 
+{
+    std::vector<std::string> dependents;
+    std::unordered_set<std::string> visited;
+    
+    auto unit = getUnit(origin_path);
+    if (!unit) return dependents;
+
+    // Standard BFS/DFS to find all files that include this one
+    std::vector<std::string> stack = unit->importedBy;
+    while (!stack.empty()) {
+        std::string current = stack.back();
+        stack.pop_back();
+
+        if (visited.count(current)) continue;
+        visited.insert(current);
+        dependents.push_back(current);
+
+        auto dep_unit = getUnit(current);
+        if (dep_unit) {
+            stack.insert(stack.end(), dep_unit->importedBy.begin(), dep_unit->importedBy.end());
+        }
+    }
+    return dependents;
+}

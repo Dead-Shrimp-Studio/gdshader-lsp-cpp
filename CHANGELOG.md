@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2026-05-15
+
+New feature: Code formatting, cross-file symbol renaming, and more!
+
+### Added 
+
+- Cross-file symbol renaming
+
+### Changed
+
+- Standard port for the lps is now 6010
+
+### Fixed
+
+- Symbol store adding logic was faulty in edge cases for varyings & uniforms
+- Wrong instantiation of local & global symbols in category "Variables" instead of "Builtin"
+- Registering global functions & environment shader variables into the "builtin" file scope now
+- Wrong registering of some symbols as function definition in symbol declaration visitor
+- To narrow type checking in Textdocument_Rename
+
 ## [0.2.4.1] - 2026-03-28
 
 A patch for all the immediate bugfixes.
