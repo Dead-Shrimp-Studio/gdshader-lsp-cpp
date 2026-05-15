@@ -11,11 +11,14 @@ New feature: Code formatting, cross-file symbol renaming, and more!
 
 ### Added 
 
-- Cross-file symbol renaming
+- Features:
+  - Cross-file symbol renaming
+  - Code formatting
 
 ### Changed
 
 - Standard port for the lps is now 6010
+- Named pipes are currently disabled for windows as communication method for this lsp
 
 ### Fixed
 

@@ -45,14 +45,13 @@ int main(int argc, char* argv[])
         }
 
         else if (!config.pipe_name.empty()) {
+#if defined(__APPLE__) || defined(__linux__)
             SPDLOG_INFO("Starting gdshader lsp on pipe: {}", config.pipe_name);
-            
             auto listener = lsp::io::NamedPipeListener(config.pipe_name);
 
             while (listener.isReady())
             {
                 auto pipe_stream = listener.listen();
-                
                 SPDLOG_INFO("Client connected via pipe!");
 
                 std::thread([stream = std::move(pipe_stream)]() mutable {
@@ -61,6 +60,11 @@ int main(int argc, char* argv[])
                     server.run();
                 }).detach();
             }
+#else
+            SPDLOG_ERROR("Named pipes are not currently supported on Windows. Please use --stdio or --port.");
+            gdshader_lsp::Logger::shutdown();
+            return 1;
+#endif
         }
 
         else {

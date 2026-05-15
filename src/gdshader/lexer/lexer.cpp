@@ -43,8 +43,10 @@ void Lexer::advance()
  * @brief Skips Godot based comments.
  * 
  */
-void Lexer::skipComment() 
+Token Lexer::parseComment(int startLine, int startCol) 
 {
+    std::string comment_text;
+
     GDSHADER_ASSERT(current_char == '/', "skipComment called but current character is '{}'", current_char);
     if (current_char == '/' && peek() == '/') {
         // Single-line comment: Skip until newline
@@ -53,16 +55,22 @@ void Lexer::skipComment()
         }
     } 
     else if (current_char == '/' && peek() == '*') {
-        // Multi-line comment: Skip until */
-        advance(); advance(); // consume /*
+        // Multi-line comment
+        comment_text += current_char; advance(); // '/'
+        comment_text += current_char; advance(); // '*'
+        
         while (current_char != '\0') {
             if (current_char == '*' && peek() == '/') {
-                advance(); advance(); // consume */
+                comment_text += current_char; advance(); // '*'
+                comment_text += current_char; advance(); // '/'
                 break;
             }
+            comment_text += current_char;
             advance();
         }
     }
+
+    return {TokenType::TOKEN_COMMENT, comment_text, startLine, startCol, (int)comment_text.length()};
 }
 
 /**
@@ -227,20 +235,6 @@ Token Lexer::createToken()
 {    
     skipWhitespace();
 
-    bool commentFound = true;
-    while (commentFound) {
-        commentFound = false;
-
-        if (current_char == '/') {
-            char next = peek();
-            if (next == '/' || next == '*') {
-                skipComment();
-                skipWhitespace(); 
-                commentFound = true; // We moved, so check again
-            }
-        }
-    }
-
     int startLine = line;
     int startCol = column;
     
@@ -255,6 +249,16 @@ Token Lexer::createToken()
     }
 
     char current = current_char;
+
+    // --- COMMENTS ---
+    if (current_char == '/') {
+        char next = peek();
+        if (next == '/' || next == '*') {
+            Token t = parseComment(startLine, startCol);
+            SPDLOG_TRACE("Token: [Comment] '{}' ({}:{})", t.value, startLine, startCol);
+            return t;
+        }
+    }
 
     // --- PREPROCESSOR ---
     if (current == '#') {

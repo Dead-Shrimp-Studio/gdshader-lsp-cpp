@@ -42,12 +42,12 @@ private:
 
     // Helper functions to advance through the source.
     void advance();
-    void skipComment();
     char peek();
 
     void skipWhitespace();
 
     // Helper functions to parse different token types.
+    Token parseComment(int startLine, int startCol);
     Token parseNumber(int startLine, int startCol);
     Token parseIdentifier(int startLine, int startCol);
     Token parseString(int startLine, int startCol);
