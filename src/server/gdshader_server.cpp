@@ -90,6 +90,7 @@ void GdShaderServer::registerHandlers() {
             caps.renameProvider = true;
             caps.foldingRangeProvider = true;
             caps.inlayHintProvider = true;
+            caps.workspaceSymbolProvider = true;
             caps.colorProvider = true;
 
             return lsp::requests::Initialize::Result{
@@ -1128,6 +1129,68 @@ void GdShaderServer::registerHandlers() {
                 });
             }
             
+            return result;
+        }
+    );
+
+    // --- FEATURE: WORKSPACE SYMBOL ---
+    handler.add<lsp::requests::Workspace_Symbol>(
+        [this](lsp::requests::Workspace_Symbol::Params&& params) -> lsp::requests::Workspace_Symbol::Result
+        {
+            std::vector<lsp::SymbolInformation> result;
+            std::string query = params.query;
+            if (query.empty()) return result;
+
+            std::string lower_query = query;
+            std::transform(lower_query.begin(), lower_query.end(), lower_query.begin(), ::tolower);
+
+            auto pm = ProjectManager::get_singleton();
+
+            for (const auto& [path, unit] : pm->getAllUnits()) 
+            {
+                std::lock_guard<std::mutex> lock(unit->unitMutex);
+                if (!unit->symbols) continue;
+
+                // Grab all symbols. We use 99999 to get everything in the file scope.
+                std::vector<Symbol> file_symbols = unit->symbols->getVisibleSymbolsAt(99999);
+
+                for (const auto& sym : file_symbols) 
+                {
+                    // Skip Built-ins (we only want user-defined symbols)
+                    if (sym.category == SymbolType::Builtin) continue;
+
+                    // Only yield the symbol if it was actually defined in THIS file
+                    std::string origin_path = sym.source_path.empty() ? path : sym.source_path;
+                    if (origin_path != path) continue;
+
+                    std::string lower_name = sym.name;
+                    std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
+
+                    if (lower_name.find(lower_query) != std::string::npos) 
+                    {
+                        lsp::SymbolInformation info;
+                        info.name = sym.name;
+
+                        if (sym.category == SymbolType::Function) {
+                            info.kind = lsp::SymbolKind::Function;
+                        } else if (sym.category == SymbolType::Struct) {
+                            info.kind = lsp::SymbolKind::Struct;
+                        } else if (sym.category == SymbolType::Uniform || sym.mutability == Mutability::ReadOnly) {
+                            info.kind = lsp::SymbolKind::Constant;
+                        } else {
+                            info.kind = lsp::SymbolKind::Variable;
+                        }
+
+                        info.location.uri = lsp::DocumentUri::fromPath(path);
+                        info.location.range.start = lsp::Position{(unsigned)sym.definition.startLine, (unsigned)sym.definition.startCol};
+                        
+                        unsigned endCol = sym.definition.endCol > 0 ? sym.definition.endCol : sym.definition.startCol + sym.name.length();
+                        info.location.range.end = lsp::Position{(unsigned)sym.definition.startLine, endCol};
+
+                        result.push_back(info);
+                    }
+                }
+            }
             return result;
         }
     );
