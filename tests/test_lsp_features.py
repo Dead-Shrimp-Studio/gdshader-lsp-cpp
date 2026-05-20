@@ -401,3 +401,90 @@ def test_document_formatting(lsp):
     # Check if the output perfectly matches
     actual_code = result[0]["newText"]
     assert actual_code.strip() == expected_code.strip(), f"Formatting failed! \nExpected:\n{expected_code}\n\nGot:\n{actual_code}"
+
+def test_call_hierarchy(lsp):
+    # Setup a file with a clear call chain: fragment -> compute_lighting -> sin
+    shader_code = (
+        "shader_type spatial;\n"                      # Line 0
+        "\n"                                          # Line 1
+        "float compute_lighting(float x) {\n"         # Line 2
+        "    return sin(x);\n"                        # Line 3
+        "}\n"                                         # Line 4
+        "\n"                                          # Line 5
+        "void fragment() {\n"                         # Line 6
+        "    float light = compute_lighting(1.0);\n"  # Line 7
+        "}\n"                                         # Line 8
+    )
+    uri = "file:///call_hierarchy.gdshader"
+
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {
+            "uri": uri,
+            "languageId": "gdshader",
+            "version": 1,
+            "text": shader_code
+        }
+    }, is_notification=True)
+    
+    # Consume diagnostics
+    lsp.read_message() 
+
+    # ---------------------------------------------------------
+    # STEP 1: PREPARE CALL HIERARCHY
+    # ---------------------------------------------------------
+    # Place the cursor right in the middle of 'compute_lighting' on Line 2
+    msg_id_prep = lsp.send_message("textDocument/prepareCallHierarchy", {
+        "textDocument": {"uri": uri},
+        "position": {"line": 2, "character": 10} 
+    })
+
+    res_prep = lsp.read_message()
+    assert res_prep["id"] == msg_id_prep
+    items = res_prep.get("result")
+    
+    assert items is not None and len(items) == 1, "PrepareCallHierarchy should return exactly 1 item."
+    target_item = items[0]
+    assert target_item["name"] == "compute_lighting", f"Expected 'compute_lighting', got '{target_item['name']}'"
+    
+    # ---------------------------------------------------------
+    # STEP 2: INCOMING CALLS
+    # ---------------------------------------------------------
+    # Ask the server: "Who calls compute_lighting?"
+    msg_id_in = lsp.send_message("callHierarchy/incomingCalls", {
+        "item": target_item
+    })
+
+    res_in = lsp.read_message()
+    assert res_in["id"] == msg_id_in
+    incoming = res_in.get("result")
+    
+    assert incoming is not None and len(incoming) == 1, "Expected exactly 1 incoming call."
+    
+    # Verify the caller is 'fragment'
+    assert incoming[0]["from"]["name"] == "fragment", "Expected caller to be 'fragment'."
+    
+    # Verify the exact range where the call happened inside fragment() (Line 7)
+    assert len(incoming[0]["fromRanges"]) == 1
+    call_range = incoming[0]["fromRanges"][0]
+    assert call_range["start"]["line"] == 7, "Call range line mapping is incorrect."
+
+    # ---------------------------------------------------------
+    # STEP 3: OUTGOING CALLS
+    # ---------------------------------------------------------
+    msg_id_out = lsp.send_message("callHierarchy/outgoingCalls", {
+        "item": target_item
+    })
+
+    res_out = lsp.read_message()
+    assert res_out["id"] == msg_id_out
+    outgoing = res_out.get("result")
+    
+    assert outgoing is not None and len(outgoing) == 1, "Expected exactly 1 outgoing call."
+    
+    # Verify it calls the built-in 'sin' function
+    assert outgoing[0]["to"]["name"] == "sin", "Expected outgoing call to be 'sin'."
+    
+    # Verify the exact range where 'sin' was called inside compute_lighting() (Line 3)
+    assert len(outgoing[0]["fromRanges"]) == 1
+    out_range = outgoing[0]["fromRanges"][0]
+    assert out_range["start"]["line"] == 3, "Outgoing call range line mapping is incorrect."

@@ -91,6 +91,7 @@ void GdShaderServer::registerHandlers() {
             caps.foldingRangeProvider = true;
             caps.inlayHintProvider = true;
             caps.workspaceSymbolProvider = true;
+            caps.callHierarchyProvider = true;
             caps.colorProvider = true;
 
             return lsp::requests::Initialize::Result{
@@ -1191,6 +1192,204 @@ void GdShaderServer::registerHandlers() {
                     }
                 }
             }
+            return result;
+        }
+    );
+
+    // --- FEATURE: CALL HIERARCHY PREPARE ---
+    handler.add<lsp::requests::TextDocument_PrepareCallHierarchy>(
+        [this](lsp::requests::TextDocument_PrepareCallHierarchy::Params&& params) -> lsp::requests::TextDocument_PrepareCallHierarchy::Result
+        {
+            std::vector<lsp::CallHierarchyItem> result;
+            
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            std::lock_guard<std::mutex> lock(su->unitMutex);
+            if (!su->ast || !su->symbols) return result;
+
+            NodeFinderVisitor finder(params.position.line, params.position.character);
+            su->ast->accept(finder);
+
+            std::string search_name = "";
+            if (auto func = dynamic_cast<const FunctionNode*>(finder.deepestNode)) {
+                search_name = func->name;
+            } else if (auto call = dynamic_cast<const FunctionCallNode*>(finder.deepestNode)) {
+                search_name = call->functionName;
+            } else if (auto id = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) {
+                search_name = id->name;
+            }
+
+            // If we found a name, look it up in the symbol table
+            if (!search_name.empty()) {
+                const Symbol* sym = su->symbols->lookupAt(search_name, 99999);
+                
+                // We only care about Functions for Call Hierarchy
+                if (sym && sym->category == SymbolType::Function && sym->definition.startLine >= 0) {
+                    
+                    std::string origin_path = sym->source_path.empty() ? path : sym->source_path;
+
+                    lsp::CallHierarchyItem item;
+                    item.name = sym->name;
+                    item.kind = lsp::SymbolKind::Function;
+                    item.detail = sym->returnType ? sym->returnType->toString() : "void";
+                    item.uri = lsp::DocumentUri::fromPath(origin_path);
+                    
+                    item.range = lsp::Range{
+                        .start = {(unsigned)sym->definition.startLine, (unsigned)sym->definition.startCol},
+                        .end   = {(unsigned)sym->definition.endLine, (unsigned)sym->definition.endCol}
+                    };
+                    item.selectionRange = item.range;
+
+                    result.push_back(item);
+                }
+            }
+
+            return result;
+        }
+    );
+
+    // --- FEATURE: INCOMING CALLS ---
+    handler.add<lsp::requests::CallHierarchy_IncomingCalls>(
+        [this](lsp::requests::CallHierarchy_IncomingCalls::Params&& params) -> lsp::requests::CallHierarchy_IncomingCalls::Result
+        {
+            std::vector<lsp::CallHierarchyIncomingCall> result;
+            auto pm = ProjectManager::get_singleton();
+            
+            // 1. Get the files that use this function (plus the origin file)
+            std::string origin_path = std::string(params.item.uri.path());
+            #ifdef _WIN32
+            if (origin_path.size() > 2 && origin_path[0] == '/' && origin_path[2] == ':') origin_path = origin_path.substr(1);
+            #endif
+
+            std::vector<std::string> affected_files = pm->getDependentFiles(origin_path);
+            affected_files.push_back(origin_path);
+
+            for (const std::string& target_path : affected_files) 
+            {
+                auto target_unit = pm->getUnit(target_path);
+                std::lock_guard<std::mutex> lock(target_unit->unitMutex);
+                if (!target_unit->symbols || !target_unit->ast) continue;
+
+                const Symbol* target_sym = target_unit->symbols->lookupAt(params.item.name, 99999);
+                if (!target_sym) continue;
+
+                // We need to group references by the function that contains them
+                std::unordered_map<std::string, lsp::CallHierarchyIncomingCall> calls_by_caller;
+
+                for (const auto& usage : target_sym->references) {
+                    
+                    EnclosingFunctionVisitor env_finder(usage.startLine);
+                    target_unit->ast->accept(env_finder);
+
+                    if (env_finder.enclosingFunc) {
+                        std::string caller_name = env_finder.enclosingFunc->name;
+
+                        // If we haven't seen this caller yet, create the Item
+                        if (calls_by_caller.find(caller_name) == calls_by_caller.end()) {
+                            lsp::CallHierarchyItem caller_item;
+                            caller_item.name = caller_name;
+                            caller_item.kind = lsp::SymbolKind::Function;
+                            caller_item.uri = lsp::DocumentUri::fromPath(target_path);
+                            caller_item.range = lsp::Range{
+                                .start = {(unsigned)env_finder.enclosingFunc->range.startLine, (unsigned)env_finder.enclosingFunc->range.startCol},
+                                .end   = {(unsigned)env_finder.enclosingFunc->range.endLine, (unsigned)env_finder.enclosingFunc->range.endCol}
+                            };
+                            caller_item.selectionRange = caller_item.range;
+
+                            calls_by_caller[caller_name] = lsp::CallHierarchyIncomingCall{
+                                .from = caller_item,
+                                .fromRanges = {}
+                            };
+                        }
+
+                        // Add the specific range where the call occurred
+                        calls_by_caller[caller_name].fromRanges.push_back(lsp::Range{
+                            .start = {(unsigned)usage.startLine, (unsigned)usage.startCol},
+                            .end   = {(unsigned)usage.startLine, (unsigned)usage.endCol}
+                        });
+                    }
+                }
+
+                for (const auto& [_, call_obj] : calls_by_caller) {
+                    result.push_back(call_obj);
+                }
+            }
+
+            return result;
+        }
+    );
+
+    // --- FEATURE: OUTGOING CALLS ---
+    handler.add<lsp::requests::CallHierarchy_OutgoingCalls>(
+        [this](lsp::requests::CallHierarchy_OutgoingCalls::Params&& params) -> lsp::requests::CallHierarchy_OutgoingCalls::Result
+        {
+            std::vector<lsp::CallHierarchyOutgoingCall> result;
+            
+            std::string path = std::string(params.item.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
+
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
+
+            std::lock_guard<std::mutex> lock(su->unitMutex);
+            if (!su->ast || !su->symbols) return result;
+
+            EnclosingFunctionVisitor env_finder(params.item.range.start.line);
+            su->ast->accept(env_finder);
+
+            if (!env_finder.enclosingFunc || !env_finder.enclosingFunc->body) {
+                return result; 
+            }
+
+            OutgoingCallVisitor call_scanner;
+            env_finder.enclosingFunc->body->accept(call_scanner);
+
+            std::unordered_map<std::string, lsp::CallHierarchyOutgoingCall> outgoing_calls;
+
+            for (const FunctionCallNode* call : call_scanner.calledFunctions) {
+                
+                const Symbol* called_sym = su->symbols->lookupAt(call->functionName, 99999);
+                if (!called_sym || called_sym->definition.startLine < 0) continue;
+
+                std::string target_path = called_sym->source_path.empty() ? path : called_sym->source_path;
+
+                if (outgoing_calls.find(call->functionName) == outgoing_calls.end()) {
+                    
+                    lsp::CallHierarchyItem called_item;
+                    called_item.name = called_sym->name;
+                    called_item.kind = lsp::SymbolKind::Function;
+                    called_item.uri = lsp::DocumentUri::fromPath(target_path);
+                    called_item.range = lsp::Range{
+                        .start = {(unsigned)called_sym->definition.startLine, (unsigned)called_sym->definition.startCol},
+                        .end   = {(unsigned)called_sym->definition.endLine, (unsigned)called_sym->definition.endCol}
+                    };
+                    called_item.selectionRange = called_item.range;
+
+                    outgoing_calls[call->functionName] = lsp::CallHierarchyOutgoingCall{
+                        .to = called_item,
+                        .fromRanges = {}
+                    };
+                }
+
+                // Add the specific range where the call was made inside THIS function
+                outgoing_calls[call->functionName].fromRanges.push_back(lsp::Range{
+                    .start = {(unsigned)call->range.startLine, (unsigned)call->range.startCol},
+                    .end   = {(unsigned)call->range.endLine, (unsigned)call->range.endCol}
+                });
+            }
+
+            for (const auto& [_, call_obj] : outgoing_calls) {
+                result.push_back(call_obj);
+            }
+
             return result;
         }
     );

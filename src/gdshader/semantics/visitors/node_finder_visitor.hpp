@@ -197,6 +197,38 @@ namespace gdshader_lsp
         void visit(IdentifierNode* node) override { isInside(node); }
         void visit(LiteralNode* node) override { isInside(node); }
     };
+
+    // Finds the function that encloses a specific line number
+    class EnclosingFunctionVisitor : public ASTVisitor {
+    public:
+        int targetLine;
+        const FunctionNode* enclosingFunc = nullptr;
+        EnclosingFunctionVisitor(int line) : targetLine(line) {}
+
+        void visit(ProgramNode* node) override {
+            for (auto& n : node->nodes) if (n) n->accept(*this);
+        }
+        void visit(FunctionNode* node) override {
+            if (targetLine >= node->range.startLine && targetLine <= node->range.endLine) {
+                enclosingFunc = node;
+            }
+        }
+
+        void visit(TypeNode*) override {} void visit(LiteralNode*) override {} void visit(IdentifierNode*) override {}
+        void visit(ParameterNode*) override {} void visit(StructMemberNode*) override {} void visit(DiscardNode*) override {} 
+        void visit(BreakNode*) override {} void visit(ContinueNode*) override {} void visit(DefineNode*) override {} 
+        void visit(IncludeNode*) override {} void visit(ShaderTypeNode*) override {} void visit(RenderModeNode*) override {}
+        void visit(ConstructorNode*) override {} void visit(UniformNode*) override {} void visit(ConstNode*) override {}
+        void visit(GroupUniformsNode*) override {} void visit(VaryingNode*) override {} void visit(StructNode*) override {}
+        void visit(BinaryOpNode*) override {} void visit(UnaryOpNode*) override {} void visit(FunctionCallNode*) override {}
+        void visit(MemberAccessNode*) override {} void visit(ArrayAccessNode*) override {} void visit(TernaryNode*) override {}
+        void visit(BlockNode*) override {} void visit(ExpressionStatementNode*) override {} void visit(VariableDeclNode*) override {}
+        void visit(IfNode*) override {} void visit(WhileNode*) override {} void visit(ForNode*) override {}
+        void visit(ReturnNode*) override {} void visit(DoWhileNode*) override {} void visit(CaseNode*) override {}
+        void visit(SwitchNode*) override {}
+
+    };
+
 } // namespace gdshader_lsp
 
 #endif // NODE_FINDER_VISITOR_HPP
