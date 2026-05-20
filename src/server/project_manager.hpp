@@ -40,6 +40,8 @@ public:
     std::string resolvePath(const std::string& currentPath, const std::string& includePath);
 
     std::shared_ptr<ShaderUnit> getUnit(const std::string& uri);
+    const std::unordered_map<std::string, std::shared_ptr<ShaderUnit>>& getAllUnits() const { return units; }
+
     std::shared_ptr<SymbolTable> getExports(const std::string& uri);
     std::vector<std::string> getDependentFiles(const std::string& uri);
 };

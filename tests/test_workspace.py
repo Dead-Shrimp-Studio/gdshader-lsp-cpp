@@ -237,3 +237,69 @@ def test_cross_file_rename(lsp):
     assert len(main_edits) == 1, "Expected exactly 1 edit in the dependent file."
     assert main_edits[0]["newText"] == "compute_lighting"
     assert main_edits[0]["range"]["start"]["line"] == 3 # Line 3 in main.gdshader
+
+def test_workspace_symbol_search(lsp):
+    # 1. Setup File 1
+    file1_code = (
+        "shader_type spatial;\n"
+        "uniform float unique_global_uniform;\n"
+        "void test_function_one() {}\n"
+    )
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {
+            "uri": "file:///workspace_file1.gdshader",
+            "languageId": "gdshader",
+            "version": 1,
+            "text": file1_code
+        }
+    }, is_notification=True)
+    lsp.read_message()
+
+    # 2. Setup File 2
+    file2_code = (
+        "shader_type spatial;\n"
+        "struct UniqueStruct { float x; };\n"
+        "void test_function_two() {}\n"
+    )
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {
+            "uri": "file:///workspace_file2.gdshaderinc",
+            "languageId": "gdshader",
+            "version": 1,
+            "text": file2_code
+        }
+    }, is_notification=True)
+    lsp.read_message()
+
+    # 3. Query for "unique"
+    msg_id = lsp.send_message("workspace/symbol", {
+        "query": "unique"
+    })
+
+    response = lsp.read_message()
+    assert response["id"] == msg_id
+    
+    result = response.get("result")
+    assert result is not None, "Workspace symbol request returned None"
+    
+    # We expect 'unique_global_uniform' and 'UniqueStruct' (testing case-insensitivity if implemented)
+    names = [sym["name"] for sym in result]
+    assert "unique_global_uniform" in names
+    assert "UniqueStruct" in names
+    assert "test_function_one" not in names # Shouldn't match query
+
+    # 4. Query for "test_function" (should pull from both files)
+    msg_id2 = lsp.send_message("workspace/symbol", {
+        "query": "test_function"
+    })
+    
+    response2 = lsp.read_message()
+    result2 = response2.get("result")
+    
+    names2 = [sym["name"] for sym in result2]
+    assert "test_function_one" in names2
+    assert "test_function_two" in names2
+    
+    # 5. Verify the location URIs are correct
+    func_two_sym = next(sym for sym in result2 if sym["name"] == "test_function_two")
+    assert "workspace_file2.gdshaderinc" in func_two_sym["location"]["uri"], "Symbol returned incorrect file URI!"
