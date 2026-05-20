@@ -71,6 +71,43 @@ namespace gdshader_lsp
         void visit(GroupUniformsNode*) override {} void visit(VaryingNode*) override {} void visit(StructNode*) override {}
     };
 
+    // Finds all FunctionCallNodes inside a specific block
+    class OutgoingCallVisitor : public ASTVisitor {
+    public:
+        std::vector<const FunctionCallNode*> calledFunctions;
+        
+        void visit(BlockNode* n) override { for(auto& s:n->statements) if(s) s->accept(*this); }
+        void visit(ExpressionStatementNode* n) override { if(n->expr) n->expr->accept(*this); }
+        void visit(VariableDeclNode* n) override { if(n->initializer) n->initializer->accept(*this); }
+        void visit(IfNode* n) override { if(n->condition) n->condition->accept(*this); if(n->thenBranch) n->thenBranch->accept(*this); if(n->elseBranch) n->elseBranch->accept(*this); }
+        void visit(WhileNode* n) override { if(n->condition) n->condition->accept(*this); if(n->body) n->body->accept(*this); }
+        void visit(DoWhileNode* n) override { if(n->condition) n->condition->accept(*this); if(n->body) n->body->accept(*this); }
+        void visit(ForNode* n) override { if(n->init) n->init->accept(*this); if(n->condition) n->condition->accept(*this); if(n->increment) n->increment->accept(*this); if(n->body) n->body->accept(*this); }
+        void visit(ReturnNode* n) override { if(n->value) n->value->accept(*this); }
+        void visit(BinaryOpNode* n) override { if(n->left) n->left->accept(*this); if(n->right) n->right->accept(*this); }
+        void visit(UnaryOpNode* n) override { if(n->operand) n->operand->accept(*this); }
+        void visit(TernaryNode* n) override { if(n->condition) n->condition->accept(*this); if(n->trueExpr) n->trueExpr->accept(*this); if(n->falseExpr) n->falseExpr->accept(*this); }
+        void visit(ArrayAccessNode* n) override { if(n->base) n->base->accept(*this); if(n->index) n->index->accept(*this); }
+        void visit(MemberAccessNode* n) override { if(n->base) n->base->accept(*this); }
+        void visit(SwitchNode* n) override { if(n->expression) n->expression->accept(*this); for(auto& c:n->cases) if(c) c->accept(*this); }
+        void visit(CaseNode* n) override { if(n->value) n->value->accept(*this); for(auto& s:n->statements) if(s) s->accept(*this); }
+        
+        // Capture the call, then recurse into arguments in case of nested calls - e.g., foo(bar())
+        void visit(FunctionCallNode* n) override {
+            calledFunctions.push_back(n);
+            for (auto& arg : n->arguments) if (arg) arg->accept(*this);
+        }
+
+        void visit(TypeNode*) override {} void visit(LiteralNode*) override {} void visit(IdentifierNode*) override {}
+        void visit(ParameterNode*) override {} void visit(StructMemberNode*) override {} void visit(DiscardNode*) override {} 
+        void visit(BreakNode*) override {} void visit(ContinueNode*) override {} void visit(DefineNode*) override {} 
+        void visit(IncludeNode*) override {} void visit(ShaderTypeNode*) override {} void visit(RenderModeNode*) override {}
+        void visit(ConstructorNode*) override {} void visit(UniformNode*) override {} void visit(ConstNode*) override {}
+        void visit(GroupUniformsNode*) override {} void visit(VaryingNode*) override {} void visit(StructNode*) override {}
+        void visit(FunctionNode*) override {} void visit (ProgramNode*) {}
+
+    };
+
 } // namespace
 
 #endif
