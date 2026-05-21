@@ -57,11 +57,19 @@ namespace gdshader_lsp
         // --- Core Helpers ---
 
         void advance();
-        void consume(TokenType type, const std::string& message);
+        void consume(TokenType type, DiagnosticCode code, const std::string& message);
         bool match(TokenType type);
         bool check(TokenType type);
-        void reportError(const std::string& message);
-        void reportErrorAt(const Token& token, const std::string& message);
+
+        // --- Errors ---
+
+        void reportDiagnosticAt(const Token& token, DiagnosticCode code, DiagnosticLevel level, const std::string& message);
+        void reportError(DiagnosticCode code, const std::string& message);
+        void reportErrorAt(const Token& token, DiagnosticCode code, const std::string& message);
+        void reportWarning(DiagnosticCode code, const std::string& message);
+        void reportHint(DiagnosticCode code, const std::string& message);
+        void reportInformation(DiagnosticCode code, const std::string& message);
+
         void synchronize(); // Error recovery
 
         // --- Top Level Parsing ---

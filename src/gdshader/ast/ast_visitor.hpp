@@ -61,11 +61,9 @@ namespace gdshader_lsp
             // Root
             virtual void visit(ProgramNode* node) = 0;
 
-            Diagnostic reportError(const ASTNode* node, const std::string& msg)
+            Diagnostic reportError(const ASTNode* node, DiagnosticCode code, const std::string& msg)
             {
-                Diagnostic dg;
-                dg.message = msg;
-                dg.level = DiagnosticLevel::Error;
+                Diagnostic dg(code, msg, DiagnosticLevel::Error);
                 
                 if (!node)
                 {
@@ -73,16 +71,14 @@ namespace gdshader_lsp
                     return dg;
                 }
 
-                SPDLOG_DEBUG("Reporting error: {}", msg);
+                SPDLOG_DEBUG("Reporting error [{}]: {}", dg.code, msg);
                 dg.range = node->range;
                 return dg;
             }
 
-            Diagnostic reportWarning(const ASTNode* node, const std::string& msg)
+            Diagnostic reportWarning(const ASTNode* node, DiagnosticCode code, const std::string& msg)
             {
-                Diagnostic dg;
-                dg.message = msg;
-                dg.level = DiagnosticLevel::Warning;
+                Diagnostic dg(code, msg, DiagnosticLevel::Warning);
                 
                 if (!node)
                 {
@@ -90,7 +86,37 @@ namespace gdshader_lsp
                     return dg;
                 }
 
-                SPDLOG_DEBUG("Reporting error: {}", msg);
+                SPDLOG_DEBUG("Reporting warning [{}]: {}", dg.code, msg);
+                dg.range = node->range;
+                return dg;
+            }
+
+            Diagnostic reportInformation(const ASTNode* node, DiagnosticCode code, const std::string& msg)
+            {
+                Diagnostic dg(code, msg, DiagnosticLevel::Information);
+                
+                if (!node)
+                {
+                    SPDLOG_ERROR("ASTNode to report information on is nullptr");
+                    return dg;
+                }
+
+                SPDLOG_DEBUG("Reporting information [{}]: {}", dg.code, msg);
+                dg.range = node->range;
+                return dg;
+            }
+
+            Diagnostic reportHint(const ASTNode* node, DiagnosticCode code, const std::string& msg)
+            {
+                Diagnostic dg(code, msg, DiagnosticLevel::Hint);
+                
+                if (!node)
+                {
+                    SPDLOG_ERROR("ASTNode to report hint on is nullptr");
+                    return dg;
+                }
+
+                SPDLOG_DEBUG("Reporting hint [{}]: {}", dg.code, msg);
                 dg.range = node->range;
                 return dg;
             }

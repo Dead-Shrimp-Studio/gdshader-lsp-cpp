@@ -93,7 +93,7 @@ std::unique_ptr<ExpressionNode> Parser::parsePrecedence(Precedence precedence)
     auto left = parsePrefix(prefixRuleToken);
 
     if (!left) {
-        reportError("Expected expression.");
+        reportError(DiagnosticCode::ExpectedExpression, "Expected expression.");
         return nullptr;
     }
 
@@ -192,7 +192,7 @@ std::unique_ptr<ExpressionNode> Parser::parseInfix(std::unique_ptr<ExpressionNod
         }
 
         default:
-            reportError("Unexpected infix token.");
+            reportError(DiagnosticCode::UnexpectedToken, "Unexpected infix token.");
             return left;
     }
 }
@@ -235,7 +235,7 @@ std::unique_ptr<ExpressionNode> Parser::parseIdentifier()
 std::unique_ptr<ExpressionNode> Parser::parseGrouping() 
 {
     auto expr = parseExpression(); // Parse the expression inside the parens
-    consume(TokenType::TOKEN_RPAREN, "Expected ')' after expression.");
+    consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')' after expression.");
     return expr;
 }
 
@@ -289,7 +289,7 @@ std::unique_ptr<ExpressionNode> Parser::parseTernary(std::unique_ptr<ExpressionN
     node->condition = std::move(left);
     
     node->trueExpr = parseExpression();
-    consume(TokenType::TOKEN_COLON, "Expected ':' in ternary operator");
+    consume(TokenType::TOKEN_COLON, DiagnosticCode::ExpectedColon, "Expected ':' in ternary operator");
     
     // Ternary is also usually right-associative
     node->falseExpr = parsePrecedence(static_cast<Precedence>(PREC_TERNARY));
@@ -323,7 +323,7 @@ std::unique_ptr<ExpressionNode> Parser::parseCall(std::unique_ptr<ExpressionNode
             callNode->arguments.push_back(parseExpression());
         } while (match(TokenType::TOKEN_COMMA));
     }
-    consume(TokenType::TOKEN_RPAREN, "Expected ')' after arguments");
+    consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')' after arguments");
 
     callNode->range.endLine = previous_token.line;
     callNode->range.endCol  = previous_token.column + previous_token.length;
@@ -348,7 +348,7 @@ std::unique_ptr<ExpressionNode> Parser::parseMemberAccess(std::unique_ptr<Expres
         dotNode->range.endLine = previous_token.line;
         dotNode->range.endCol  = previous_token.column + previous_token.length;
     } else {
-        reportError("Expected property name after '.'");
+        reportError(DiagnosticCode::ExpectedIdentifier, "Expected property name after '.'");
 
         dotNode->range.endLine = previous_token.line;
         dotNode->range.endCol  = previous_token.column + previous_token.length;
@@ -367,7 +367,7 @@ std::unique_ptr<ExpressionNode> Parser::parseArrayAccess(std::unique_ptr<Express
     indexNode->range.startCol  = indexNode->base->range.startCol;
 
     indexNode->index = parseExpression();
-    consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
+    consume(TokenType::TOKEN_RBRACKET, DiagnosticCode::UnmatchedBracket, "Expected ']'");
 
     indexNode->range.endLine = previous_token.line;
     indexNode->range.endCol  = previous_token.column + previous_token.length;
