@@ -94,6 +94,8 @@ void GdShaderServer::registerHandlers() {
             caps.callHierarchyProvider = true;
             caps.colorProvider = true;
 
+            caps.codeActionProvider = true;
+
             return lsp::requests::Initialize::Result{
                 .capabilities = caps,
                 .serverInfo = lsp::InitializeResultServerInfo{
@@ -1392,6 +1394,65 @@ void GdShaderServer::registerHandlers() {
             }
 
             return result;
+        }
+    );
+
+    // --- FEATURE: CODE ACTIONS (QUICK FIXES) ---
+    handler.add<lsp::requests::TextDocument_CodeAction>(
+        [this](lsp::requests::TextDocument_CodeAction::Params&& params) -> lsp::requests::TextDocument_CodeAction::Result
+        {
+            std::vector<std::variant<lsp::Command, lsp::CodeAction>> actions;
+
+            for (const auto& diag : params.context.diagnostics) 
+            {
+                std::string code = ""; 
+                if (diag.code.has_value()) {
+                    if (std::holds_alternative<std::string>(diag.code.value())) {
+                        code = std::get<std::string>(diag.code.value());
+                    } else if (std::holds_alternative<int>(diag.code.value())) {
+                        code = std::to_string(std::get<int>(diag.code.value()));
+                    }
+                }
+
+                // Missing Semicolon (GDS1001)
+                if (code == "GDS1001") {
+                    lsp::CodeAction action;
+                    action.title = "Insert missing semicolon";
+                    action.kind = lsp::CodeActionKind::QuickFix;
+                    action.diagnostics = { diag }; 
+                    
+                    lsp::TextEdit edit;
+                    edit.range = lsp::Range{diag.range.end, diag.range.end}; 
+                    edit.newText = ";";
+                    
+                    lsp::WorkspaceEdit wsEdit;
+                    wsEdit.changes.emplace(); 
+                    (*wsEdit.changes)[params.textDocument.uri].push_back(edit);
+                    action.edit = wsEdit;
+                    
+                    actions.push_back(action);
+                }
+                
+                // Empty Statement Hint (GDS5000)
+                else if (code == "GDS5000") {
+                    lsp::CodeAction action;
+                    action.title = "Remove unnecessary semicolon";
+                    action.kind = lsp::CodeActionKind::QuickFix;
+                    action.diagnostics = { diag };
+                    
+                    lsp::TextEdit edit;
+                    edit.range = diag.range; 
+                    edit.newText = "";       
+                    
+                    lsp::WorkspaceEdit wsEdit;
+                    wsEdit.changes.emplace();
+                    (*wsEdit.changes)[params.textDocument.uri].push_back(edit);
+                    action.edit = wsEdit;
+                    
+                    actions.push_back(action);
+                }
+            }
+            return actions;
         }
     );
 

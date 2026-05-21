@@ -16,7 +16,7 @@ New features: Code formatting, cross-file symbol renaming, and more!
   - Code formatting
   - Workspace Symbol search
   - Call hierarchy
-  - Primitive Code Actions
+  - Primitive Code Actions (BETA)
 
 - Fastly improved diagnostic error codes
 - Improved support for windows named pipes as communication protocol
