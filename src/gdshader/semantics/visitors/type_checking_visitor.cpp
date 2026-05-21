@@ -1,4 +1,3 @@
-
 #include "gdshader/diagnostics.hpp"
 #include "gdshader/ast/ast.h"
 #include "gdshader/semantics/visitors/type_checking_visitor.hpp"
@@ -30,7 +29,6 @@ void TypeCheckingVisitor::visit(VariableDeclNode* node)
 
         GDSHADER_RETURN_IF(node->name.empty(), "node name is empty");
         
-        // We use lookupAt to get the type we registered in Pass 1
         int line = node->range.startLine;
         const Symbol* s = symbols.lookupAt(node->name, line);
 
@@ -73,8 +71,8 @@ void TypeCheckingVisitor::visit(UniformNode* node)
         TypePtr valType = resolveType(node->defaultValue.get());
         if (*valType != *s->type && valType->kind != TypeKind::UNKNOWN) {
             GDSHADER_ERROR_IF(true, "Uniform type mismatch: '{}' vs '{}'", s->type->toString(), valType->toString());
-            diagnostics.push_back(reportError(node, "Type mismatch: Cannot initialize uniform '" + s->type->toString() + 
-                "' with value of type '" + valType->toString() + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::TypeMismatch, "Type mismatch: Cannot initialize uniform '" + s->type->toString() + 
+                "' with value of type '" + valType->toString() + "'."));
         }
     }
 }
@@ -88,7 +86,6 @@ void TypeCheckingVisitor::visit(FunctionNode* node)
     const Symbol* funcSym = symbols.lookupAt(node->name, line);
     if (!funcSym) return;
 
-    // Setup state for ReturnNode checking
     ShaderStage previousStage = currentProcessorFunction;
     TypePtr previousExpected = currentExpectedReturnType;
 
@@ -99,10 +96,8 @@ void TypeCheckingVisitor::visit(FunctionNode* node)
     else if (node->name == "light") currentProcessorFunction = ShaderStage::Light;
     else currentProcessorFunction = ShaderStage::Global;
 
-    // Visit the body to check expressions and returns
     if (node->body) node->body->accept(*this);
 
-    // Restore state
     currentProcessorFunction = previousStage;
     currentExpectedReturnType = previousExpected;
 }
@@ -121,16 +116,16 @@ void TypeCheckingVisitor::visit(ReturnNode* node) {
     if (currentExpectedReturnType->name == "void") {
         if (actualType->name != "void") {
             GDSHADER_ERROR_IF(true, "Void function attempting to return a value");
-            diagnostics.push_back(reportError(node, "Void function cannot return a value"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::VoidCannotReturnValue, "Void function cannot return a value."));
         }
     } else {
         if (actualType->name == "void") {
             GDSHADER_ERROR_IF(true, "Function expected to return '{}', but returned void", currentExpectedReturnType->toString());
-            diagnostics.push_back(reportError(node, "Function must return a value of type '" + currentExpectedReturnType->toString() + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::TypeMismatch, "Function must return a value of type '" + currentExpectedReturnType->toString() + "'."));
         } else if (actualType->kind != TypeKind::UNKNOWN && *actualType != *currentExpectedReturnType) {
             GDSHADER_ERROR_IF(true, "Return type mismatch: Expected '{}', found '{}'", currentExpectedReturnType->toString(), actualType->toString());
-            diagnostics.push_back(reportError(node, "Type mismatch: Expected return type '" + currentExpectedReturnType->toString() + 
-                "' but found '" + actualType->toString() + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::TypeMismatch, "Type mismatch: Expected return type '" + currentExpectedReturnType->toString() + 
+                "' but found '" + actualType->toString() + "'."));
         }
     }
 }
@@ -145,7 +140,7 @@ void TypeCheckingVisitor::visit(IdentifierNode* node)
     
     if (!s) {
         GDSHADER_ERROR_IF(true, "Undefined identifier '{}'", node->name);
-        diagnostics.push_back(reportError(node, "Undefined identifier '" + node->name + "'"));
+        diagnostics.push_back(reportError(node, DiagnosticCode::UndefinedIdentifier, "Undefined identifier '" + node->name + "'."));
     } else {
         node->resolvedSymbol = s;
         symbols.addReference(const_cast<Symbol*>(s), node->range);
@@ -159,7 +154,7 @@ void gdshader_lsp::TypeCheckingVisitor::visit(TernaryNode *node)
         node->condition->accept(*this);
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
-            diagnostics.push_back(reportError(node->condition.get(), "Ternary condition must be bool."));
+            diagnostics.push_back(reportError(node->condition.get(), DiagnosticCode::ConditionMustBeBool, "Ternary condition must be bool."));
         }
     }
     if (node->trueExpr) node->trueExpr->accept(*this);
@@ -168,9 +163,8 @@ void gdshader_lsp::TypeCheckingVisitor::visit(TernaryNode *node)
     TypePtr tTrue = resolveType(node->trueExpr.get());
     TypePtr tFalse = resolveType(node->falseExpr.get());
     
-    // Check if branch types match
     if (tTrue->kind != TypeKind::UNKNOWN && tFalse->kind != TypeKind::UNKNOWN && *tTrue != *tFalse) {
-        diagnostics.push_back(reportError(node, "Type mismatch in ternary operator branches."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::TypeMismatch, "Type mismatch in ternary operator branches."));
     }
 }
 
@@ -186,7 +180,7 @@ void TypeCheckingVisitor::visit(BinaryOpNode* node)
     );
 
     if (isAssignment) {
-        visitAssignment(node); // Route to assignment logic
+        visitAssignment(node); 
         return;
     }
     
@@ -196,7 +190,7 @@ void TypeCheckingVisitor::visit(BinaryOpNode* node)
     if (node->op == TokenType::TOKEN_SLASH) {
         if (auto lit = dynamic_cast<const LiteralNode*>(node->right.get())) {
             if (lit->value == "0" || lit->value == "0.0") {
-                diagnostics.push_back(reportError(node->right.get(), "Division by zero."));
+                diagnostics.push_back(reportError(node->right.get(), DiagnosticCode::DivisionByZero, "Division by zero."));
             }
         }
     }
@@ -209,7 +203,7 @@ void TypeCheckingVisitor::visit(BinaryOpNode* node)
     TypePtr result = getBinaryOpResultType(l, r, node->op);
     if (result->kind == TypeKind::UNKNOWN) {
         GDSHADER_ERROR_IF(true, "Invalid binary operation between '{}' and '{}'", l->toString(), r->toString());
-        diagnostics.push_back(reportError(node, "Invalid binary operation '" + l->toString() + "' and '" + r->toString() + "'"));
+        diagnostics.push_back(reportError(node, DiagnosticCode::InvalidOperation, "Invalid binary operation between '" + l->toString() + "' and '" + r->toString() + "'."));
     }
 }
 
@@ -229,12 +223,12 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
         if (s && s->type) lType = s->type; 
         else if (s && !s->type) {
             GDSHADER_ERROR_IF(true, "Attempted assignment to function symbol '{}'", id->name);
-            diagnostics.push_back(reportError(node, "Cannot assign to function '" + id->name + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::NotAssignable, "Cannot assign to function '" + id->name + "'."));
             return;
         }
         else {
             GDSHADER_ERROR_IF(true, "Undefined identifier '{}' in assignment", id->name);
-            diagnostics.push_back(reportError(node, "Undefined identifier '" + id->name + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::UndefinedIdentifier, "Undefined identifier '" + id->name + "'."));
             return;
         }
         
@@ -245,18 +239,17 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
     } else 
     {
         GDSHADER_ERROR_IF(true, "Expression on LHS is not assignable");
-        diagnostics.push_back(reportError(node->left.get(), "Expression is not assignable."));
+        diagnostics.push_back(reportError(node->left.get(), DiagnosticCode::NotAssignable, "Expression is not assignable."));
         return;
     }
 
-    // Validate Mutability
     if (s) {
         if (s->mutability == Mutability::ReadOnly) {
             GDSHADER_ERROR_IF(true, "Attempted assignment to read-only variable '{}'", s->name);
-            diagnostics.push_back(reportError(node->left.get(), "Cannot assign to read-only variable '" + s->name + "'"));
+            diagnostics.push_back(reportError(node->left.get(), DiagnosticCode::CannotAssignToReadOnly, "Cannot assign to read-only variable '" + s->name + "'."));
         } else if (s->category == SymbolType::Varying && currentProcessorFunction != ShaderStage::Vertex) {
             GDSHADER_ERROR_IF(true, "Attempted to write to varying in fragment processor");
-            diagnostics.push_back(reportError(node->left.get(), "Varyings are read-only in the fragment processor."));
+            diagnostics.push_back(reportError(node->left.get(), DiagnosticCode::VaryingReadOnlyInFragment, "Varyings are read-only in the fragment processor."));
         }
     }
 
@@ -266,7 +259,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
     if (node->op == TokenType::TOKEN_EQUAL) {
         if (getConversionCost(rType, lType) == -1) {
             GDSHADER_ERROR_IF(true, "Type mismatch on assignment: cannot assign '{}' to '{}'", rType->toString(), lType->toString());
-            diagnostics.push_back(reportError(node, "Type mismatch: Cannot assign '" + rType->toString() + "' to '" + lType->toString() + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::TypeMismatch, "Type mismatch: Cannot assign '" + rType->toString() + "' to '" + lType->toString() + "'."));
         }
     } else {
         TokenType mathOp;
@@ -284,33 +277,30 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
             default:                                            mathOp = TokenType::TOKEN_ERROR; break;
         }
 
-        // 1. Check if the math is valid (e.g. vec2 * float -> vec2)
         TypePtr resultType = getBinaryOpResultType(lType, rType, mathOp);
         
         if (resultType->kind == TypeKind::UNKNOWN) {
             GDSHADER_ERROR_IF(true, "Invalid operation for compound assignment");
-            diagnostics.push_back(reportError(node, "Invalid operation for compound assignment."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidOperation, "Invalid operation for compound assignment."));
             return;
         }
 
-        // 2. Check if the result can be assigned back to LHS
         int cost = getConversionCost(resultType, lType);
         if (cost == -1) {
             GDSHADER_ERROR_IF(true, "Type mismatch on compound assignment: '{}' cannot be assigned to '{}'", resultType->toString(), lType->toString());
-            diagnostics.push_back(reportError(node, "Type mismatch: Result of compound assignment '" + resultType->toString() + 
-                        "' cannot be assigned to '" + lType->toString() + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::TypeMismatch, "Type mismatch: Result of compound assignment '" + resultType->toString() + 
+                        "' cannot be assigned to '" + lType->toString() + "'."));
         }
     }
 
     const ExpressionNode* lhs = node->left.get();
     
     if (auto mem = dynamic_cast<const MemberAccessNode*>(lhs)) {
-        // CHECK: Swizzle duplication (e.g. v.xx = vec2(1.0) is INVALID)
         std::string s = mem->member;
-        if (s.length() <= 4) { // Heuristic: it's likely a swizzle
+        if (s.length() <= 4) { 
             
             bool isSwizzleChars = true;
-            const std::string validSet = "xyzwrgbastpq"; // Combined sets
+            const std::string validSet = "xyzwrgbastpq"; 
             for (char c : s) {
                 if (validSet.find(c) == std::string::npos) {
                     isSwizzleChars = false;
@@ -323,7 +313,7 @@ void TypeCheckingVisitor::visitAssignment(const BinaryOpNode* node)
                     for(size_t j=i+1; j<s.length(); ++j) {
                         if (s[i] == s[j]) {
                             GDSHADER_ERROR_IF(true, "Invalid Write Mask: Component '{}' assigned twice", std::string(1, s[i]));
-                            diagnostics.push_back(reportError(node, "Invalid Write Mask: Component '" + 
+                            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidSwizzle, "Invalid Write Mask: Component '" + 
                             std::string(1, s[i]) + "' is assigned twice."));
                         }
                     }
@@ -347,7 +337,7 @@ void TypeCheckingVisitor::visit(ConstNode* node) {
         TypePtr valType = resolveType(node->value.get());
         if (*valType != *s->type && valType->kind != TypeKind::UNKNOWN) {
             GDSHADER_ERROR_IF(true, "Type mismatch in const declaration");
-            diagnostics.push_back(reportError(node, "Type mismatch in const declaration."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::TypeMismatch, "Type mismatch in const declaration."));
         }
     }
 }
@@ -359,7 +349,7 @@ void TypeCheckingVisitor::visit(IfNode* node) {
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
             GDSHADER_ERROR_IF(true, "If condition is not bool");
-            diagnostics.push_back(reportError(node, "If condition must be bool"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ConditionMustBeBool, "If condition must be bool."));
         }
     }
     if (node->thenBranch) node->thenBranch->accept(*this);
@@ -374,7 +364,7 @@ void TypeCheckingVisitor::visit(ForNode* node) {
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
             GDSHADER_ERROR_IF(true, "For loop condition is not bool");
-            diagnostics.push_back(reportError(node, "For loop condition must be bool"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ConditionMustBeBool, "For loop condition must be bool."));
         }
     }
     if (node->increment) node->increment->accept(*this);
@@ -388,7 +378,7 @@ void TypeCheckingVisitor::visit(WhileNode* node) {
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
             GDSHADER_ERROR_IF(true, "While condition is not bool");
-            diagnostics.push_back(reportError(node, "While condition must be bool"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ConditionMustBeBool, "While condition must be bool."));
         }
     }
     if (node->body) node->body->accept(*this);
@@ -402,7 +392,7 @@ void TypeCheckingVisitor::visit(DoWhileNode* node) {
         TypePtr condT = resolveType(node->condition.get());
         if (condT->name != "bool" && condT->kind != TypeKind::UNKNOWN) {
             GDSHADER_ERROR_IF(true, "Do-while condition is not bool");
-            diagnostics.push_back(reportError(node, "Do-while condition must be bool"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ConditionMustBeBool, "Do-while condition must be bool."));
         }
     }
 }
@@ -417,7 +407,7 @@ void TypeCheckingVisitor::visit(SwitchNode* node) {
         
         if (exprType->name != "int" && exprType->name != "uint" && exprType->name != "unknown") {
             GDSHADER_ERROR_IF(true, "Switch expression must be int/uint, found '{}'", exprType->name);
-            diagnostics.push_back(reportError(node->expression.get(), "Switch expression must be 'int' or 'uint', found '" + exprType->name + "'"));
+            diagnostics.push_back(reportError(node->expression.get(), DiagnosticCode::SwitchExpressionMustBeInt, "Switch expression must be 'int' or 'uint', found '" + exprType->name + "'."));
         }
     }
 
@@ -427,7 +417,7 @@ void TypeCheckingVisitor::visit(SwitchNode* node) {
             TypePtr cType = resolveType(c->value.get());
             if (*cType != *exprType && cType->kind != TypeKind::UNKNOWN) {
                 GDSHADER_ERROR_IF(true, "Switch case type mismatch");
-                diagnostics.push_back(reportError(c->value.get(), "Case Type mismatch"));
+                diagnostics.push_back(reportError(c->value.get(), DiagnosticCode::TypeMismatch, "Case Type mismatch."));
             }
         }
         for (const auto& stmt : c->statements) {
@@ -445,7 +435,6 @@ void TypeCheckingVisitor::visit(UnaryOpNode* node)
     GDSHADER_RETURN_IF(!node, "UnaryOpNode is null");
     if (node->operand) node->operand->accept(*this);
 
-    // Rule: ++ and -- require an L-Value (assignable target)
     if (node->op == TokenType::TOKEN_PLUS_PLUS || node->op == TokenType::TOKEN_MINUS_MINUS) {
         bool assignable = false;
         if (dynamic_cast<const IdentifierNode*>(node->operand.get()) || 
@@ -456,24 +445,23 @@ void TypeCheckingVisitor::visit(UnaryOpNode* node)
 
         if (!assignable) {
             GDSHADER_ERROR_IF(true, "Expression is not assignable");
-            diagnostics.push_back(reportError(node->operand.get(), "Expression is not assignable."));
+            diagnostics.push_back(reportError(node->operand.get(), DiagnosticCode::NotAssignable, "Expression is not assignable."));
         } else {
             const Symbol* s = getRootSymbol(node->operand.get());
             if (s && s->mutability == Mutability::ReadOnly) {
                 GDSHADER_ERROR_IF(true, "Attempted assignment to read-only variable '{}'", s->name);
-                diagnostics.push_back(reportError(node->operand.get(), "Cannot assign to read-only variable '" + s->name + "'"));
+                diagnostics.push_back(reportError(node->operand.get(), DiagnosticCode::CannotAssignToReadOnly, "Cannot assign to read-only variable '" + s->name + "'."));
             }
         }
     }
 
-    // Rule: ~ (Bitwise NOT) only works on Integers
     if (node->op == TokenType::TOKEN_TILDE) {
         TypePtr t = resolveType(node->operand.get());
         if (t->kind != TypeKind::UNKNOWN && t->name.find("int") == std::string::npos && 
             t->name.find("uint") == std::string::npos && t->name.find("ivec") == std::string::npos && 
             t->name.find("uvec") == std::string::npos) {
             GDSHADER_ERROR_IF(true, "Bitwise NOT on non-integer type");
-            diagnostics.push_back(reportError(node, "Type mismatch: bitwise NOT requires integer type."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::BitwiseRequiresInteger, "Type mismatch: bitwise NOT requires integer type."));
         }
     }
 }
@@ -504,7 +492,7 @@ void TypeCheckingVisitor::visit(FunctionCallNode* node)
 
     if (candidates.empty()) {
         GDSHADER_ERROR_IF(true, "Call to unknown function '{}'", name);
-        diagnostics.push_back(reportError(node, "Unknown function '" + name + "'"));
+        diagnostics.push_back(reportError(node, DiagnosticCode::UnknownFunction, "Unknown function '" + name + "'."));
         return;
     }
 
@@ -521,7 +509,7 @@ void TypeCheckingVisitor::visit(FunctionCallNode* node)
         if (arityMatches.empty()) {
             size_t expected = candidates[0]->parameterTypes.size();
             GDSHADER_ERROR_IF(true, "Invalid argument count for '{}'", name);
-            diagnostics.push_back(reportError(node, "Invalid argument count for '" + name + "'. Expected " + 
+            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidArgumentCount, "Invalid argument count for '" + name + "'. Expected " + 
                         std::to_string(expected) + ", but got " + std::to_string(argTypes.size()) + "."));
         } else {
             const Symbol* closest = arityMatches[0];
@@ -543,7 +531,7 @@ void TypeCheckingVisitor::visit(FunctionCallNode* node)
                 TypePtr actual = argTypes[i];
                 if (getConversionCost(actual, expected) == -1) {
                     GDSHADER_ERROR_IF(true, "Invalid argument type in function call '{}'", name);
-                    diagnostics.push_back(reportError(node->arguments[i].get(), 
+                    diagnostics.push_back(reportError(node->arguments[i].get(), DiagnosticCode::InvalidArgumentType, 
                     "Invalid argument " + std::to_string(i + 1) + " for function '" + name + "'. Expected '" + 
                     expected->toString() + "', but found '" + actual->toString() + "'."));
                     break; 
@@ -573,7 +561,7 @@ void TypeCheckingVisitor::visit(MemberAccessNode* node)
             
             if (swizzle.length() > 4) {
                 GDSHADER_ERROR_IF(true, "Swizzle '{}' too long", swizzle);
-                diagnostics.push_back(reportError(node, "Swizzle '" + swizzle + "' is too long (max 4 components)."));
+                diagnostics.push_back(reportError(node, DiagnosticCode::InvalidSwizzle, "Swizzle '" + swizzle + "' is too long (max 4 components)."));
                 return;
             }
 
@@ -604,10 +592,10 @@ void TypeCheckingVisitor::visit(MemberAccessNode* node)
                 if (hasXYZW && hasRGBA || hasXYZW && hasSTPQ || hasRGBA && hasSTPQ) 
                 {
                     GDSHADER_ERROR_IF(true, "Illegal swizzle '{}', mixed sets", swizzle);
-                    diagnostics.push_back(reportError(node, "Illegal swizzle '" + swizzle + "'. Cannot mix xyzw, rgba and stpq sets."));
+                    diagnostics.push_back(reportError(node, DiagnosticCode::InvalidSwizzle, "Illegal swizzle '" + swizzle + "'. Cannot mix xyzw, rgba and stpq sets."));
                 } else {
                     GDSHADER_ERROR_IF(true, "Invalid swizzle component in '{}'", swizzle);
-                    diagnostics.push_back(reportError(node, "Invalid swizzle component in '" + swizzle + "'."));
+                    diagnostics.push_back(reportError(node, DiagnosticCode::InvalidSwizzle, "Invalid swizzle component in '" + swizzle + "'."));
                 }
                 return;
             }
@@ -617,13 +605,13 @@ void TypeCheckingVisitor::visit(MemberAccessNode* node)
                 size_t componentIndex = currentSet.find(c);
                 if (componentIndex >= (size_t)baseT->componentCount) {
                     GDSHADER_ERROR_IF(true, "Swizzle component out of bounds");
-                    diagnostics.push_back(reportError(node, "Swizzle component '" + std::string(1, c) + "' is out of bounds for " + baseT->toString() + "."));
+                    diagnostics.push_back(reportError(node, DiagnosticCode::InvalidSwizzle, "Swizzle component '" + std::string(1, c) + "' is out of bounds for " + baseT->toString() + "."));
                     return;
                 }
             }
         }
         GDSHADER_ERROR_IF(true, "Invalid member '{}' on type '{}'", node->member, baseT->toString());
-        diagnostics.push_back(reportError(node, "Invalid member '" + node->member + "' on type '" + baseT->toString() + "'"));
+        diagnostics.push_back(reportError(node, DiagnosticCode::InvalidMemberAccess, "Invalid member '" + node->member + "' on type '" + baseT->toString() + "'."));
     }
 }
 
@@ -638,12 +626,12 @@ void TypeCheckingVisitor::visit(ArrayAccessNode* node)
 
     if (baseType->kind != TypeKind::ARRAY && baseType->kind != TypeKind::VECTOR && baseType->kind != TypeKind::MATRIX && baseType->kind != TypeKind::UNKNOWN) {
         GDSHADER_ERROR_IF(true, "Type '{}' is not indexable", baseType->toString());
-        diagnostics.push_back(reportError(node, "Type '" + baseType->toString() + "' is not indexable."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::NotIndexable, "Type '" + baseType->toString() + "' is not indexable."));
     }
 
     if (indexType->name != "int" && indexType->name != "uint" && indexType->kind != TypeKind::UNKNOWN) {
         GDSHADER_ERROR_IF(true, "Array index is not an integer");
-        diagnostics.push_back(reportError(node->index.get(), "Array index must be an integer."));
+        diagnostics.push_back(reportError(node->index.get(), DiagnosticCode::InvalidArrayIndex, "Array index must be an integer."));
     }
 }
 
@@ -857,7 +845,7 @@ const Symbol* TypeCheckingVisitor::findBestOverload(const FunctionCallNode* node
     
     if (isAmbiguous) {
         GDSHADER_ERROR_IF(true, "Ambiguous function call for '{}'", name);
-        diagnostics.push_back(reportError(node, "Ambiguous function call for '" + name + "'. Multiple overloads match these arguments."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::AmbiguousFunctionCall, "Ambiguous function call for '" + name + "'. Multiple overloads match these arguments."));
     }
     return bestMatch;
 }
@@ -878,9 +866,9 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
 
         if (node->arguments.size() != target->members.size()) {
             GDSHADER_ERROR_IF(true, "Struct constructor arg mismatch for '{}'", typeName);
-            diagnostics.push_back(reportError(node, "Constructor for '" + typeName + "' expects " + 
+            diagnostics.push_back(reportError(node, DiagnosticCode::ConstructorArgumentMismatch, "Constructor for '" + typeName + "' expects " + 
                         std::to_string(target->members.size()) + " arguments, but got " + 
-                        std::to_string(node->arguments.size())));
+                        std::to_string(node->arguments.size()) + "."));
             return;
         }
 
@@ -890,9 +878,9 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
 
             if (*argType != *expectedType) {
                 GDSHADER_ERROR_IF(true, "Struct constructor type mismatch for arg {}", i+1);
-                diagnostics.push_back(reportError(node->arguments[i].get(), 
+                diagnostics.push_back(reportError(node->arguments[i].get(), DiagnosticCode::TypeMismatch, 
                     "Type mismatch in struct constructor argument " + std::to_string(i+1) + 
-                    ". Expected '" + expectedType->toString() + "', found '" + argType->toString() + "'"));
+                    ". Expected '" + expectedType->toString() + "', found '" + argType->toString() + "'."));
             }
         }
         return;
@@ -909,24 +897,24 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
                 if (auto lit = dynamic_cast<const LiteralNode*>(arg.get())) {
                     if (lit->type == TokenType::TOKEN_STRING) {
                         GDSHADER_ERROR_IF(true, "Attempted to construct '{}' from string", typeName);
-                        diagnostics.push_back(reportError(arg.get(), "Cannot construct '" + typeName + "' from a string."));
+                        diagnostics.push_back(reportError(arg.get(), DiagnosticCode::CannotConstructType, "Cannot construct '" + typeName + "' from a string."));
                         continue;
                     }
                 }
                 GDSHADER_ERROR_IF(true, "Invalid argument type in vector constructor");
-                diagnostics.push_back(reportError(arg.get(), "Invalid argument type."));
+                diagnostics.push_back(reportError(arg.get(), DiagnosticCode::InvalidArgumentType, "Invalid argument type."));
                 continue; 
             }
 
             if (argT->name == "void") {
                 GDSHADER_ERROR_IF(true, "Attempted to use void in constructor");
-                diagnostics.push_back(reportError(arg.get(), "Cannot use 'void' expression in constructor."));
+                diagnostics.push_back(reportError(arg.get(), DiagnosticCode::CannotConstructType, "Cannot use 'void' expression in constructor."));
                 continue;
             }
             
             if (argT->kind != TypeKind::SCALAR && argT->kind != TypeKind::VECTOR) {
                 GDSHADER_ERROR_IF(true, "Invalid arg for vector constructor (needs scalar or vector)");
-                diagnostics.push_back(reportError(arg.get(), "Invalid argument for vector constructor. Expected Scalar or Vector."));
+                diagnostics.push_back(reportError(arg.get(), DiagnosticCode::InvalidArgumentType, "Invalid argument for vector constructor. Expected Scalar or Vector."));
                 continue; 
             }
 
@@ -937,8 +925,8 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
 
         if (provided != expected) {
             GDSHADER_ERROR_IF(true, "Component count mismatch in vector constructor (Expected: {}, Found: {})", expected, provided);
-            diagnostics.push_back(reportError(node, "Invalid constructor. Expected " + std::to_string(expected) + 
-                " components, but found " + std::to_string(provided)));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ConstructorArgumentMismatch, "Invalid constructor. Expected " + std::to_string(expected) + 
+                " components, but found " + std::to_string(provided) + "."));
         }
         return;
     }
@@ -954,7 +942,7 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
             TypePtr argT = resolveType(arg.get());
             if (argT == typeRegistry.getUnknownType() || argT == typeRegistry.getType("void")) {
                 GDSHADER_ERROR_IF(true, "Invalid matrix constructor argument");
-                diagnostics.push_back(reportError(arg.get(), "Invalid matrix constructor argument."));
+                diagnostics.push_back(reportError(arg.get(), DiagnosticCode::InvalidArgumentType, "Invalid matrix constructor argument."));
                 continue;
             }
 
@@ -965,34 +953,34 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
 
         if (provided < expected && provided < 50) {
             GDSHADER_ERROR_IF(true, "Not enough components for matrix constructor '{}'", typeName);
-            diagnostics.push_back(reportError(node, "Not enough components to construct '" + typeName + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ConstructorArgumentMismatch, "Not enough components to construct '" + typeName + "'."));
         }
     }
 
     if (target->kind == TypeKind::SCALAR) {
         if (typeName == "void") {
             GDSHADER_ERROR_IF(true, "Attempted to construct void");
-            diagnostics.push_back(reportError(node, "Cannot construct 'void'."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::CannotConstructType, "Cannot construct 'void'."));
             return;
         }
 
         bool isBasic = (typeName == "float" || typeName == "int" || typeName == "uint" || typeName == "bool");
         if (!isBasic) {
             GDSHADER_ERROR_IF(true, "Attempted to construct opaque type '{}'", typeName);
-            diagnostics.push_back(reportError(node, "Cannot construct opaque type '" + typeName + "'."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::CannotConstructType, "Cannot construct opaque type '" + typeName + "'."));
             return;
         }
 
         if (node->arguments.size() != 1) {
             GDSHADER_ERROR_IF(true, "Scalar constructor expects 1 argument");
-            diagnostics.push_back(reportError(node, "Scalar constructor expects exactly 1 argument."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ConstructorArgumentMismatch, "Scalar constructor expects exactly 1 argument."));
         }
 
         if (!node->arguments.empty()) {
             TypePtr argT = resolveType(node->arguments[0].get());
              if (argT->kind == TypeKind::UNKNOWN) {
                 GDSHADER_ERROR_IF(true, "Invalid argument in scalar constructor");
-                diagnostics.push_back(reportError(node->arguments[0].get(), "Invalid argument."));
+                diagnostics.push_back(reportError(node->arguments[0].get(), DiagnosticCode::InvalidArgumentType, "Invalid argument."));
             }
         }
         return;
@@ -1000,18 +988,18 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
 
     if (target->kind == TypeKind::SAMPLER) {
         GDSHADER_ERROR_IF(true, "Attempted to construct opaque sampler type '{}'", typeName);
-        diagnostics.push_back(reportError(node, "Samplers are opaque types and cannot be instantiated via constructors."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::CannotConstructType, "Samplers are opaque types and cannot be instantiated via constructors."));
         return;
     }
     
     GDSHADER_ERROR_IF(true, "Cannot construct type '{}'", typeName);
-    diagnostics.push_back(reportError(node, "Cannot construct type '" + typeName + "'."));
+    diagnostics.push_back(reportError(node, DiagnosticCode::CannotConstructType, "Cannot construct type '" + typeName + "'."));
 }
 
 void TypeCheckingVisitor::reportTypeMismatch(const ASTNode* node, const std::string& expected, const std::string& found) 
 {
     GDSHADER_ERROR_IF(true, "Type mismatch reported: Expected '{}', Found '{}'", expected, found);
-    diagnostics.push_back(reportError(node, "Type mismatch: Expected '" + expected + "', but found '" + found + "'."));
+    diagnostics.push_back(reportError(node, DiagnosticCode::TypeMismatch, "Type mismatch: Expected '" + expected + "', but found '" + found + "'."));
 }
 
 } // namespace gdshader_lsp

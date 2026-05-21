@@ -19,7 +19,7 @@ namespace gdshader_lsp
 enum class DiagnosticCode 
 {
     Unknown                 = 1,
-    
+
     // --- Lexical & Parsing Errors (1000 - 1999) ---
     UnexpectedToken         = 1000,
     MissingSemicolon        = 1001, // consume(..., "Expected ';'")
@@ -38,23 +38,62 @@ enum class DiagnosticCode
     OrphanedElif            = 1101, // "#elif without #if"
     OrphanedElse            = 1102, // "#else without #if"
     OrphanedEndif           = 1103, // "#endif without #if"
+    IncludeNotFound         = 1104,
+    MacroRedefinition       = 1105,
 
     // --- Semantic & Type Errors (2000 - 2999) ---
-    UndeclaredIdentifier    = 2000,
+    UndefinedIdentifier     = 2000,
     TypeMismatch            = 2001,
     InvalidOperation        = 2002,
+    MissingReturnValue      = 2003,
+    NotAllPathsReturn       = 2004,
+    BreakOutsideLoop        = 2005,
+    ContinueOutsideLoop     = 2006,
+    MissingExecutionBranch  = 2007,
+    SymbolRedefinition      = 2008,
+    UnknownType             = 2009,
+    ConditionMustBeBool         = 2010,
+    SwitchExpressionMustBeInt   = 2011,
+    VoidCannotReturnValue       = 2012,
+    NotAssignable               = 2013,
+    CannotAssignToReadOnly      = 2014,
+    DivisionByZero              = 2015,
+    BitwiseRequiresInteger      = 2016,
+    UnknownFunction             = 2017,
+    AmbiguousFunctionCall       = 2018,
+    InvalidArgumentCount        = 2019,
+    InvalidArgumentType         = 2020,
+    CannotConstructType         = 2021, // For opaque, void, or string attempts
+    ConstructorArgumentMismatch = 2022,
+    NotIndexable                = 2023,
+    InvalidArrayIndex           = 2024,
+    InvalidMemberAccess         = 2025,
+    InvalidSwizzle              = 2026,
 
     // --- Shader-Specific Constraints (3000 - 3999) ---
-    ExpectedShaderType      = 3000, // "Expected shader type identifier"
-    ExpectedRenderMode      = 3001, // "Expected render mode identifier"
-    InvalidTopLevelDecl     = 3002, // "Unexpected token at top level"
-    MissingUniformKeyword   = 3003, // "Expected 'uniform' after 'instance'"
-    MissingVaryingKeyword   = 3004, // "Expected 'varying' after 'flat'"
-    InvalidHintRange        = 3005, // "hint_range min > max"
+    ExpectedShaderType          = 3000, // "Expected shader type identifier"
+    ExpectedRenderMode          = 3001, // "Expected render mode identifier"
+    InvalidTopLevelDecl         = 3002, // "Unexpected token at top level"
+    MissingUniformKeyword       = 3003, // "Expected 'uniform' after 'instance'"
+    MissingVaryingKeyword       = 3004, // "Expected 'varying' after 'flat'"
+    InvalidHintRange            = 3005, // "hint_range min > max"
+    ProcessorMustReturnVoid     = 3006,
+    ProcessorCannotHaveArgs     = 3007,
+    RecursionNotAllowed         = 3008,
+    InvalidDiscardUsage         = 3010,
+    LocalSamplerNotAllowed      = 3011,
+    MissingOrUnknownShaderType  = 3012,
+    InvalidRenderModeScope      = 3013,
+    UnknownRenderMode           = 3014,
+    InvalidInstanceUniformType  = 3015,
+    IntegerVaryingNeedsFlat     = 3016,
+    VaryingReadOnlyInFragment   = 3017,
 
     // --- Warnings (4000 - 4999) ---
     UnusedVariable          = 4000,
     DeprecatedFeature       = 4001,
+    UnreachableCode         = 4002,
+    VariableShadowed        = 4003,
 
     // --- Hints (5000 - 5999) ---
     EmptyStatement          = 5000,
@@ -63,7 +102,7 @@ enum class DiagnosticCode
     IgnoredPrecision        = 6000
 };
 
-std::string diagnostic_code_to_string(DiagnosticCode code) 
+inline std::string diagnostic_code_to_string(DiagnosticCode code) 
 {
     // A buffer of 8 characters is sufficient for "GDS" + 4 digits + null terminator.
     char buffer[16];

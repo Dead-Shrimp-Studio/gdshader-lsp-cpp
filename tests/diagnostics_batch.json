@@ -588,7 +588,7 @@
             "    switch(1) {}",
             "}"
         ],
-        "expected_error": "require at least one execution path"
+        "expected_error": "require at least one case block"
     },
     {
         "name": "for_loop_condition_not_bool",

@@ -1,4 +1,3 @@
-
 #include "linting_visitor.hpp"
 #include "gdshader/ast/ast.h"
 #include "utils/logger.hpp"
@@ -43,11 +42,11 @@ void LintingVisitor::visit(FunctionNode* node)
     if (currentProcessorFunction != ShaderStage::Global) {
         if (node->returnType && node->returnType->baseName != "void") {
             GDSHADER_ERROR_IF(true, "Processor function '{}' does not return void", node->name);
-            diagnostics.push_back(reportError(node, "Processor function '" + node->name + "' must return 'void'."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ProcessorMustReturnVoid, "Processor function '" + node->name + "' must return 'void'."));
         }
         if (!node->parameters.empty()) {
             GDSHADER_ERROR_IF(true, "Processor function '{}' has arguments", node->name);
-            diagnostics.push_back(reportError(node, "Processor function '" + node->name + "' must not have arguments."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::ProcessorCannotHaveArgs, "Processor function '" + node->name + "' must not have arguments."));
         }
     }
 
@@ -58,10 +57,10 @@ void LintingVisitor::visit(FunctionNode* node)
     if (node->returnType && node->returnType->baseName != "void") {
         if (!currentFunctionHasReturn) {
             GDSHADER_ERROR_IF(true, "Function '{}' missing return value", node->name);
-            diagnostics.push_back(reportError(node, "Function '" + node->name + "' must return a value."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::MissingReturnValue, "Function '" + node->name + "' must return a value."));
         } else if (!allPathsReturn(node->body.get())) {
             GDSHADER_ERROR_IF(true, "Not all paths return a value in '{}'", node->name);
-            diagnostics.push_back(reportError(node, "Not all code paths return a value in function '" + node->name + "'."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::NotAllPathsReturn, "Not all code paths return a value in function '" + node->name + "'."));
         }
     }
 
@@ -80,7 +79,7 @@ void LintingVisitor::visit(BlockNode* node)
     {
         if (unreachable) {
             GDSHADER_WARN_IF(true, "Unreachable code detected in block");
-            diagnostics.push_back(reportWarning(stmt.get(), "Unreachable code detected."));
+            diagnostics.push_back(reportWarning(stmt.get(), DiagnosticCode::UnreachableCode, "Unreachable code detected."));
         }
 
         if (stmt) stmt->accept(*this);
@@ -104,7 +103,7 @@ void LintingVisitor::visit(BlockNode* node)
             if (!sym) continue;
             if (sym->category == SymbolType::Variable && sym->references.empty()) {
                 GDSHADER_WARN_IF(true, "Unused variable '{}'", varDecl->name);
-                diagnostics.push_back(reportWarning(varDecl, "Unused variable '" + varDecl->name + "'"));
+                diagnostics.push_back(reportWarning(varDecl, DiagnosticCode::UnusedVariable, "Unused variable '" + varDecl->name + "'."));
             }
         }
     }
@@ -123,18 +122,18 @@ void LintingVisitor::visit(DiscardNode* node)
     GDSHADER_RETURN_IF(!node, "DiscardNode is null");
     if (currentProcessorFunction == ShaderStage::Vertex || currentProcessorFunction == ShaderStage::Light) {
         GDSHADER_ERROR_IF(true, "Invalid discard in vertex/light processor");
-        diagnostics.push_back(reportError(node, "'discard' cannot be used in the vertex or light processor."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::InvalidDiscardUsage, "'discard' cannot be used in the vertex or light processor."));
     }
 }
 
 void gdshader_lsp::LintingVisitor::visit(BreakNode *node)
 {
-    if (loopDepth == 0) diagnostics.push_back(reportError(node, "Break statement outside of loop."));
+    if (loopDepth == 0) diagnostics.push_back(reportError(node, DiagnosticCode::BreakOutsideLoop, "Break statement outside of loop."));
 }
 
 void LintingVisitor::visit(ContinueNode* node) 
 {
-    if (loopDepth == 0) diagnostics.push_back(reportError(node, "Continue statement outside of loop."));
+    if (loopDepth == 0) diagnostics.push_back(reportError(node, DiagnosticCode::ContinueOutsideLoop, "Continue statement outside of loop."));
 }
 
 void LintingVisitor::visit(FunctionCallNode* node) 
@@ -144,7 +143,7 @@ void LintingVisitor::visit(FunctionCallNode* node)
     if (node->functionName == currentFunctionName) 
     {
         GDSHADER_ERROR_IF(true, "Recursion detected: '{}' calls itself", node->functionName);
-        diagnostics.push_back(reportError(node, "Recursion is not allowed in shaders (function '" + node->functionName + "' calls itself)."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::RecursionNotAllowed, "Recursion is not allowed in shaders (function '" + node->functionName + "' calls itself)."));
     }
 
     for (const auto& arg : node->arguments) 
@@ -161,7 +160,6 @@ void LintingVisitor::visit(IfNode* node)
 {
     GDSHADER_RETURN_IF(!node, "IfNode is null");
 
-    // Checked the condition validity in type checking already
     if (node->condition) node->condition->accept(*this);
 
     if (node->thenBranch)
@@ -170,7 +168,7 @@ void LintingVisitor::visit(IfNode* node)
     } else 
     {
         GDSHADER_ERROR_IF(true, "If statement missing execution branch");
-        diagnostics.push_back(reportError(node, "If statements require at least one execution path (missing branch)."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::MissingExecutionBranch, "If statements require at least one execution path (missing branch)."));
     }
     if (node->elseBranch) node->elseBranch->accept(*this);
 }
@@ -189,7 +187,7 @@ void LintingVisitor::visit(WhileNode* node)
     } else 
     {
         GDSHADER_ERROR_IF(true, "While statement missing body");
-        diagnostics.push_back(reportError(node, "while statement require at least one execution path (missing branch)."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::MissingExecutionBranch, "While statements require a body."));
     }
 }
 
@@ -209,7 +207,7 @@ void LintingVisitor::visit(ForNode* node)
     } else 
     {
         GDSHADER_ERROR_IF(true, "For statement missing body");
-        diagnostics.push_back(reportError(node, "for statement require at least one execution path (missing branch)."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::MissingExecutionBranch, "For statements require a body."));
     }
 }
 
@@ -227,7 +225,7 @@ void LintingVisitor::visit(DoWhileNode* node)
     } else
     {
         GDSHADER_ERROR_IF(true, "Do-while statement missing body");
-        diagnostics.push_back(reportError(node, "do-while statement require at least one execution path (missing branch)."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::MissingExecutionBranch, "Do-while statements require a body."));
     }
 }
 
@@ -240,7 +238,7 @@ void LintingVisitor::visit(SwitchNode* node)
     if (node->cases.empty())
     {
         GDSHADER_ERROR_IF(true, "Switch statement missing cases");
-        diagnostics.push_back(reportError(node, "switch statement require at least one execution path (missing branch)."));
+        diagnostics.push_back(reportError(node, DiagnosticCode::MissingExecutionBranch, "Switch statements require at least one case block."));
     }
 
     for (const auto& c : node->cases) {

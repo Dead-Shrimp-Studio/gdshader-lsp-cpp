@@ -1023,6 +1023,7 @@ void GdShaderServer::registerHandlers() {
         }
     );
 
+    // --- FEATURE: DODCUMENT COLOR
     handler.add<lsp::requests::TextDocument_DocumentColor>(
         [this](lsp::requests::TextDocument_DocumentColor::Params&& params) -> lsp::requests::TextDocument_DocumentColor::Result
         {
@@ -1445,10 +1446,20 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
     for (const auto& err : errors) {
 
         lsp::DiagnosticSeverity severity;
-        if (err.level == DiagnosticLevel::Warning) {
-            severity = lsp::DiagnosticSeverity::Warning;
-        } else {
-            severity = lsp::DiagnosticSeverity::Error;
+        switch (err.level) {
+            case DiagnosticLevel::Warning:
+                severity = lsp::DiagnosticSeverity::Warning;
+                break;
+            case DiagnosticLevel::Information:
+                severity = lsp::DiagnosticSeverity::Information;
+                break;
+            case DiagnosticLevel::Hint:
+                severity = lsp::DiagnosticSeverity::Hint;
+                break;
+            case DiagnosticLevel::Error:
+            default:
+                severity = lsp::DiagnosticSeverity::Error;
+                break;
         }
 
         lspDiagnostics.push_back(lsp::Diagnostic{
@@ -1458,7 +1469,8 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
             },
             .message = err.message,
             .severity = severity,
-            .source = "gdshader"
+            .code = err.code,
+            .source = err.source
         });
     }
 
