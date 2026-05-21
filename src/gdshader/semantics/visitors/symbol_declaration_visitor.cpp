@@ -1,4 +1,3 @@
-
 #include "gdshader/ast/ast.h"
 #include "gdshader/semantics/visitors/symbol_declaration_visitor.hpp"
 #include "utils/logger.hpp"
@@ -116,7 +115,7 @@ namespace gdshader_lsp {
 
         TypePtr type = resolveTypeFromNode(node->type.get());
         if (type->kind == TypeKind::SAMPLER) {
-            diagnostics.push_back(reportError(node, "Samplers must be declared as uniform, cannot be local."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::LocalSamplerNotAllowed, "Samplers must be declared as uniform, cannot be local."));
         }
 
         Mutability mut = node->isConst ? Mutability::ReadOnly : Mutability::Mutable;
@@ -125,10 +124,10 @@ namespace gdshader_lsp {
 
         if (symbols.lookup(node->name)) {
             if (symbols.add(s)) {
-                diagnostics.push_back(reportWarning(node, "Variable '" + node->name + "' shadows an existing declaration.")); 
-                GDSHADER_WARN_IF(true, "Variable shadowed: {}", node->name); // Log shadow instances to the server
+                diagnostics.push_back(reportWarning(node, DiagnosticCode::VariableShadowed, "Variable '" + node->name + "' shadows an existing declaration.")); 
+                GDSHADER_WARN_IF(true, "Variable shadowed: {}", node->name); 
             } else {
-                diagnostics.push_back(reportError(node, "Redefinition of variable '" + node->name + "' in the same scope."));
+                diagnostics.push_back(reportError(node, DiagnosticCode::SymbolRedefinition, "Redefinition of variable '" + node->name + "' in the same scope."));
             }
         } else {
             symbols.add(s);
@@ -153,14 +152,14 @@ namespace gdshader_lsp {
 
         if (!symbols.add(s)) 
         {
-            diagnostics.push_back(reportError(node, "Redefinition of function '" + node->name + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::SymbolRedefinition, "Redefinition of function '" + node->name + "'"));
         }
         
         symbols.pushScope(node->range.startLine);
 
         if (currentShaderType == ShaderType::Unknown)
         {
-            diagnostics.push_back(reportError(node, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::MissingOrUnknownShaderType, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
         }
 
         loadBuiltinsForFunction(node->name);
@@ -189,7 +188,7 @@ namespace gdshader_lsp {
             members.push_back({m->name, memberType});
 
             if (memberType->kind == TypeKind::UNKNOWN) {
-                diagnostics.push_back(reportError(node, "Undefined type in struct member '" + m->name + "'."));
+                diagnostics.push_back(reportError(node, DiagnosticCode::UnknownType, "Undefined type in struct member '" + m->name + "'."));
             }
         }
 
@@ -197,7 +196,7 @@ namespace gdshader_lsp {
         TypePtr structType = typeRegistry.getType(node->name);
 
         Symbol s = symbols.createSymbol(node->name, structType, SymbolType::Struct, node->range, Mutability::Mutable, nullptr, {}, {}, false, currentFilePath);
-        if (!symbols.add(s)) diagnostics.push_back(reportError(node, "Redefinition of struct '" + s.name + "'"));
+        if (!symbols.add(s)) diagnostics.push_back(reportError(node, DiagnosticCode::SymbolRedefinition, "Redefinition of struct '" + s.name + "'"));
     }
 
     void SymbolDeclarationVisitor::visit(ShaderTypeNode* node) 
@@ -211,7 +210,7 @@ namespace gdshader_lsp {
         else {
             currentShaderType = ShaderType::Unknown;
             GDSHADER_ERROR_IF(true, "Unknown shader type encountered: {}", node->shaderType);
-            diagnostics.push_back(reportError(node, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::MissingOrUnknownShaderType, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
         }
         loadGlobalVariables();
     }
@@ -225,7 +224,7 @@ namespace gdshader_lsp {
         
         if (is_not_spatial)
         {
-            diagnostics.push_back(reportError(node, "render_mode declarations are only valid in spatial type shaders."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidRenderModeScope, "render_mode declarations are only valid in spatial type shaders."));
         }
 
         for (const std::string& mode : node->modes)
@@ -235,7 +234,7 @@ namespace gdshader_lsp {
             
             if (is_unknown)
             {
-                diagnostics.push_back(reportError(node, "Unknown render_mode: " + mode));
+                diagnostics.push_back(reportError(node, DiagnosticCode::UnknownRenderMode, "Unknown render_mode: " + mode));
             }
         }
     }
@@ -246,14 +245,14 @@ namespace gdshader_lsp {
         TypePtr type = resolveTypeFromNode(node->type.get());
 
         if (node->isInstance && type->kind == TypeKind::SAMPLER) {
-            diagnostics.push_back(reportError(node, "Instance uniforms cannot be opaque types (like samplers)."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidInstanceUniformType, "Instance uniforms cannot be opaque types (like samplers)."));
         }
 
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Uniform, node->range, Mutability::ReadOnly, nullptr, {}, {}, false, currentFilePath);
         s.hint = node->hint;
 
         if (!symbols.add(s)) {
-            diagnostics.push_back(reportError(node, "Redefinition of uniform '" + s.name + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::SymbolRedefinition, "Redefinition of uniform '" + s.name + "'"));
         }
         
         if (node->defaultValue) {
@@ -268,12 +267,12 @@ namespace gdshader_lsp {
         
         bool isInt = (type == typeRegistry.getType("int") || type == typeRegistry.getType("uint"));
         if (isInt && node->interpolation != "flat") {
-            diagnostics.push_back(reportError(node, "Integer varyings must use 'flat' interpolation."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::IntegerVaryingNeedsFlat, "Integer varyings must use 'flat' interpolation."));
         }
 
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Varying, node->range, Mutability::ReadOnly, nullptr, {}, {}, false, currentFilePath);        
         if (!symbols.add(s)) {
-            diagnostics.push_back(reportError(node, "Redefinition of varying '" + s.name + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::SymbolRedefinition, "Redefinition of varying '" + s.name + "'"));
         }
     }
 
@@ -284,7 +283,7 @@ namespace gdshader_lsp {
         Symbol s = symbols.createSymbol(node->name, type, SymbolType::Variable, node->range, Mutability::ReadOnly, nullptr, {}, {}, false, currentFilePath);
         
         if (!symbols.add(s)) {
-            diagnostics.push_back(reportError(node, "Redefinition of const '" + s.name + "'"));
+            diagnostics.push_back(reportError(node, DiagnosticCode::SymbolRedefinition, "Redefinition of const '" + s.name + "'"));
         }
 
         if (node->value) {

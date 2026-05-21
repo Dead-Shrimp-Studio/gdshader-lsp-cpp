@@ -1,4 +1,3 @@
-
 #include "gdshader/semantics/visitors/preprocessor_visitor.hpp"
 
 #include "gdshader/ast/ast.h"
@@ -53,7 +52,7 @@ void PreprocessorVisitor::visit(IncludeNode* node)
     auto exportedSymbols = pm->getExports(absPath);
 
     if (!exportedSymbols) {
-        diagnostics.push_back(reportError(node, "Could not load include: " + node->path + " (not found or cyclic include)"));
+        diagnostics.push_back(reportError(node, DiagnosticCode::IncludeNotFound, "Could not load include: " + node->path + " (not found or cyclic include)"));
         return;
     }
 
@@ -64,7 +63,7 @@ void PreprocessorVisitor::visit(IncludeNode* node)
             if (sym.category == SymbolType::Builtin || sym.source_path == "builtin" || sym.source_path.empty()) continue;
 
             if (!symbols.add(sym)) {
-                diagnostics.push_back(reportError(node, "Symbol '" + name + "' imported from " + node->path + " conflicts with existing symbol."));
+                diagnostics.push_back(reportError(node, DiagnosticCode::SymbolRedefinition, "Symbol '" + name + "' imported from " + node->path + " conflicts with existing symbol."));
             }
 
             if (sym.category == SymbolType::Struct) {
@@ -84,7 +83,7 @@ void PreprocessorVisitor::visit(DefineNode* node)
         s.hint = "Macro definition";
         
         if (!symbols.add(s)) {
-            diagnostics.push_back(reportWarning(node, "Macro redefinition"));
+            diagnostics.push_back(reportWarning(node, DiagnosticCode::MacroRedefinition, "Macro redefinition"));
         }
 
     } else {
