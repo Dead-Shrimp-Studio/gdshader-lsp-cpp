@@ -61,7 +61,7 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
 
                 return node;
             } else {
-                reportError("Expected string literal after #include");
+                reportError(DiagnosticCode::ExpectedStringLiteral, "Expected string literal after #include");
                 return nullptr;
             }
         }
@@ -86,7 +86,7 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
 
         else if (directive == "elif") {
              if (preprocessorStack.empty()) {
-                reportError("#elif without #if");
+                reportError(DiagnosticCode::OrphanedElif, "#elif without #if");
             } else {
                 // Logic: If the previous #if was TRUE, we are currently parsing.
                 // We must now SKIP this #elif block regardless of condition.
@@ -124,7 +124,7 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
         // --- #else ---
         else if (directive == "else") {
             if (preprocessorStack.empty()) {
-                reportError("#else without #if");
+                reportError(DiagnosticCode::OrphanedElse, "#else without #if");
                 return nullptr;
             }
             
@@ -142,7 +142,7 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parsePreprocessor()
         // --- #endif ---
         else if (directive == "endif") {
             if (preprocessorStack.empty()) {
-                reportError("#endif without #if");
+                reportError(DiagnosticCode::OrphanedEndif, "#endif without #if");
             } else {
                 preprocessorStack.pop_back();
             }
@@ -189,13 +189,13 @@ bool gdshader_lsp::Parser::evaluatePreprocessorExpression()
     // Handle "defined(X)"
     if (current_token.value == "defined") {
         advance();
-        consume(TokenType::TOKEN_LPAREN, "Expected '(' after defined");
+        consume(TokenType::TOKEN_LPAREN, DiagnosticCode::UnmatchedParen, "Expected '(' after defined");
         if (check(TokenType::TOKEN_IDENTIFIER)) {
             std::string name = current_token.value;
             result = (activeDefines.count(name) > 0);
             advance();
         }
-        consume(TokenType::TOKEN_RPAREN, "Expected ')'");
+        consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')'");
     } 
     // Handle boolean literals
     else if (current_token.type == TokenType::KEYWORD_TRUE) {

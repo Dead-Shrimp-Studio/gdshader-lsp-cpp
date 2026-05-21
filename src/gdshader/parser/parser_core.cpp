@@ -47,17 +47,17 @@ void Parser::advance()
         }
 
         if (current_token.type != TokenType::TOKEN_ERROR) break;
-        reportErrorAt(current_token, "Lexical error: " + current_token.value);
+        reportErrorAt(current_token, DiagnosticCode::UnexpectedToken, "Lexical error: " + current_token.value);
     }
 }
 
-void Parser::consume(TokenType type, const std::string& message) 
+void Parser::consume(TokenType type, DiagnosticCode code, const std::string& message) 
 {
     if (current_token.type == type) {
         advance();
         return;
     }
-    reportError(message);
+    reportError(code, message);
 }
 
 bool Parser::match(TokenType type) 
@@ -74,18 +74,41 @@ bool Parser::check(TokenType type)
     return current_token.type == type;
 }
 
-void Parser::reportError(const std::string& message) 
+void Parser::reportDiagnosticAt(const Token& token, DiagnosticCode code, DiagnosticLevel level, const std::string& message)
 {
-    reportErrorAt(current_token, message);
+    if (panicMode && level == DiagnosticLevel::Error) return;
+    if (level == DiagnosticLevel::Error) panicMode = true;
+    
+    Diagnostic dg(code, message, level);
+    dg.range = {token.line, token.column, token.line, token.column + token.length};
+    
+    diagnostics.push_back(dg);
+    SPDLOG_DEBUG("Diagnostic [{}] at {}:{}: {}", dg.code, token.line, token.column, message);
 }
 
-void Parser::reportErrorAt(const Token& token, const std::string& message) 
+void Parser::reportError(DiagnosticCode code, const std::string& message) 
 {
-    if (panicMode) return; // Suppress cascade errors
-    panicMode = true;
-    
-    SPDLOG_DEBUG("Parse Error at {}:{}: {}", token.line, token.column, message);
-    diagnostics.push_back({message, DiagnosticLevel::Error, {token.line, token.column, token.line, token.column + token.length}});
+    reportDiagnosticAt(current_token, code, DiagnosticLevel::Error, message);
+}
+
+void Parser::reportErrorAt(const Token& token, DiagnosticCode code, const std::string& message) 
+{
+    reportDiagnosticAt(token, code, DiagnosticLevel::Error, message);
+}
+
+void Parser::reportWarning(DiagnosticCode code, const std::string& message)
+{
+    reportDiagnosticAt(current_token, code, DiagnosticLevel::Warning, message);
+}
+
+void Parser::reportHint(DiagnosticCode code, const std::string& message)
+{
+    reportDiagnosticAt(current_token, code, DiagnosticLevel::Hint, message);
+}
+
+void Parser::reportInformation(DiagnosticCode code, const std::string& message)
+{
+    reportDiagnosticAt(current_token, code, DiagnosticLevel::Information, message);
 }
 
 void Parser::synchronize() 
@@ -173,6 +196,8 @@ std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
     // 1. Optional Precision (highp/lowp) - mostly ignored in Godot but valid syntax
     if (match(TokenType::KEYWORD_HIGH_PRECISION)) {
         node->precision = previous_token.value;
+        reportInformation(DiagnosticCode::IgnoredPrecision, 
+            "Precision qualifiers ('" + node->precision + "') are ignored in GDShader.");
     }
 
     // 2. Base Type Name
@@ -187,7 +212,7 @@ std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
 
         advance(); // Consume the type keyword/identifier
     } else {
-        reportError("Expected type specifier.");
+        reportError(DiagnosticCode::ExpectedTypeSpecifier, "Expected type specifier.");
     }
 
     // 3. Array Dimensions: float[5][3]
@@ -197,13 +222,13 @@ std::unique_ptr<TypeNode> gdshader_lsp::Parser::parseType()
                 int size = std::stoi(previous_token.value);
                 node->arraySizes.push_back(size);
             } catch (...) {
-                reportError("Array dimension specifier must be a integer value.");
+                reportError(DiagnosticCode::InvalidArraySize, "Array dimension specifier must be a integer value.");
                 node->arraySizes.push_back(0); // Error fallback
             }
         } else {
-            reportError("Expected array size. Must be an integer value.");
+            reportError(DiagnosticCode::InvalidArraySize, "Expected array size. Must be an integer value.");
         }
-        consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
+        consume(TokenType::TOKEN_RBRACKET, DiagnosticCode::UnmatchedBracket, "Expected ']'");
     }
 
     setRange(node.get(), start, previous_token);

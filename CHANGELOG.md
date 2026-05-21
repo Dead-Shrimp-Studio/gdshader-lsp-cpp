@@ -15,8 +15,10 @@ New features: Code formatting, cross-file symbol renaming, and more!
   - Cross-file symbol renaming
   - Code formatting
   - Workspace Symbol search
+  - Call hierarchy
   - Primitive Code Actions
 
+- Fastly improved diagnostic error codes
 - Improved support for windows named pipes as communication protocol
 
 - Tests for all of the above

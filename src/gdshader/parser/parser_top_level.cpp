@@ -20,7 +20,7 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
 
         if (match(TokenType::KEYWORD_INSTANCE)) {
             Token start = previous_token; // Capture 'instance'
-            consume(TokenType::KEYWORD_UNIFORM, "Expected 'uniform' after 'instance'");
+            consume(TokenType::KEYWORD_UNIFORM, DiagnosticCode::UnexpectedToken, "Expected 'uniform' after 'instance'");
             auto node = parseUniform();
             if (auto* uniNode = dynamic_cast<UniformNode*>(node.get())) {
                 uniNode->isInstance = true; 
@@ -34,7 +34,7 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
         if (match(TokenType::KEYWORD_FLAT) || match(TokenType::KEYWORD_SMOOTH)) {
             Token start = previous_token; // Capture 'flat'/'smooth'
             std::string interp = previous_token.value;
-            consume(TokenType::KEYWORD_VARYING, "Expected 'varying' after interpolation qualifier");
+            consume(TokenType::KEYWORD_VARYING, DiagnosticCode::UnexpectedToken, "Expected 'varying' after interpolation qualifier");
             auto node = parseVarying();
             if (auto* varNode = dynamic_cast<VaryingNode*>(node.get())) {
                 varNode->interpolation = interp; 
@@ -46,7 +46,7 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
         }
         
         if (match(TokenType::KEYWORD_IN) || match(TokenType::KEYWORD_OUT) || match(TokenType::KEYWORD_INOUT)) {
-            reportError("Expected return type for function declaration.");
+            reportError(DiagnosticCode::UnexpectedToken, "Expected return type for function declaration.");
             return nullptr;
         }
         if (match(TokenType::KEYWORD_VARYING))          return parseVarying();
@@ -57,7 +57,7 @@ std::unique_ptr<ASTNode> Parser::parseTopLevelDecl()
             return parseTypeIdentifierDecl();
         }
 
-        reportError("Unexpected token at top level: " + current_token.value);
+        reportError(DiagnosticCode::UnexpectedToken, "Unexpected token at top level: " + current_token.value);
         advance();
         return nullptr;
 
@@ -76,9 +76,9 @@ std::unique_ptr<ASTNode> Parser::parseShaderType()
         node->shaderType = current_token.value;
         advance();
     } else {
-        reportError("Expected shader type identifier (e.g. spatial)");
+        reportError(DiagnosticCode::ExpectedShaderType, "Expected shader type identifier (e.g. spatial)");
     }
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after shader_type");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after shader_type");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -94,11 +94,11 @@ std::unique_ptr<ASTNode> Parser::parseRenderMode()
             node->modes.push_back(current_token.value);
             advance();
         } else {
-            reportError("Expected render mode identifier");
+            reportError(DiagnosticCode::ExpectedRenderMode, "Expected render mode identifier");
         }
     } while (match(TokenType::TOKEN_COMMA));
 
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after render_mode");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after render_mode");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -120,14 +120,14 @@ std::unique_ptr<ASTNode> gdshader_lsp::Parser::parseGroupUniform()
                 node->name += current_token.value;
                 advance();
             } else {
-                reportError("Expected identifier after '.' in group name");
+                reportError(DiagnosticCode::ExpectedIdentifier, "Expected identifier after '.' in group name");
             }
         }
     } else {
-        reportError("Expected identifier");
+        reportError(DiagnosticCode::ExpectedIdentifier, "Expected identifier");
     }
 
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after group_uniforms");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after group_uniforms");
     setRange(node.get(), start, previous_token);
     
     return node;
@@ -153,7 +153,7 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
         node->nameRange.endCol = previous_token.column + previous_token.length;
         advance();
     } else {
-        reportError("Expected uniform name");
+        reportError(DiagnosticCode::ExpectedIdentifier, "Expected uniform name");
     }
 
     // Hint:  : hint_range(0, 1), source_color, filter_linear
@@ -206,7 +206,7 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
                 }
                 
                 if (!current_arg.empty()) args.push_back(current_arg);
-                consume(TokenType::TOKEN_RPAREN, "Expected ')' after hint arguments");
+                consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')' after hint arguments");
                 node->hint += ")";
 
                 if (hint_name == "hint_range" && args.size() >= 2) {
@@ -214,7 +214,7 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
                         float min_val = std::stof(args[0]);
                         float max_val = std::stof(args[1]);
                         if (min_val > max_val) {
-                            reportError("hint_range min value must not be greater than max value.");
+                            reportWarning(DiagnosticCode::InvalidHintRange, "hint_range min value must not be greater than max value.");
                         }
                     } catch (...) {} // Ignore parsing failures if they aren't numbers
                 }
@@ -230,7 +230,7 @@ std::unique_ptr<ASTNode> Parser::parseUniform()
         node->defaultValue = parseExpression();
     }
 
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after uniform declaration");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after uniform declaration");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -251,9 +251,9 @@ std::unique_ptr<ASTNode> Parser::parseVarying()
         node->nameRange.endCol = previous_token.column + previous_token.length;
         advance();
     } else {
-        reportError("Expected varying name");
+        reportError(DiagnosticCode::ExpectedIdentifier, "Expected varying name");
     }
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after varying");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after varying");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -274,13 +274,13 @@ std::unique_ptr<ASTNode> Parser::parseConst()
         node->nameRange.endCol = previous_token.column + previous_token.length;
         advance();
     } else {
-        reportError("Expected const name");
+        reportError(DiagnosticCode::ExpectedIdentifier, "Expected const name");
     }
 
-    consume(TokenType::TOKEN_EQUAL, "Const requires an initialization value");
+    consume(TokenType::TOKEN_EQUAL, DiagnosticCode::ExpectedInitialization, "Const requires an initialization value");
     node->value = parseExpression();
 
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after const declaration");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after const declaration");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -311,10 +311,10 @@ std::unique_ptr<ASTNode> Parser::parseStruct()
         node->nameRange.endCol    = current_token.column + current_token.length;
         advance();
     } else {
-        reportError("Expected struct name");
+        reportError(DiagnosticCode::ExpectedIdentifier, "Expected struct name");
     }
 
-    consume(TokenType::TOKEN_LBRACE, "Expected '{' before struct body");
+    consume(TokenType::TOKEN_LBRACE, DiagnosticCode::UnmatchedBrace, "Expected '{' before struct body");
 
     while (!check(TokenType::TOKEN_RBRACE) && !check(TokenType::TOKEN_EOF)) {
         Token memberStart = current_token;
@@ -332,16 +332,16 @@ std::unique_ptr<ASTNode> Parser::parseStruct()
 
             advance();
         } else {
-            reportError("Expected struct member name");
+            reportError(DiagnosticCode::ExpectedIdentifier, "Expected struct member name");
         }
 
-        consume(TokenType::TOKEN_SEMI, "Expected ';' after struct member");
+        consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after struct member");
 
         setRange(member.get(), memberStart, previous_token);
         node->members.push_back(std::move(member));
     }
-    consume(TokenType::TOKEN_RBRACE, "Expected '}' after struct body");
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after struct definition");
+    consume(TokenType::TOKEN_RBRACE, DiagnosticCode::UnmatchedBrace, "Expected '}' after struct body");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after struct definition");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -371,18 +371,18 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl()
             if (match(TokenType::TOKEN_NUMBER)) {
                 try {
                     int size = std::stoi(previous_token.value);
-                    if (size <= 0) reportError("Array size must be greater than 0.");
+                    if (size <= 0) reportError(DiagnosticCode::InvalidArraySize, "Array size must be greater than 0.");
                 } catch (...) {
-                    reportError("Array size must be a valid integer.");
+                    reportError(DiagnosticCode::InvalidArraySize, "Array size must be a valid integer.");
                 }
             } else {
-                reportError("Expected array size.");
+                reportError(DiagnosticCode::InvalidArraySize, "Expected array size.");
             }
-            consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
+            consume(TokenType::TOKEN_RBRACKET, DiagnosticCode::UnmatchedBracket, "Expected ']'");
         }
 
     } else {
-        reportError("Expected identifier after type");
+        reportError(DiagnosticCode::ExpectedIdentifier, "Expected identifier after type");
         return nullptr;
     }
 
@@ -405,7 +405,7 @@ std::unique_ptr<ASTNode> Parser::parseTypeIdentifierDecl()
         if (match(TokenType::TOKEN_EQUAL)) {
             varNode->initializer = parseExpression();
         }
-        consume(TokenType::TOKEN_SEMI, "Expected ';' after variable declaration");
+        consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after variable declaration");
 
         setRange(varNode.get(), start, previous_token);
         return varNode;
@@ -438,7 +438,7 @@ std::unique_ptr<FunctionNode> Parser::parseFunction(std::unique_ptr<TypeNode> re
         }
     }
 
-    consume(TokenType::TOKEN_LPAREN, "Expected '('");
+    consume(TokenType::TOKEN_LPAREN, DiagnosticCode::UnmatchedParen, "Expected '('");
 
     // Parse Arguments
     if (!check(TokenType::TOKEN_RPAREN)) {
@@ -470,13 +470,13 @@ std::unique_ptr<FunctionNode> Parser::parseFunction(std::unique_ptr<TypeNode> re
         } while (match(TokenType::TOKEN_COMMA));
     }
 
-    consume(TokenType::TOKEN_RPAREN, "Expected ')'");
+    consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')'");
 
     if (check(TokenType::TOKEN_LBRACE)) {
         node->body = parseBlock();
         node->is_function_definition = true;
     } else {
-        consume(TokenType::TOKEN_SEMI, "Expected body or ';'");
+        consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected body or ';'");
     }
 
     Token endToken = previous_token;
@@ -500,7 +500,7 @@ std::unique_ptr<BlockNode> Parser::parseBlock()
         }
     }
 
-    consume(TokenType::TOKEN_LBRACE, "Expected '{'");
+    consume(TokenType::TOKEN_LBRACE, DiagnosticCode::UnmatchedBrace, "Expected '{'");
     
     while (!check(TokenType::TOKEN_RBRACE) && !check(TokenType::TOKEN_EOF)) 
     {
@@ -517,12 +517,12 @@ std::unique_ptr<BlockNode> Parser::parseBlock()
             current_token.column == startToken.column && 
             current_token.type != TokenType::TOKEN_EOF) {
             
-            reportError("Parser stuck on '" + current_token.value + "'. Skipping.");
+            reportError(DiagnosticCode::Unknown, "Parser stuck on '" + current_token.value + "'. Skipping.");
             advance(); 
         }
     }
     
-    consume(TokenType::TOKEN_RBRACE, "Expected '}'");
+    consume(TokenType::TOKEN_RBRACE, DiagnosticCode::UnmatchedBrace, "Expected '}'");
     setRange(node.get(), start, previous_token);
     return node;
 }

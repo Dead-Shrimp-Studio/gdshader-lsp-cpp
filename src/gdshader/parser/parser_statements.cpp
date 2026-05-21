@@ -22,7 +22,7 @@ std::unique_ptr<StatementNode> Parser::parseStatement()
 
         Token start = previous_token;
         auto node = std::make_unique<DiscardNode>();
-        consume(TokenType::TOKEN_SEMI, "Expected ';'");
+        consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';'");
 
         setRange(node.get(), start, previous_token);
         return node;
@@ -62,19 +62,19 @@ std::unique_ptr<StatementNode> Parser::parseVarDecl()
             if (match(TokenType::TOKEN_NUMBER)) {
                 try {
                     int size = std::stoi(previous_token.value);
-                    if (size <= 0) reportError("Array size must be greater than 0.");
+                    if (size <= 0) reportError(DiagnosticCode::InvalidArraySize, "Array size must be greater than 0.");
                     node->type->arraySizes.push_back(size);
                 } catch (...) {
-                    reportError("Array size must be a valid integer.");
+                    reportError(DiagnosticCode::InvalidArraySize, "Array size must be a valid integer.");
                 }
             } else {
-                reportError("Expected array size.");
+                reportError(DiagnosticCode::InvalidArraySize, "Expected array size.");
             }
-            consume(TokenType::TOKEN_RBRACKET, "Expected ']'");
+            consume(TokenType::TOKEN_RBRACKET, DiagnosticCode::UnmatchedBracket, "Expected ']'");
         }
 
     } else {
-        reportError("Expected variable name, got '" + current_token.value + "'");
+        reportError(DiagnosticCode::ExpectedIdentifier, "Expected variable name, got '" + current_token.value + "'");
 
         node->nameRange.startLine = current_token.line;
         node->nameRange.startCol = current_token.column;
@@ -92,7 +92,7 @@ std::unique_ptr<StatementNode> Parser::parseVarDecl()
         node->initializer = parseExpression();
     }
 
-    consume(TokenType::TOKEN_SEMI, "Expected ';'");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';'");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -103,9 +103,9 @@ std::unique_ptr<StatementNode> Parser::parseIf()
     Token start = current_token; // Snapshot 'if'
     auto node = std::make_unique<IfNode>();
 
-    consume(TokenType::TOKEN_LPAREN, "Expected '(' after if");
+    consume(TokenType::TOKEN_LPAREN, DiagnosticCode::UnmatchedParen, "Expected '(' after if");
     node->condition = parseExpression();
-    consume(TokenType::TOKEN_RPAREN, "Expected ')' after condition");
+    consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')' after condition");
 
     node->thenBranch = parseStatement();
     
@@ -122,7 +122,7 @@ std::unique_ptr<StatementNode> Parser::parseFor()
     Token start = current_token; // Snapshot 'for'
     auto node = std::make_unique<ForNode>();
 
-    consume(TokenType::TOKEN_LPAREN, "Expected '(' after for");
+    consume(TokenType::TOKEN_LPAREN, DiagnosticCode::UnmatchedParen, "Expected '(' after for");
     
     // Init
     if (!match(TokenType::TOKEN_SEMI)) {
@@ -133,12 +133,12 @@ std::unique_ptr<StatementNode> Parser::parseFor()
     if (!check(TokenType::TOKEN_SEMI)) {
         node->condition = parseExpression();
     }
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after for loop condition");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after for loop condition");
 
     if (!check(TokenType::TOKEN_RPAREN)) {
         node->increment = parseExpression();
     }
-    consume(TokenType::TOKEN_RPAREN, "Expected ')' after for clauses");
+    consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')' after for clauses");
 
     node->body = parseStatement();
 
@@ -151,9 +151,9 @@ std::unique_ptr<StatementNode> Parser::parseWhile()
     Token start = current_token; // Snapshot 'while'
     auto node = std::make_unique<WhileNode>();
 
-    consume(TokenType::TOKEN_LPAREN, "Expected '(' after while");
+    consume(TokenType::TOKEN_LPAREN, DiagnosticCode::UnmatchedParen, "Expected '(' after while");
     node->condition = parseExpression();
-    consume(TokenType::TOKEN_RPAREN, "Expected ')'");
+    consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')'");
     
     node->body = parseStatement();
 
@@ -169,7 +169,7 @@ std::unique_ptr<StatementNode> Parser::parseReturn()
     if (!check(TokenType::TOKEN_SEMI)) {
         node->value = parseExpression();
     }
-    consume(TokenType::TOKEN_SEMI, "Expected ';'");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';'");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -184,12 +184,13 @@ std::unique_ptr<StatementNode> Parser::parseExpressionStatement()
     if (!node->expr) {
         // If we have a semicolon, consume it and return a "empty" statement (valid-ish)
         if (match(TokenType::TOKEN_SEMI)) {
+            reportHint(DiagnosticCode::EmptyStatement, "Empty statement. Consider removing the unnecessary semicolon.");
             return node; 
         }
         return nullptr; 
     }
 
-    consume(TokenType::TOKEN_SEMI, "Expected ';'");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';'");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -203,13 +204,13 @@ std::unique_ptr<StatementNode> Parser::parseDoWhile()
     // Parse Body (e.g., do { ... })
     node->body = parseStatement();
     
-    consume(TokenType::KEYWORD_WHILE, "Expected 'while' after 'do' body");
-    consume(TokenType::TOKEN_LPAREN, "Expected '(' after 'while'");
+    consume(TokenType::KEYWORD_WHILE, DiagnosticCode::UnexpectedToken, "Expected 'while' after 'do' body");
+    consume(TokenType::TOKEN_LPAREN, DiagnosticCode::UnmatchedParen, "Expected '(' after 'while'");
     
     node->condition = parseExpression();
     
-    consume(TokenType::TOKEN_RPAREN, "Expected ')' after condition");
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after do-while loop");
+    consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')' after condition");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after do-while loop");
     
     setRange(node.get(), start, previous_token);
     return node;
@@ -220,11 +221,11 @@ std::unique_ptr<StatementNode> Parser::parseSwitch()
     Token start = current_token; // Snapshot 'switch'
     auto node = std::make_unique<SwitchNode>();
 
-    consume(TokenType::TOKEN_LPAREN, "Expected '(' after 'switch'");
+    consume(TokenType::TOKEN_LPAREN, DiagnosticCode::UnmatchedParen, "Expected '(' after 'switch'");
     node->expression = parseExpression();
-    consume(TokenType::TOKEN_RPAREN, "Expected ')' after switch expression");
+    consume(TokenType::TOKEN_RPAREN, DiagnosticCode::UnmatchedParen, "Expected ')' after switch expression");
     
-    consume(TokenType::TOKEN_LBRACE, "Expected '{' before switch body");
+    consume(TokenType::TOKEN_LBRACE, DiagnosticCode::UnmatchedBrace, "Expected '{' before switch body");
     
     while (!check(TokenType::TOKEN_RBRACE) && !check(TokenType::TOKEN_EOF)) {
         
@@ -235,7 +236,7 @@ std::unique_ptr<StatementNode> Parser::parseSwitch()
         } else if (match(TokenType::KEYWORD_DEFAULT)) {
             isDefault = true;
         } else {
-            reportError("Expected 'case' or 'default' inside switch block.");
+            reportError(DiagnosticCode::UnexpectedToken, "Expected 'case' or 'default' inside switch block.");
             // Stuck parser protection (from our previous fix)
             advance(); 
             continue;
@@ -249,7 +250,7 @@ std::unique_ptr<StatementNode> Parser::parseSwitch()
             caseNode->value = parseExpression();
         }
         
-        consume(TokenType::TOKEN_COLON, "Expected ':' after case label");
+        consume(TokenType::TOKEN_COLON, DiagnosticCode::ExpectedColon, "Expected ':' after case label");
 
         // 3. Parse Statements until next case/default or end of switch
         // This handles "Fallthrough" naturally (statements list will be empty)
@@ -265,7 +266,7 @@ std::unique_ptr<StatementNode> Parser::parseSwitch()
                 current_token.type != TokenType::TOKEN_EOF) {
                 
                 // Only report if we haven't already panicked
-                if (!panicMode) reportError("Unexpected token '" + current_token.value + "' inside switch case.");
+                if (!panicMode) reportError(DiagnosticCode::UnexpectedToken, "Unexpected token '" + current_token.value + "' inside switch case.");
                 advance(); 
             }
         }
@@ -273,7 +274,7 @@ std::unique_ptr<StatementNode> Parser::parseSwitch()
         node->cases.push_back(std::move(caseNode));
     }
     
-    consume(TokenType::TOKEN_RBRACE, "Expected '}' after switch body");
+    consume(TokenType::TOKEN_RBRACE, DiagnosticCode::UnmatchedBrace, "Expected '}' after switch body");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -284,7 +285,7 @@ std::unique_ptr<StatementNode> Parser::parseBreak()
     Token start = current_token;
     auto node = std::make_unique<BreakNode>();
 
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after 'break'");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after 'break'");
 
     setRange(node.get(), start, previous_token);
     return node;
@@ -295,7 +296,7 @@ std::unique_ptr<StatementNode> Parser::parseContinue()
     Token start = current_token;
     auto node = std::make_unique<ContinueNode>();
 
-    consume(TokenType::TOKEN_SEMI, "Expected ';' after 'continue'");
+    consume(TokenType::TOKEN_SEMI, DiagnosticCode::MissingSemicolon, "Expected ';' after 'continue'");
 
     setRange(node.get(), start, previous_token);
     return node;
