@@ -151,6 +151,24 @@ To use this with VSCode, you can use a generic LSP client extension (like *glsl-
 
 *Note: A dedicated VSCode extension wrapper is NOT planned. Feel free to implement one!*
 
+## Configuration (Neovim Example)
+
+Using Neovim's native LSP client (0.11+), the server must be passed `--stdio`
+explicitly — without it, it defaults to TCP mode and silently fails to attach
+as a stdio-spawned client.
+
+```lua
+vim.lsp.config("gdshader_lsp", {
+	cmd = {
+		"/path/to/bin/gdshader-lsp-release",
+		"--stdio",
+	},
+	filetypes = { "gdshader", "gdshaderinc" },
+	root_markers = { "project.godot", ".git" },
+})
+vim.lsp.enable("gdshader_lsp")
+```
+
 ## Roadmap
 
 This project is currently in **Alpha**. While the core analysis engine is robust, the following features are planned:
