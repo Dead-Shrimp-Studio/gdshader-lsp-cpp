@@ -180,3 +180,52 @@ def test_quick_fix_typo_correction(lsp):
     changes = action["edit"]["changes"][uri]
     assert len(changes) == 1
     assert changes[0]["newText"] == "ALBEDO"
+
+def test_generate_function_stub(lsp):
+    uri = "file:///action_stub.gdshader"
+    shader_code = (
+        "shader_type spatial;\n"
+        "\n"
+        "void fragment() {\n"
+        "    calculate_fresnel(vec3(1.0), 0.5);\n" # Unknown function call
+        "}\n"
+    )
+    
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {"uri": uri, "languageId": "gdshader", "version": 1, "text": shader_code}
+    }, is_notification=True)
+
+    # 1. Catch the GDS2017 (UnknownFunction) diagnostic
+    diags = lsp.read_message()["params"]["diagnostics"]
+    target_diag = next((d for d in diags if str(d.get("code")) == "GDS2017"), None)
+    assert target_diag is not None, "Did not receive UnknownFunction diagnostic."
+
+    # 2. Request Code Actions
+    msg_id = lsp.send_message("textDocument/codeAction", {
+        "textDocument": {"uri": uri},
+        "range": target_diag["range"],
+        "context": {
+            "diagnostics": [target_diag]
+        }
+    })
+
+    # 3. Verify the Code Action Response
+    res = lsp.read_message()["result"]
+    assert res is not None
+    
+    # Check if the Generate Stub fix was suggested
+    action = next((a for a in res if "Generate function 'calculate_fresnel'" in a["title"]), None)
+    assert action is not None, "Generate function stub action missing"
+    assert action["kind"] == "quickfix"
+    
+    # 4. Verify the Text Edit Output
+    changes = action["edit"]["changes"][uri]
+    assert len(changes) == 1
+    
+    generated_code = changes[0]["newText"]
+    
+    # Ensure it correctly parsed the argument types (vec3 and float)
+    assert "void calculate_fresnel(vec3 arg1, float arg2)" in generated_code
+    
+    # Verify insertion point (Line 2, just above void fragment())
+    assert changes[0]["range"]["start"]["line"] == 2
