@@ -9,7 +9,8 @@
 
 namespace gdshader_lsp 
 {
-    class NodeFinderVisitor : public ASTVisitor {
+    class NodeFinderVisitor : public ASTVisitor 
+    {
     public:
         int targetLine, targetCol;
         const ASTNode* deepestNode = nullptr;
@@ -199,7 +200,8 @@ namespace gdshader_lsp
     };
 
     // Finds the function that encloses a specific line number
-    class EnclosingFunctionVisitor : public ASTVisitor {
+    class EnclosingFunctionVisitor : public ASTVisitor 
+    {
     public:
         int targetLine;
         const FunctionNode* enclosingFunc = nullptr;
@@ -226,7 +228,6 @@ namespace gdshader_lsp
         void visit(IfNode*) override {} void visit(WhileNode*) override {} void visit(ForNode*) override {}
         void visit(ReturnNode*) override {} void visit(DoWhileNode*) override {} void visit(CaseNode*) override {}
         void visit(SwitchNode*) override {}
-
     };
 
 } // namespace gdshader_lsp

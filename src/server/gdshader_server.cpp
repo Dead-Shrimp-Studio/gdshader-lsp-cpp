@@ -1,5 +1,7 @@
 
 #include "server/gdshader_server.hpp"
+#include "server/code_action_handler.hpp"
+#include "server/project_manager.hpp"
 
 #include "gdshader/semantics/semantic_analyzer.hpp"
 
@@ -10,7 +12,6 @@
 #include "gdshader/semantics/visitors/color_visitor.hpp"
 #include "gdshader/semantics/visitors/semantic_token_visitor.hpp"
 
-#include "server/project_manager.hpp"
 #include "gdshader/ast/ast.h"
 #include "utils/logger.hpp"
 
@@ -1401,58 +1402,26 @@ void GdShaderServer::registerHandlers() {
     handler.add<lsp::requests::TextDocument_CodeAction>(
         [this](lsp::requests::TextDocument_CodeAction::Params&& params) -> lsp::requests::TextDocument_CodeAction::Result
         {
-            std::vector<std::variant<lsp::Command, lsp::CodeAction>> actions;
+            std::string path = std::string(params.textDocument.uri.path());
+            #ifdef _WIN32
+            if (path.size() > 2 && path[0] == '/' && path[2] == ':') path = path.substr(1);
+            #endif
 
-            for (const auto& diag : params.context.diagnostics) 
-            {
-                std::string code = ""; 
-                if (diag.code.has_value()) {
-                    if (std::holds_alternative<std::string>(diag.code.value())) {
-                        code = std::get<std::string>(diag.code.value());
-                    } else if (std::holds_alternative<int>(diag.code.value())) {
-                        code = std::to_string(std::get<int>(diag.code.value()));
-                    }
-                }
+            auto pm = ProjectManager::get_singleton();
+            auto su = pm->getUnit(path);
 
-                // Missing Semicolon (GDS1001)
-                if (code == "GDS1001") {
-                    lsp::CodeAction action;
-                    action.title = "Insert missing semicolon";
-                    action.kind = lsp::CodeActionKind::QuickFix;
-                    action.diagnostics = { diag }; 
-                    
-                    lsp::TextEdit edit;
-                    edit.range = lsp::Range{diag.range.end, diag.range.end}; 
-                    edit.newText = ";";
-                    
-                    lsp::WorkspaceEdit wsEdit;
-                    wsEdit.changes.emplace(); 
-                    (*wsEdit.changes)[params.textDocument.uri].push_back(edit);
-                    action.edit = wsEdit;
-                    
-                    actions.push_back(action);
-                }
-                
-                // Empty Statement Hint (GDS5000)
-                else if (code == "GDS5000") {
-                    lsp::CodeAction action;
-                    action.title = "Remove unnecessary semicolon";
-                    action.kind = lsp::CodeActionKind::QuickFix;
-                    action.diagnostics = { diag };
-                    
-                    lsp::TextEdit edit;
-                    edit.range = diag.range; 
-                    edit.newText = "";       
-                    
-                    lsp::WorkspaceEdit wsEdit;
-                    wsEdit.changes.emplace();
-                    (*wsEdit.changes)[params.textDocument.uri].push_back(edit);
-                    action.edit = wsEdit;
-                    
-                    actions.push_back(action);
-                }
-            }
-            return actions;
+            // Lock the unit so the compiler thread doesn't modify the AST while we read it
+            std::lock_guard<std::mutex> lock(su->unitMutex);
+
+            CodeActionContext context {
+                .params = params,
+                .ast = su->ast,
+                .symbols = su->symbols,
+                .source_code = su->source_code,
+                .file_path = path
+            };
+
+            return CodeActionHandler::getActions(context);
         }
     );
 
