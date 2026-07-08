@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5.1] - Unreleased
+
+More code actions!
+
+### Added
+- Dedicated handler for code actions
+- Simple Code Actions for:
+  - Missing Semicolom, Colon
+  - Missing Parenthes, Brackets, Braces
+  - Invalid Argument Counts
+  - Keywords 'break' or 'continue' outside of a loop
+  - Invalid 'discard' usage
+  - Void functions that return a value
+  - Missing shader type declaration (with the two most commong options)
+  - Unused variables (by commenting them out)
+
+- Advanced Code Actions for:
+  - Typo Corrections ("Did you mean ...")
+  - Extracting magic numbers to uniforms
+
+- Test for all of the above
+
+### Changed
+
+### Fixed
+- A couple edge cases in type casting confusion when resolving function arguments
+
 ## [0.2.5] - 2026-05-15
 
 New features: Code formatting, cross-file symbol renaming, and more!
@@ -64,7 +91,8 @@ Major improvements to performance, autocomplete, and stability. Closing the last
 - Semantic tokens are back
 
 - Performance improvements
-  - AST decoration used for frontend requests diminishing the amount of string manipulations needed
+  - AST decoration used for frontend requests dimini
+  - shing the amount of string manipulations needed
   - AST improvements for range tracking and lookup
 
 ### Changed

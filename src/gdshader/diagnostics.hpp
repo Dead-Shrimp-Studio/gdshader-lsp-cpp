@@ -2,6 +2,7 @@
 #define DIAGNOSTICS_HPP
 
 #include <string>
+#include <lsp/types.h>
 
 namespace gdshader_lsp
 {
@@ -117,6 +118,17 @@ struct Range
     int startCol = 0;
     int endLine = 0;
     int endCol = 0;
+
+    /**
+     * @brief Converts the internal AST range to an lsp::Range.
+     */
+    lsp::Range toLspRange() const 
+    {
+        return lsp::Range{
+            lsp::Position{static_cast<unsigned int>(startLine), static_cast<unsigned int>(startCol)},
+            lsp::Position{static_cast<unsigned int>(endLine), static_cast<unsigned int>(endCol)}
+        };
+    }
 };
 
 enum class DiagnosticLevel 
