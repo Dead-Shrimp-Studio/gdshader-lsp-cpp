@@ -48,6 +48,7 @@ namespace gdshader_lsp
             static std::optional<lsp::CodeAction> fixMissingArguments(const lsp::Diagnostic& diag, const CodeActionContext& context);
             static std::optional<lsp::CodeAction> extractMagicNumber(const CodeActionContext& context);
             static std::string findClosestSymbolName(const std::string& typo, const std::shared_ptr<SymbolTable>& symbols);
+            static std::optional<lsp::CodeAction> generateFunctionStub(const lsp::Diagnostic& diag, const CodeActionContext& context);
 
             // Inserts text at a specific position (usually the end of the diagnostic range)
             static lsp::CodeAction createInsertFix(

@@ -25,7 +25,7 @@ using TypePtr = std::shared_ptr<Type>;
 struct Type 
 {
     TypeKind kind = TypeKind::UNKNOWN;
-    std::string name; // "vec3", "MyStruct", "int"
+    std::string name = "unknown"; // "vec3", "MyStruct", "int"
     
     // For Arrays: "float[5]" -> baseType="float", arraySize=5
     // For Vectors: "vec3" -> baseType="float", componentCount=3

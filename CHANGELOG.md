@@ -11,6 +11,7 @@ More code actions!
 
 ### Added
 - Dedicated handler for code actions
+
 - Simple Code Actions for:
   - Missing Semicolom, Colon
   - Missing Parenthes, Brackets, Braces
@@ -24,6 +25,8 @@ More code actions!
 - Advanced Code Actions for:
   - Typo Corrections ("Did you mean ...")
   - Extracting magic numbers to uniforms
+  - Auto-Generate function/variable stubs
+  - Extract to functionr refactoring
 
 - Test for all of the above
 
@@ -31,6 +34,8 @@ More code actions!
 
 ### Fixed
 - A couple edge cases in type casting confusion when resolving function arguments
+- Early return bug in the type checking visitor for function arguments
+- Missing parentheses around an if-statement condition or-clause with multiple arguments that caused bugs
 
 ## [0.2.5] - 2026-05-15
 

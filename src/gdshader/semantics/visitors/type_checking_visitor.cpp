@@ -589,7 +589,7 @@ void TypeCheckingVisitor::visit(MemberAccessNode* node)
                     if (std::string("rgba").find(c) != std::string::npos) hasRGBA = true;
                     if (std::string("stpq").find(c) != std::string::npos) hasSTPQ = true;
                 }
-                if (hasXYZW && hasRGBA || hasXYZW && hasSTPQ || hasRGBA && hasSTPQ) 
+                if ( (hasXYZW && hasRGBA) || (hasXYZW && hasSTPQ) || (hasRGBA && hasSTPQ) ) 
                 {
                     GDSHADER_ERROR_IF(true, "Illegal swizzle '{}', mixed sets", swizzle);
                     diagnostics.push_back(reportError(node, DiagnosticCode::InvalidSwizzle, "Illegal swizzle '" + swizzle + "'. Cannot mix xyzw, rgba and stpq sets."));
@@ -674,23 +674,33 @@ TypePtr TypeCheckingVisitor::resolveType(const ExpressionNode* node)
     if (auto call = dynamic_cast<const FunctionCallNode*>(node)) 
     {
         TypePtr t = typeRegistry.getType(call->functionName);
-        if (t->kind != TypeKind::UNKNOWN) return t;
-
-        std::vector<TypePtr> argTypes;
-        for (const auto& arg : call->arguments) {
-            if (!arg) {
-                SPDLOG_ERROR("arg in functionCallNode is nullptr");
-                argTypes.push_back(typeRegistry.getUnknownType());
-                continue;
-            }
-            argTypes.push_back(resolveType(arg.get()));
+        if (t->kind != TypeKind::UNKNOWN) {
+            result = t;
         }
+        else {
+            std::vector<TypePtr> argTypes;
+            for (const auto& arg : call->arguments) {
+                if (!arg) {
+                    SPDLOG_ERROR("arg in functionCallNode is nullptr");
+                    argTypes.push_back(typeRegistry.getUnknownType());
+                    continue;
+                }
+                argTypes.push_back(resolveType(arg.get()));
+            }
 
-        const Symbol* match = findBestOverload(call, argTypes);
-        if (match && match->returnType) result = match->returnType;
-        else result = typeRegistry.getUnknownType();
+            const Symbol* match = findBestOverload(call, argTypes);
+            if (match && match->returnType) result = match->returnType;
+            else result = typeRegistry.getUnknownType();
+        }
     }
-    
+
+    if (auto ctor = dynamic_cast<const ConstructorNode*>(node)) {
+        TypePtr t = typeRegistry.getType(ctor->typeName);
+        if (t->kind != TypeKind::UNKNOWN) {
+            result = t;
+        }
+    }
+
     if (auto mem = dynamic_cast<const MemberAccessNode*>(node)) {
         if (mem->member == "length") return typeRegistry.getType("int");
         TypePtr base = resolveType(mem->base.get());

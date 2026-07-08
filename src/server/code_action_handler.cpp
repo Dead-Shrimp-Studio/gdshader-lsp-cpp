@@ -11,6 +11,138 @@
 
 namespace gdshader_lsp {
 
+
+std::vector<std::variant<lsp::Command, lsp::CodeAction>> 
+CodeActionHandler::getActions(const CodeActionContext& context) 
+{
+    std::vector<std::variant<lsp::Command, lsp::CodeAction>> actions;
+    const auto& uri = context.params.textDocument.uri;
+
+    for (const auto& diag : context.params.context.diagnostics) 
+    {
+        std::string code = ""; 
+        if (diag.code.has_value()) {
+            if (std::holds_alternative<std::string>(diag.code.value())) {
+                code = std::get<std::string>(diag.code.value());
+            } else if (std::holds_alternative<int>(diag.code.value())) {
+                code = std::to_string(std::get<int>(diag.code.value()));
+            }
+        }
+
+        if (code == "GDS1001") { // MissingSemicolon
+            actions.push_back(createInsertFix("Insert missing ';'", uri, diag.range.end, ";", diag));
+        } 
+        else if (code == "GDS1002") { // UnmatchedParen
+            actions.push_back(createInsertFix("Insert missing ')'", uri, diag.range.end, ")", diag));
+        }
+        else if (code == "GDS1003") { // UnmatchedBracket
+            actions.push_back(createInsertFix("Insert missing ']'", uri, diag.range.end, "]", diag));
+        }
+        else if (code == "GDS1004") { // UnmatchedBrace
+            actions.push_back(createInsertFix("Insert missing '}'", uri, diag.range.end, "}", diag));
+        }
+        else if (code == "GDS1009") { // ExpectedColon
+            actions.push_back(createInsertFix("Insert missing ':'", uri, diag.range.end, ":", diag));
+        }
+
+        else if (code == "GDS2000") { // UndefinedIdentifier
+
+            NodeFinderVisitor finder(diag.range.start.line, diag.range.start.character);
+            context.ast->accept(finder);
+
+            if (finder.deepestNode) {
+                std::string typoName = "";
+                
+                if (auto idNode = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) {
+                    typoName = idNode->name;
+                } else if (auto callNode = dynamic_cast<const FunctionCallNode*>(finder.deepestNode)) {
+                    typoName = callNode->functionName;
+                }
+
+                if (!typoName.empty()) {
+
+                    std::string suggestion = findClosestSymbolName(typoName, context.symbols);
+                    
+                    if (!suggestion.empty()) {
+
+                        std::string fixTitle = "Change to '" + suggestion + "'";
+                        
+                        actions.push_back(createReplaceFix(
+                            fixTitle, 
+                            uri, 
+                            finder.deepestNode->range.toLspRange(), 
+                            suggestion, 
+                            diag
+                        ));
+                    }
+                }
+            }
+        }
+
+        else if (code == "GDS2005" || code == "GDS2006") { // BreakOutsideLoop or ContinueOutsideLoop
+            actions.push_back(createReplaceFix("Remove invalid control flow statement", uri, diag.range, "", diag));
+        }
+        else if (code == "GDS2012") { // VoidCannotReturnValue
+            actions.push_back(createReplaceFix("Change to empty return", uri, diag.range, "return;", diag));
+        }
+        else if (code == "GDS2017") { // UnknownFunction
+
+            NodeFinderVisitor finder(diag.range.start.line, diag.range.start.character);
+            context.ast->accept(finder);
+
+            if (auto callNode = dynamic_cast<const FunctionCallNode*>(finder.deepestNode)) {
+                std::string suggestion = findClosestSymbolName(callNode->functionName, context.symbols);
+                if (!suggestion.empty()) {
+                    actions.push_back(createReplaceFix(
+                        "Change to '" + suggestion + "'", uri, finder.deepestNode->range.toLspRange(), suggestion, diag
+                    ));
+                }
+            }
+
+            if (auto stubAction = generateFunctionStub(diag, context)) {
+                actions.push_back(*stubAction);
+            }
+        }
+        else if (code == "GDS2019") { // InvalidArgumentCount
+            if (auto action = fixMissingArguments(diag, context)) {
+                if (action.has_value()) {
+                    actions.push_back(action.value());
+                }
+            }
+        }
+
+        else if (code == "GDS3010") { 
+            // InvalidDiscardUsage
+            actions.push_back(createReplaceFix("Remove invalid 'discard'", uri, diag.range, "", diag));
+        }
+        else if (code == "GDS3012") { 
+            // MissingOrUnknownShaderType
+            lsp::Position topOfFile = {0, 0};
+            // Offer the two most common options to the user
+            actions.push_back(createInsertFix("Add 'shader_type spatial;' at top", uri, topOfFile, "shader_type spatial;\n", diag));
+            actions.push_back(createInsertFix("Add 'shader_type canvas_item;' at top", uri, topOfFile, "shader_type canvas_item;\n", diag));
+        }
+
+        else if (code == "GDS4000") { 
+            // UnusedVariable
+            // Instead of deleting it and risking formatting issues, just comment it out.
+            actions.push_back(createInsertFix("Comment out unused variable", uri, diag.range.start, "// ", diag));
+        }
+
+        else if (code == "GDS5000") { // EmptyStatement
+            actions.push_back(createReplaceFix("Remove unnecessary ';'", uri, diag.range, "", diag));
+        }
+    }
+
+    if (auto extractActions = extractMagicNumber(context)) {
+        if (extractActions.has_value()) {
+            actions.push_back(extractActions.value());
+        }
+    }
+
+    return actions;
+}
+
 // --- Implementations ---
 
 std::optional<lsp::CodeAction> CodeActionHandler::fixMissingArguments(const lsp::Diagnostic& diag, const CodeActionContext& context)
@@ -73,7 +205,6 @@ std::optional<lsp::CodeAction> CodeActionHandler::fixMissingArguments(const lsp:
 std::optional<lsp::CodeAction> gdshader_lsp::CodeActionHandler::extractMagicNumber(const CodeActionContext &context)
 {
     if (!context.ast) {
-        SPDLOG_WARN("AST for CodeActionContext is null.");
         return std::nullopt;
     }
 
@@ -82,13 +213,11 @@ std::optional<lsp::CodeAction> gdshader_lsp::CodeActionHandler::extractMagicNumb
     context.ast->accept(finder);
 
     if (!finder.deepestNode) {
-        SPDLOG_ERROR("Could not find a node at the given position.");
         return std::nullopt;
     }
 
     auto literalNode = dynamic_cast<const LiteralNode*>(finder.deepestNode);
     if (!literalNode || literalNode->type != TokenType::TOKEN_NUMBER) {
-        SPDLOG_DEBUG("Node found at cursor position is not LiteralNode");
         return std::nullopt; 
     }
 
@@ -153,120 +282,57 @@ std::string gdshader_lsp::CodeActionHandler::findClosestSymbolName(const std::st
     return bestMatch;
 }
 
-std::vector<std::variant<lsp::Command, lsp::CodeAction>> 
-CodeActionHandler::getActions(const CodeActionContext& context) 
+std::optional<lsp::CodeAction> gdshader_lsp::CodeActionHandler::generateFunctionStub(const lsp::Diagnostic &diag, const CodeActionContext &context)
 {
-    std::vector<std::variant<lsp::Command, lsp::CodeAction>> actions;
-    const auto& uri = context.params.textDocument.uri;
+    if (!context.ast) return std::nullopt;
 
-    for (const auto& diag : context.params.context.diagnostics) 
+    CallFinderVisitor finder(diag.range.start.line, diag.range.start.character);
+    context.ast->accept(finder);
+
+    auto callNode = finder.activeCall;
+    if (!callNode) return std::nullopt;
+
+    std::string paramsStr = "";
+    for (size_t i = 0; i < callNode->arguments.size(); ++i) 
     {
-        std::string code = ""; 
-        if (diag.code.has_value()) {
-            if (std::holds_alternative<std::string>(diag.code.value())) {
-                code = std::get<std::string>(diag.code.value());
-            } else if (std::holds_alternative<int>(diag.code.value())) {
-                code = std::to_string(std::get<int>(diag.code.value()));
-            }
-        }
+        if (i > 0) paramsStr += ", ";
+        
+        std::string typeStr = "float"; // Default fallback
+        const auto& arg = callNode->arguments[i];
 
-        if (code == "GDS1001") { // MissingSemicolon
-            actions.push_back(createInsertFix("Insert missing ';'", uri, diag.range.end, ";", diag));
-        } 
-        else if (code == "GDS1002") { // UnmatchedParen
-            actions.push_back(createInsertFix("Insert missing ')'", uri, diag.range.end, ")", diag));
+        if (arg && arg->evaluatedType && arg->evaluatedType->name != "unknown") {
+            typeStr = arg->evaluatedType->toString(); 
         }
-        else if (code == "GDS1003") { // UnmatchedBracket
-            actions.push_back(createInsertFix("Insert missing ']'", uri, diag.range.end, "]", diag));
-        }
-        else if (code == "GDS1004") { // UnmatchedBrace
-            actions.push_back(createInsertFix("Insert missing '}'", uri, diag.range.end, "}", diag));
-        }
-        else if (code == "GDS1009") { // ExpectedColon
-            actions.push_back(createInsertFix("Insert missing ':'", uri, diag.range.end, ":", diag));
-        }
-
-        else if (code == "GDS2000" || code == "GDS2017") { 
-            // UndefinedIdentifier or UnknownFunction
-
-            NodeFinderVisitor finder(diag.range.start.line, diag.range.start.character);
-            context.ast->accept(finder);
-
-            if (finder.deepestNode) {
-                std::string typoName = "";
-                
-                if (auto idNode = dynamic_cast<const IdentifierNode*>(finder.deepestNode)) {
-                    typoName = idNode->name;
-                } else if (auto callNode = dynamic_cast<const FunctionCallNode*>(finder.deepestNode)) {
-                    typoName = callNode->functionName;
-                }
-
-                if (!typoName.empty()) {
-
-                    std::string suggestion = findClosestSymbolName(typoName, context.symbols);
-                    
-                    if (!suggestion.empty()) {
-
-                        std::string fixTitle = "Change to '" + suggestion + "'";
-                        
-                        actions.push_back(createReplaceFix(
-                            fixTitle, 
-                            uri, 
-                            finder.deepestNode->range.toLspRange(), 
-                            suggestion, 
-                            diag
-                        ));
-                    }
-                }
-            }
-        }
-
-        else if (code == "GDS2005" || code == "GDS2006") { // BreakOutsideLoop or ContinueOutsideLoop
-            actions.push_back(createReplaceFix("Remove invalid control flow statement", uri, diag.range, "", diag));
-        }
-        else if (code == "GDS2012") {
-            // VoidCannotReturnValue
-            // Replaces `return x;` with `return;`
-            actions.push_back(createReplaceFix("Change to empty return", uri, diag.range, "return;", diag));
-        }
-        else if (code == "GDS2019") { // InvalidArgumentCount
-            if (auto action = fixMissingArguments(diag, context)) {
-                if (action.has_value()) {
-                    actions.push_back(action.value());
-                }
-            }
-        }
-
-        else if (code == "GDS3010") { 
-            // InvalidDiscardUsage
-            actions.push_back(createReplaceFix("Remove invalid 'discard'", uri, diag.range, "", diag));
-        }
-        else if (code == "GDS3012") { 
-            // MissingOrUnknownShaderType
-            lsp::Position topOfFile = {0, 0};
-            // Offer the two most common options to the user
-            actions.push_back(createInsertFix("Add 'shader_type spatial;' at top", uri, topOfFile, "shader_type spatial;\n", diag));
-            actions.push_back(createInsertFix("Add 'shader_type canvas_item;' at top", uri, topOfFile, "shader_type canvas_item;\n", diag));
-        }
-
-        else if (code == "GDS4000") { 
-            // UnusedVariable
-            // Instead of deleting it and risking formatting issues, just comment it out.
-            actions.push_back(createInsertFix("Comment out unused variable", uri, diag.range.start, "// ", diag));
-        }
-
-        else if (code == "GDS5000") { // EmptyStatement
-            actions.push_back(createReplaceFix("Remove unnecessary ';'", uri, diag.range, "", diag));
-        }
+        
+        paramsStr += typeStr + " arg" + std::to_string(i + 1);
     }
 
-    if (auto extractActions = extractMagicNumber(context)) {
-        if (extractActions.has_value()) {
-            actions.push_back(extractActions.value());
-        }
+    EnclosingFunctionVisitor funcFinder(diag.range.start.line);
+    context.ast->accept(funcFinder);
+
+    lsp::Position insertPos = {0, 0}; 
+    if (funcFinder.enclosingFunc) {
+        insertPos.line = funcFinder.enclosingFunc->range.startLine;
+        insertPos.character = 0;
     }
 
-    return actions;
+    std::string stub = "void " + callNode->functionName + "(" + paramsStr + ") {\n\t// TODO: Implement\n}\n\n";
+
+    lsp::CodeAction action;
+    action.title = "Generate function '" + callNode->functionName + "'";
+    action.kind = lsp::CodeActionKind::QuickFix;
+    action.diagnostics = { diag };
+
+    lsp::TextEdit edit;
+    edit.range = lsp::Range{insertPos, insertPos};
+    edit.newText = stub;
+
+    lsp::WorkspaceEdit wsEdit;
+    wsEdit.changes.emplace();
+    (*wsEdit.changes)[context.params.textDocument.uri].push_back(edit);
+    
+    action.edit = wsEdit;
+    return action;
 }
 
 // --- Helper Implementations ---
