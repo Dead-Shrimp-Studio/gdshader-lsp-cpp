@@ -66,7 +66,8 @@ def main():
                     a_name = arg.get("name", "")
                     a_type = arg.get("type", "")
                     a_doc = arg.get("doc", "").replace('"', '\\"')
-                    args_cpp.append(f'{{"{a_name}", "{a_type}", "{a_doc}"}}')
+                    a_opt = "true" if arg.get("is_optional", False) else "false"
+                    args_cpp.append(f'{{"{a_name}", "{a_type}", "{a_doc}", {a_opt}}}')
                 
                 args_str = "{" + ", ".join(args_cpp) + "}"
 
