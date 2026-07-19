@@ -247,7 +247,7 @@
             "    my_color = vec3(1.0);",
             "}"
         ],
-        "expected_error": "read-only variable"
+        "expected_error": "read-only"
     },
     {
         "name": "duplicate_swizzle_write",

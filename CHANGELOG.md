@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.5.2] - 2026-07-XX
 
+### Added
+- Test cases for all bugfixes
+
+### Changed
+- Varyings are not read-only internally, but instead validated at each point of assignment
+
 ### Fixed
 - A bug...
+  - Missing definition of clamp() in data layer
   - False positive "read-only variable" when assigning to varying in vertex()
 
 ## [0.2.5.1] - 2026-07-17

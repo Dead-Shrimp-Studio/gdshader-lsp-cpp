@@ -270,7 +270,7 @@ namespace gdshader_lsp {
             diagnostics.push_back(reportError(node, DiagnosticCode::IntegerVaryingNeedsFlat, "Integer varyings must use 'flat' interpolation."));
         }
 
-        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Varying, node->range, Mutability::ReadOnly, nullptr, {}, {}, false, currentFilePath);        
+        Symbol s = symbols.createSymbol(node->name, type, SymbolType::Varying, node->range, Mutability::Mutable, nullptr, {}, {}, false, currentFilePath);        
         if (!symbols.add(s)) {
             diagnostics.push_back(reportError(node, DiagnosticCode::SymbolRedefinition, "Redefinition of varying '" + s.name + "'"));
         }
