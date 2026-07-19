@@ -633,7 +633,7 @@
         "name": "max",
         "return": {
             "type": "vec_int_type",
-            "doc": "The maximum value. vec_type *clamp*(vec_type x, vec_type minVal, vec_type maxVal) \ud83d\udd17 func-clamp> vec_int_type *clamp*(vec_int_type x, vec_int_type minVal, vec_int_type vec_int_type *clamp*(vec_int_type x, int minVal, int maxVal) \ud83d\udd17 vec_uint_type *clamp*(vec_uint_type x, vec_uint_type minVal, vec_uint_type *clamp*(vec_uint_type x, uint minVal, uint maxVal) \ud83d\udd17 Returns the value of `x` constrained to the range `minVal` to `maxVal`. The returned value is computed as `min(max(x, minVal), maxVal)`. The clamped value."
+            "doc": "The maximum value."
         },
         "arguments": [
             {
@@ -1459,10 +1459,207 @@
             {
                 "name": "bias",
                 "type": "float",
-                "doc": ""
+                "doc": "An optional bias to be applied during level-of-detail computation."
             }
         ],
         "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "texture",
+        "return": {
+            "type": "vec4",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "samplerCubeArray",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec4",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "bias",
+                "type": "float",
+                "doc": "An optional bias to be applied during level-of-detail computation."
+            }
+        ],
+        "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "texture",
+        "return": {
+            "type": "vec4",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "samplerExternalOES",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec2",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "bias",
+                "type": "float",
+                "doc": "An optional bias to be applied during level-of-detail computation."
+            }
+        ],
+        "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "texture",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec2",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "bias",
+                "type": "float",
+                "doc": "An optional bias to be applied during level-of-detail computation."
+            }
+        ],
+        "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "texture",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2DArray",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "bias",
+                "type": "float",
+                "doc": "An optional bias to be applied during level-of-detail computation."
+            }
+        ],
+        "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "texture",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler3D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "bias",
+                "type": "float",
+                "doc": "An optional bias to be applied during level-of-detail computation."
+            }
+        ],
+        "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "clamp",
+        "return": {
+            "type": "vec_type",
+            "doc": "The clamped value."
+        },
+        "arguments": [
+            {
+                "name": "x",
+                "type": "vec_type",
+                "doc": "The value to constrain."
+            },
+            {
+                "name": "minVal",
+                "type": "vec_type",
+                "doc": "The lower end of the range into which to constrain x."
+            },
+            {
+                "name": "maxVal",
+                "type": "vec_type",
+                "doc": "The upper end of the range into which to constrain x."
+            }
+        ]
+    },
+    {
+        "name": "clamp",
+        "return": {
+            "type": "vec_int_type",
+            "doc": "The clamped value."
+        },
+        "arguments": [
+            {
+                "name": "x",
+                "type": "vec_int_type",
+                "doc": "The value to constrain."
+            },
+            {
+                "name": "minVal",
+                "type": "vec_int_type",
+                "doc": "The lower end of the range into which to constrain x."
+            },
+            {
+                "name": "maxVal",
+                "type": "vec_int_type",
+                "doc": "The upper end of the range into which to constrain x."
+            }
+        ]
+    },
+    {
+        "name": "clamp",
+        "return": {
+            "type": "vec_uint_type",
+            "doc": "The clamped value."
+        },
+        "arguments": [
+            {
+                "name": "x",
+                "type": "vec_uint_type",
+                "doc": "The value to constrain."
+            },
+            {
+                "name": "minVal",
+                "type": "vec_uint_type",
+                "doc": "The lower end of the range into which to constrain x."
+            },
+            {
+                "name": "maxVal",
+                "type": "vec_uint_type",
+                "doc": "The upper end of the range into which to constrain x."
+            }
+        ]
     },
     {
         "name": "textureLod",
