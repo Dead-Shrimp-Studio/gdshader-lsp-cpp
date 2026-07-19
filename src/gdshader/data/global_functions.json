@@ -1309,15 +1309,15 @@
             {
                 "name": "s",
                 "type": "gsampler2D",
-                "doc": ""
+                "doc": "The sampler to which the texture whose level-of-detail will be queried is bound."
             },
             {
                 "name": "p",
                 "type": "vec2",
-                "doc": ""
+                "doc": "The texture coordinates at which the level-of-detail will be queried."
             }
         ],
-        "doc": "texturequerylod>"
+        "doc": "Compute the level-of-detail that would be used to sample from a texture. The mipmap array(s) that would be accessed is returned in the x component of the return value. The computed level-of-detail relative to the base level is returned in the y component of the return value. If called on an incomplete texture, the result of the operation is undefined."
     },
     {
         "name": "textureQueryLod",
@@ -1329,15 +1329,15 @@
             {
                 "name": "s",
                 "type": "gsampler2DArray",
-                "doc": ""
+                "doc": "The sampler to which the texture whose level-of-detail will be queried is bound."
             },
             {
                 "name": "p",
                 "type": "vec2",
-                "doc": ""
+                "doc": "The texture coordinates at which the level-of-detail will be queried."
             }
         ],
-        "doc": "texturequerylod>"
+        "doc": "Compute the level-of-detail that would be used to sample from a texture. The mipmap array(s) that would be accessed is returned in the x component of the return value. The computed level-of-detail relative to the base level is returned in the y component of the return value. If called on an incomplete texture, the result of the operation is undefined."
     },
     {
         "name": "textureQueryLod",
@@ -1349,15 +1349,15 @@
             {
                 "name": "s",
                 "type": "gsampler3D",
-                "doc": ""
+                "doc": "The sampler to which the texture whose level-of-detail will be queried is bound."
             },
             {
                 "name": "p",
                 "type": "vec3",
-                "doc": ""
+                "doc": "The texture coordinates at which the level-of-detail will be queried."
             }
         ],
-        "doc": "texturequerylod>"
+        "doc": "Compute the level-of-detail that would be used to sample from a texture. The mipmap array(s) that would be accessed is returned in the x component of the return value. The computed level-of-detail relative to the base level is returned in the y component of the return value. If called on an incomplete texture, the result of the operation is undefined."
     },
     {
         "name": "textureQueryLod",
@@ -1377,7 +1377,7 @@
                 "doc": "The texture coordinates at which the level-of-detail will be queried."
             }
         ],
-        "doc": "texturequerylod>  Compute the level-of-detail that would be used to sample from a texture. The mipmap array(s) that would be accessed is returned in the x component of the return value. The computed level-of-detail relative to the base level is returned in the y component of the return value. If called on an incomplete texture, the result of the operation is undefined."
+        "doc": "Compute the level-of-detail that would be used to sample from a texture. The mipmap array(s) that would be accessed is returned in the x component of the return value. The computed level-of-detail relative to the base level is returned in the y component of the return value. If called on an incomplete texture, the result of the operation is undefined."
     },
     {
         "name": "textureQueryLevels",
@@ -1534,7 +1534,8 @@
             {
                 "name": "bias",
                 "type": "float",
-                "doc": "An optional bias to be applied during level-of-detail computation."
+                "doc": "An optional bias to be applied during level-of-detail computation.",
+                "is_optional": true
             }
         ],
         "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
@@ -1559,7 +1560,8 @@
             {
                 "name": "bias",
                 "type": "float",
-                "doc": "An optional bias to be applied during level-of-detail computation."
+                "doc": "An optional bias to be applied during level-of-detail computation.",
+                "is_optional": true
             }
         ],
         "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
@@ -1584,7 +1586,323 @@
             {
                 "name": "bias",
                 "type": "float",
-                "doc": "An optional bias to be applied during level-of-detail computation."
+                "doc": "An optional bias to be applied during level-of-detail computation.",
+                "is_optional": true
+            }
+        ],
+        "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "textureProjGrad",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "dPdx",
+                "type": "vec2",
+                "doc": "The partial derivative of p with respect to window x."
+            },
+            {
+                "name": "dPdy",
+                "type": "vec2",
+                "doc": "The partial derivative of p with respect to window y."
+            }
+        ],
+        "doc": "Perform a texture lookup with projection and explicit gradients. The texture coordinates consumed from p, not including the last component of p, are divided by the last component of p. After these values are computed, the texture lookup proceeds as in textureGrad<shader_func_textureGrad>, passing dPdx and dPdy as gradients."
+    },
+    {
+        "name": "textureProjGrad",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec4",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "dPdx",
+                "type": "vec2",
+                "doc": "The partial derivative of p with respect to window x."
+            },
+            {
+                "name": "dPdy",
+                "type": "vec2",
+                "doc": "The partial derivative of p with respect to window y."
+            }
+        ],
+        "doc": "Perform a texture lookup with projection and explicit gradients. The texture coordinates consumed from p, not including the last component of p, are divided by the last component of p. After these values are computed, the texture lookup proceeds as in textureGrad<shader_func_textureGrad>, passing dPdx and dPdy as gradients."
+    },
+    {
+        "name": "textureProjGrad",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler3D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec4",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "dPdx",
+                "type": "vec3",
+                "doc": "The partial derivative of p with respect to window x."
+            },
+            {
+                "name": "dPdy",
+                "type": "vec3",
+                "doc": "The partial derivative of p with respect to window y."
+            }
+        ],
+        "doc": "Perform a texture lookup with projection and explicit gradients. The texture coordinates consumed from p, not including the last component of p, are divided by the last component of p. After these values are computed, the texture lookup proceeds as in textureGrad<shader_func_textureGrad>, passing dPdx and dPdy as gradients."
+    },
+    {
+        "name": "texelFetch",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "ivec2",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "int",
+                "doc": "Specifies the level-of-detail within the texture from which the texel will be fetched."
+            }
+        ]
+    },
+    {
+        "name": "texelFetch",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2DArray",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "ivec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "int",
+                "doc": "Specifies the level-of-detail within the texture from which the texel will be fetched."
+            }
+        ]
+    },
+    {
+        "name": "texelFetch",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler3D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "ivec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "int",
+                "doc": "Specifies the level-of-detail within the texture from which the texel will be fetched."
+            }
+        ]
+    },
+    {
+        "name": "textureGather",
+        "return": {
+            "type": "vec4",
+            "doc": "The gathered texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "samplerCube",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "comps",
+                "type": "int",
+                "doc": "The component of the source texture (0 -> x, 1 -> y, 2 -> z, 3 -> w) that will be used to generate the resulting vector. Zero if not specified.",
+                "is_optional": true
+            }
+        ]
+    },
+    {
+        "name": "textureGather",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "The gathered texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec2",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "comps",
+                "type": "int",
+                "doc": "The component of the source texture (0 -> x, 1 -> y, 2 -> z, 3 -> w) that will be used to generate the resulting vector. Zero if not specified.",
+                "is_optional": true
+            }
+        ]
+    },
+    {
+        "name": "textureGather",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "The gathered texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2DArray",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "comps",
+                "type": "int",
+                "doc": "The component of the source texture (0 -> x, 1 -> y, 2 -> z, 3 -> w) that will be used to generate the resulting vector. Zero if not specified.",
+                "is_optional": true
+            }
+        ]
+    },
+    {
+        "name": "textureProj",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "bias",
+                "type": "float",
+                "doc": "An optional bias to be applied during level-of-detail computation.",
+                "is_optional": true
+            }
+        ],
+        "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "textureProj",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec4",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "bias",
+                "type": "float",
+                "doc": "An optional bias to be applied during level-of-detail computation.",
+                "is_optional": true
+            }
+        ],
+        "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
+    },
+    {
+        "name": "textureProj",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler3D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "bias",
+                "type": "float",
+                "doc": "An optional bias to be applied during level-of-detail computation.",
+                "is_optional": true
             }
         ],
         "doc": "Samples texels from the texture bound to `s` at texture coordinate ` p`. An optional bias, specified in `bias` is included in the level- of-detail computation that is used to choose mipmap(s) from which to sample. For shadow forms, the last component of `p` is used as Dsub and the array layer is specified in the second to last component of `p`. (The second component of `p` is unused for 1D shadow lookups.) For non-shadow variants, the array layer comes from the last component of P."
@@ -1662,6 +1980,156 @@
         ]
     },
     {
+        "name": "textureProjLod",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "float",
+                "doc": "The explicit level-of-detail."
+            }
+        ],
+        "doc": "Performs a texture lookup at coordinate `p` from the texture bound to sampler with an explicit level-of-detail as specified in `lod`. ` lod` specifies \u03bbbase and sets the partial derivatives as follows: \u03b4u/\u03b4x=0, \u03b4v/\u03b4x=0, \u03b4w/\u03b4x=0 \u03b4u/\u03b4y=0, \u03b4v/\u03b4y=0, \u03b4w/\u03b4y=0 Copy to clipboard"
+    },
+    {
+        "name": "textureProjLod",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec4",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "float",
+                "doc": "The explicit level-of-detail."
+            }
+        ],
+        "doc": "Performs a texture lookup at coordinate `p` from the texture bound to sampler with an explicit level-of-detail as specified in `lod`. ` lod` specifies \u03bbbase and sets the partial derivatives as follows: \u03b4u/\u03b4x=0, \u03b4v/\u03b4x=0, \u03b4w/\u03b4x=0 \u03b4u/\u03b4y=0, \u03b4v/\u03b4y=0, \u03b4w/\u03b4y=0 Copy to clipboard"
+    },
+    {
+        "name": "textureProjLod",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler3D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec4",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "float",
+                "doc": "The explicit level-of-detail."
+            }
+        ],
+        "doc": "Performs a texture lookup at coordinate `p` from the texture bound to sampler with an explicit level-of-detail as specified in `lod`. ` lod` specifies \u03bbbase and sets the partial derivatives as follows: \u03b4u/\u03b4x=0, \u03b4v/\u03b4x=0, \u03b4w/\u03b4x=0 \u03b4u/\u03b4y=0, \u03b4v/\u03b4y=0, \u03b4w/\u03b4y=0 Copy to clipboard"
+    },
+    {
+        "name": "textureLod",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec2",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "float",
+                "doc": "The explicit level-of-detail."
+            }
+        ],
+        "doc": "Performs a texture lookup at coordinate `p` from the texture bound to sampler with an explicit level-of-detail as specified in `lod`. ` lod` specifies \u03bbbase and sets the partial derivatives as follows: \u03b4u/\u03b4x=0, \u03b4v/\u03b4x=0, \u03b4w/\u03b4x=0 \u03b4u/\u03b4y=0, \u03b4v/\u03b4y=0, \u03b4w/\u03b4y=0 Copy to clipboard"
+    },
+    {
+        "name": "textureLod",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler3D",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "float",
+                "doc": "The explicit level-of-detail."
+            }
+        ],
+        "doc": "Performs a texture lookup at coordinate `p` from the texture bound to sampler with an explicit level-of-detail as specified in `lod`. ` lod` specifies \u03bbbase and sets the partial derivatives as follows: \u03b4u/\u03b4x=0, \u03b4v/\u03b4x=0, \u03b4w/\u03b4x=0 \u03b4u/\u03b4y=0, \u03b4v/\u03b4y=0, \u03b4w/\u03b4y=0 Copy to clipboard"
+    },
+    {
+        "name": "textureLod",
+        "return": {
+            "type": "gvec4_type",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "gsampler2DArray",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "float",
+                "doc": "The explicit level-of-detail."
+            }
+        ],
+        "doc": "Performs a texture lookup at coordinate `p` from the texture bound to sampler with an explicit level-of-detail as specified in `lod`. ` lod` specifies \u03bbbase and sets the partial derivatives as follows: \u03b4u/\u03b4x=0, \u03b4v/\u03b4x=0, \u03b4w/\u03b4x=0 \u03b4u/\u03b4y=0, \u03b4v/\u03b4y=0, \u03b4w/\u03b4y=0 Copy to clipboard"
+    },
+    {
         "name": "textureLod",
         "return": {
             "type": "vec4",
@@ -1676,6 +2144,31 @@
             {
                 "name": "p",
                 "type": "vec3",
+                "doc": "The texture coordinates at which texture will be sampled."
+            },
+            {
+                "name": "lod",
+                "type": "float",
+                "doc": "The explicit level-of-detail."
+            }
+        ],
+        "doc": "Performs a texture lookup at coordinate `p` from the texture bound to sampler with an explicit level-of-detail as specified in `lod`. ` lod` specifies \u03bbbase and sets the partial derivatives as follows: \u03b4u/\u03b4x=0, \u03b4v/\u03b4x=0, \u03b4w/\u03b4x=0 \u03b4u/\u03b4y=0, \u03b4v/\u03b4y=0, \u03b4w/\u03b4y=0 Copy to clipboard"
+    },
+    {
+        "name": "textureLod",
+        "return": {
+            "type": "vec4",
+            "doc": "A texel."
+        },
+        "arguments": [
+            {
+                "name": "s",
+                "type": "samplerCubeArray",
+                "doc": "The sampler to which the texture from which texels will be retrieved is bound."
+            },
+            {
+                "name": "p",
+                "type": "vec4",
                 "doc": "The texture coordinates at which texture will be sampled."
             },
             {

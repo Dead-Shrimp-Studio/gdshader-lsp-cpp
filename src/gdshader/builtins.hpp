@@ -85,6 +85,7 @@ struct BuiltinArg
     std::string name;
     std::string type;
     std::string doc;
+    bool is_optional = false;
 };
 
 struct BuiltinReturn 

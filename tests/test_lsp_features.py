@@ -488,3 +488,52 @@ def test_call_hierarchy(lsp):
     assert len(outgoing[0]["fromRanges"]) == 1
     out_range = outgoing[0]["fromRanges"][0]
     assert out_range["start"]["line"] == 3, "Outgoing call range line mapping is incorrect."
+
+def test_builtin_optional_arguments(lsp):
+    # Setup test with valid bounds (2 and 3 args) and invalid bounds (1 and 4 args)
+    shader_code = (
+        "shader_type spatial;\n"
+        "uniform sampler2D my_tex;\n"
+        "void fragment() {\n"
+        "    vec2 my_uv = vec2(0.5);\n"
+        "    vec4 col1 = texture(my_tex, my_uv);\n"           # Line 4: Valid (2 args, omitted bias)
+        "    vec4 col2 = texture(my_tex, my_uv, 1.5);\n"      # Line 5: Valid (3 args, provided bias)
+        "    vec4 col3 = texture(my_tex);\n"                  # Line 6: Invalid (1 arg, too few)
+        "    vec4 col4 = texture(my_tex, my_uv, 1.5, 0.0);\n" # Line 7: Invalid (4 args, too many)
+        "}\n"
+    )
+    
+    # Open the document via LSP
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {
+            "uri": "file:///test_optional_args.gdshader",
+            "languageId": "gdshader",
+            "version": 1,
+            "text": shader_code
+        }
+    }, is_notification=True)
+    
+    # Read the diagnostics published by the server
+    response = lsp.read_message()
+    assert response["method"] == "textDocument/publishDiagnostics"
+    
+    # Filter for actual errors (severity 1), ignoring warnings like unused variables
+    diags = [d for d in response["params"]["diagnostics"] if d.get("severity", 1) == 1]
+
+    # We rigorously expect exactly 2 errors for the invalid calls on Lines 6 and 7
+    assert len(diags) == 2, f"Expected exactly 2 errors, got {len(diags)}: {diags}"
+
+    # Extract the line numbers where errors occurred
+    error_lines = {d["range"]["start"]["line"] for d in diags}
+
+    # Verify the invalid calls throw errors
+    assert 6 in error_lines, "Expected 'Invalid argument count' error on line 6 (too few args)"
+    assert 7 in error_lines, "Expected 'Invalid argument count' error on line 7 (too many args)"
+    
+    # Verify the valid calls do NOT throw errors (ensures our overload logic works)
+    assert 4 not in error_lines, "False positive error on line 4 (valid 2-argument texture call)"
+    assert 5 not in error_lines, "False positive error on line 5 (valid 3-argument texture call)"
+    
+    # Ensure the errors are specifically argument count errors
+    for d in diags:
+        assert "Invalid argument count" in d["message"], f"Unexpected error message: {d['message']}"

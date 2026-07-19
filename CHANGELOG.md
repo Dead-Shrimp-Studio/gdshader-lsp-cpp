@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.5.2] - 2026-07-XX
 
 ### Added
+- Handling for optional arguments (and updated the data layer accordingly)
 - Test cases for all bugfixes
 
 ### Changed

@@ -126,33 +126,54 @@ void SemanticAnalyzer::registerGlobalFunctions()
             checkGeneric(arg.type);
         }
 
-        if (isGeneric) 
-        {
-            // Safety measure: keep track of generated signatures to prevent duplicate registrations
-            std::set<std::string> generatedSignatures;
+        std::set<std::string> generatedSignatures;
 
-            for (int i = 0; i < variations; i++) 
-            {
-                std::string r = resolveGeneric(func.returnProperties.type, i);
-                std::vector<BuiltinArg> argsResolved;
-                
-                std::string signatureKey = r + "(";
-                for (const BuiltinArg& arg : func.args)
-                {
-                    std::string resolvedArg = resolveGeneric(arg.type, i);
-                    argsResolved.push_back({arg.name, resolvedArg, arg.doc});
-                    signatureKey += resolvedArg + ",";
+        // Helper: Registers the full signature, then peels off optional args from the end and registers those too
+        auto registerWithOptionals = [&](const std::string& name, const std::string& ret, const std::vector<BuiltinArg>& args, const std::string& doc) -> void
+        {
+            std::vector<BuiltinArg> currentArgs = args;
+            
+            while (true) {
+                // Build a signature key to prevent duplicate overloads
+                std::string signatureKey = ret + "(";
+                for (const BuiltinArg& arg : currentArgs) {
+                    signatureKey += arg.type + ",";
                 }
                 signatureKey += ")";
 
                 // Only register if we haven't already registered this exact signature
                 if (generatedSignatures.insert(signatureKey).second) {
-                    registerConcrete(func.name, r, argsResolved, func.doc);
+                    registerConcrete(name, ret, currentArgs, doc);
                 }
+
+                // If the last argument is optional, pop it and loop again to register the shorter signature
+                if (!currentArgs.empty() && currentArgs.back().is_optional) {
+                    currentArgs.pop_back();
+                } else {
+                    break; // No more optional arguments at the end, stop generating overloads
+                }
+            }
+        };
+
+        if (isGeneric) 
+        {
+            for (int i = 0; i < variations; i++) 
+            {
+                std::string r = resolveGeneric(func.returnProperties.type, i);
+                std::vector<BuiltinArg> argsResolved;
+                
+                for (const BuiltinArg& arg : func.args)
+                {
+                    std::string resolvedArg = resolveGeneric(arg.type, i);
+                    // Pass the is_optional flag through the generic resolution!
+                    argsResolved.push_back({arg.name, resolvedArg, arg.doc, arg.is_optional});
+                }
+
+                registerWithOptionals(func.name, r, argsResolved, func.doc);
             }
         }
         else {
-            registerConcrete(func.name, func.returnProperties.type, func.args, func.doc);
+            registerWithOptionals(func.name, func.returnProperties.type, func.args, func.doc);
         }
     }
 }
