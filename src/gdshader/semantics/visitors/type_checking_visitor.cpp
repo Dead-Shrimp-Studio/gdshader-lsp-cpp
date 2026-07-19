@@ -451,6 +451,9 @@ void TypeCheckingVisitor::visit(UnaryOpNode* node)
             if (s && s->mutability == Mutability::ReadOnly) {
                 GDSHADER_ERROR_IF(true, "Attempted assignment to read-only variable '{}'", s->name);
                 diagnostics.push_back(reportError(node->operand.get(), DiagnosticCode::CannotAssignToReadOnly, "Cannot assign to read-only variable '" + s->name + "'."));
+            } else if (s->category == SymbolType::Varying && currentProcessorFunction != ShaderStage::Vertex) {
+                GDSHADER_ERROR_IF(true, "Attempted to write to varying in non-vertex processor");
+                diagnostics.push_back(reportError(node->operand.get(), DiagnosticCode::VaryingReadOnlyInFragment, "Varyings are read-only outside the vertex processor."));
             }
         }
     }

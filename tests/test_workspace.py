@@ -1,5 +1,44 @@
 import pytest # type: ignore
 
+def test_valid_varying_assignment_in_vertex(lsp):
+
+    shader_code = """
+    shader_type spatial;
+    varying vec3 my_color;
+    varying float my_float;
+    
+    void vertex() {
+        // Binary assignment (should be valid)
+        my_color = vec3(1.0, 0.0, 0.0);
+        
+        // Unary modification (should also be valid after our patch)
+        my_float = 0.0;
+        my_float++;
+    }
+    """
+
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {
+            "uri": "file:///valid_varying_vertex.gdshader",
+            "languageId": "gdshader",
+            "version": 1,
+            "text": shader_code
+        }
+    }, is_notification=True)
+    
+    # Read the diagnostics published by the server[cite: 12]
+    response = lsp.read_message()
+    
+    assert response["method"] == "textDocument/publishDiagnostics"
+    diags = response["params"]["diagnostics"]
+    
+    # Filter for any errors (ignoring potential unused variable warnings, if any)
+    # LSP DiagnosticSeverity: Error = 1, Warning = 2
+    errors = [d for d in diags if d.get("severity", 1) == 1]
+    
+    # Assert that no false positive "read-only" errors were thrown
+    assert len(errors) == 0, f"Expected 0 errors for varying assignment in vertex(), but got: {errors}"
+
 def test_preprocessor_defines(lsp):
     shader_code = """
     shader_type spatial;
