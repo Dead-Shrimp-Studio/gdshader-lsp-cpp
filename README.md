@@ -49,16 +49,16 @@ GDShader LSP is built for speed and low latency.
 
 The GDShader language evolves with every Godot Engine release (adding new built-ins, changing keywords, etc.). To ensure strict semantic accuracy, **GDShader LSP** releases are pinned to specific Godot versions.
 
-We follow a **"Main is Latest"** strategy:
-* The `main` branch always tracks the **latest stable** version of Godot.
+We follow a **"Master is Latest"** strategy:
+* The `master` branch always tracks the **latest stable** version of Godot.
 * Previous Godot versions are supported via long-lived `support/` branches.
 
 | LSP Version | Godot Version | Git Branch |
 | :--- | :--- | :--- |
-| **v0.3.x** *(Upcoming)* | **Godot 4.6** | `main` |
-| **v0.2.x** *(Current)* | **Godot 4.5** | `support/4.5` |
+| **v0.3.x** *(Upcoming)* | **Godot 4.7** (incl. `blist`) | `master` |
+| **v0.2.x** *(Current)* | **Godot 4.5 / 4.6** | `support/4.5+` |
 
-*Note: If you are building from source, ensure you checkout the branch matching your project's Godot version.*
+*Note: This branch (`support/4.5+`) targets **Godot 4.5 and 4.6**. The upcoming **Godot 4.7 `blist`** shader type is supported exclusively on `master`. If you are building from source, ensure you checkout the branch matching your project's Godot version.*
 
 ## Building from Source
 
