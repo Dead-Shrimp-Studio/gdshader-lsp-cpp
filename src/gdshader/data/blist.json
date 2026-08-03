@@ -1,0 +1,44 @@
+[
+    {
+        "name": "FRAGCOORD",
+        "type": "vec4",
+        "doc": "Coordinate of pixel center. In screen space. xy specifies position in viewport. Upper-left of the viewport is the origin, (0.0, 0.0).",
+        "qualifier": "in"
+    },
+    {
+        "name": "UV",
+        "type": "vec2",
+        "doc": "UV from the vertex() function. This is set to sample all of a source texture.",
+        "qualifier": "in"
+    },
+    {
+        "name": "MODULATE",
+        "type": "vec4",
+        "doc": "MODULATE color passed in by RenderingServer API.",
+        "qualifier": "in"
+    },
+    {
+        "name": "COLOR0",
+        "type": "vec4",
+        "doc": "Output color to be blended with the DrawableTexture target. Initialized to (0.0, 0.0, 0.0, 0.0).",
+        "qualifier": "out"
+    },
+    {
+        "name": "COLOR1",
+        "type": "vec4",
+        "doc": "Output color to be blended with an extra DrawableTexture target. Initialized to (0.0, 0.0, 0.0, 0.0).",
+        "qualifier": "out"
+    },
+    {
+        "name": "COLOR2",
+        "type": "vec4",
+        "doc": "Output color to be blended with an extra DrawableTexture target. Initialized to (0.0, 0.0, 0.0, 0.0).",
+        "qualifier": "out"
+    },
+    {
+        "name": "COLOR3",
+        "type": "vec4",
+        "doc": "Output color to be blended with an extra DrawableTexture target. Initialized to (0.0, 0.0, 0.0, 0.0).",
+        "qualifier": "out"
+    }
+]

@@ -8,7 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - Upcoming v0.3.x (Godot 4.7)
 
 ### Added
-- Support for the new **`blist`** shader type introduced in Godot 4.7 (implementation in progress)
+- Support for the new **`blist`** shader type introduced in Godot 4.7
+  - New `blist` and `blist_global` builtin data files
+  - `blit()` processor function recognition (void return, no args validation)
+  - `blist` shader type mapping and builtin loading
+  - `blend_disabled` render mode
+  - `hint_blit_source0..3` uniform hints supported
+  - Code action to insert `shader_type blist;`
+  - Test coverage for blist diagnostics and autocompletion
+
+### Fixed
+- `render_mode` was incorrectly rejected in `canvas_item` shaders; it is now valid in `spatial`, `canvas_item`, and `blist` shaders
 
 ## [0.2.5.2] - 2026-07-XX
 

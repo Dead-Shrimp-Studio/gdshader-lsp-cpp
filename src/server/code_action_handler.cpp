@@ -121,6 +121,7 @@ CodeActionHandler::getActions(const CodeActionContext& context)
             // Offer the two most common options to the user
             actions.push_back(createInsertFix("Add 'shader_type spatial;' at top", uri, topOfFile, "shader_type spatial;\n", diag));
             actions.push_back(createInsertFix("Add 'shader_type canvas_item;' at top", uri, topOfFile, "shader_type canvas_item;\n", diag));
+            actions.push_back(createInsertFix("Add 'shader_type blist;' at top", uri, topOfFile, "shader_type blist;\n", diag));
         }
 
         else if (code == "GDS4000") { 

@@ -454,15 +454,6 @@
         "expected_error": "Cannot assign to function"
     },
     {
-        "name": "render_mode_not_spatial",
-        "code": [
-            "shader_type canvas_item;",
-            "render_mode unshaded;",
-            "void fragment() {}"
-        ],
-        "expected_error": "only valid in spatial type shaders"
-    },
-    {
         "name": "unused_variable_warning",
         "code": [
             "shader_type spatial;",
@@ -1121,5 +1112,54 @@
             "}"
         ],
         "expected_error": "Type mismatch"
+    },
+    {
+        "name": "blist_blit_with_args",
+        "code": [
+            "shader_type blist;",
+            "void blit(int arg) {",
+            "    COLOR0 = vec4(1.0);",
+            "}"
+        ],
+        "expected_error": "must not have arguments"
+    },
+    {
+        "name": "blist_blit_returns_value",
+        "code": [
+            "shader_type blist;",
+            "float blit() {",
+            "    return 1.0;",
+            "}"
+        ],
+        "expected_error": "must return 'void'"
+    },
+    {
+        "name": "blist_global_time_readonly",
+        "code": [
+            "shader_type blist;",
+            "void blit() {",
+            "    TIME = 2.0;",
+            "}"
+        ],
+        "expected_error": "read-only"
+    },
+    {
+        "name": "render_mode_in_particles",
+        "code": [
+            "shader_type particles;",
+            "render_mode blend_mix;",
+            "void process() {",
+            "}"
+        ],
+        "expected_error": "only valid in spatial, canvas_item, or blist"
+    },
+    {
+        "name": "blist_unknown_shader_type_message",
+        "code": [
+            "shader_type blistt;",
+            "void blit() {",
+            "}"
+        ],
+        "expected_error": "spatial, canvas_item, particles, sky, fog, or blist"
     }
 ]

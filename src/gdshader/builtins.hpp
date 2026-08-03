@@ -17,6 +17,7 @@ enum class ShaderType
     Particles,
     Sky,
     Fog,
+    Blist,
     Unknown
 };
 
@@ -29,7 +30,8 @@ enum class ShaderStage
     Start,   // Particles
     Process, // Particles
     Sky,     // Sky
-    Fog      // Fog
+    Fog,     // Fog
+    Blit     // Blist
 };
 
 enum class RenderMode
@@ -69,7 +71,8 @@ enum class RenderMode
     PARTICLE_TRAILS,
     ALPHA_TO_COVERAGE,
     ALPHA_TO_COVERAGE_AND_ONE,
-    FOG_DISABLED
+    FOG_DISABLED,
+    BLEND_DISABLED
 };
 
 struct BuiltinVariable 
@@ -135,6 +138,9 @@ static inline const BuiltinList& get_nonglobal_builtins(ShaderType type, ShaderS
     else if (type == ShaderType::Fog) {
         if (scope == ShaderStage::Fog) return gdshader_lsp::generated::FOG;
     }
+    else if (type == ShaderType::Blist) {
+        if (scope == ShaderStage::Blit) return gdshader_lsp::generated::BLIST;
+    }
     return EMTPY_LIST;
 }
 
@@ -154,6 +160,9 @@ static inline const BuiltinList& get_global_builtins(ShaderType type)
     }
     else if (type == ShaderType::Fog) {
         return gdshader_lsp::generated::FOG_GLOBAL;
+    }
+    else if (type == ShaderType::Blist) {
+        return gdshader_lsp::generated::BLIST_GLOBAL;
     }
     return EMTPY_LIST;
 }
@@ -202,7 +211,8 @@ static inline RenderMode stringToRenderMode(const std::string& modeStr)
         {"particle_trails", RenderMode::PARTICLE_TRAILS},
         {"alpha_to_coverage", RenderMode::ALPHA_TO_COVERAGE},
         {"alpha_to_coverage_and_one", RenderMode::ALPHA_TO_COVERAGE_AND_ONE},
-        {"fog_disabled", RenderMode::FOG_DISABLED}
+        {"fog_disabled", RenderMode::FOG_DISABLED},
+        {"blend_disabled", RenderMode::BLEND_DISABLED}
     };
 
     auto it = modeMap.find(modeStr);

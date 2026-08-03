@@ -4,6 +4,23 @@
 #include "generated/builtins_data.hpp"
 namespace gdshader_lsp::generated {
 
+const BuiltinList BLIST = {
+    {"FRAGCOORD", "vec4", "Coordinate of pixel center. In screen space. xy specifies position in viewport. Upper-left of the viewport is the origin, (0.0, 0.0).", "in"},
+    {"UV", "vec2", "UV from the vertex() function. This is set to sample all of a source texture.", "in"},
+    {"MODULATE", "vec4", "MODULATE color passed in by RenderingServer API.", "in"},
+    {"COLOR0", "vec4", "Output color to be blended with the DrawableTexture target. Initialized to (0.0, 0.0, 0.0, 0.0).", "out"},
+    {"COLOR1", "vec4", "Output color to be blended with an extra DrawableTexture target. Initialized to (0.0, 0.0, 0.0, 0.0).", "out"},
+    {"COLOR2", "vec4", "Output color to be blended with an extra DrawableTexture target. Initialized to (0.0, 0.0, 0.0, 0.0).", "out"},
+    {"COLOR3", "vec4", "Output color to be blended with an extra DrawableTexture target. Initialized to (0.0, 0.0, 0.0, 0.0).", "out"},
+};
+
+const BuiltinList BLIST_GLOBAL = {
+    {"TIME", "float", "Global time since the engine has started, in seconds. It repeats after every 3,600 seconds (which can be changed with the rollover setting). It's affected by time_scale but not by pausing. If you need a TIME variable that is not affected by time scale, add your own global shader uniform and update it each frame.", "in"},
+    {"PI", "float", "A PI constant (3.141592). A ratio of a circle's circumference to its diameter and amount of radians in half turn.", "in"},
+    {"TAU", "float", "A TAU constant (6.283185). An equivalent of PI * 2 and amount of radians in full turn.", "in"},
+    {"E", "float", "An E constant (2.718281). Euler's number and a base of the natural logarithm.", "in"},
+};
+
 const BuiltinList CANVAS_FRAGMENT = {
     {"FRAGCOORD", "vec4", "Coordinate of pixel center. In screen space. xy specifies position in viewport. Upper-left of the viewport is the origin, (0.0, 0.0).", "in"},
     {"SCREEN_PIXEL_SIZE", "vec2", "Size of individual pixels. Equal to inverse of resolution.", "in"},

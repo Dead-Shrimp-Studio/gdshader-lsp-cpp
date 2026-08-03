@@ -537,3 +537,43 @@ def test_builtin_optional_arguments(lsp):
     # Ensure the errors are specifically argument count errors
     for d in diags:
         assert "Invalid argument count" in d["message"], f"Unexpected error message: {d['message']}"
+
+def test_blist_shader_support(lsp):
+    # Valid blist shader should produce no diagnostics
+    shader_code = (
+        "shader_type blist;\n"
+        "render_mode blend_add;\n"
+        "uniform sampler2D source_tex : hint_blit_source0;\n"
+        "void blit() {\n"
+        "    COLOR0 = texture(source_tex, UV) * MODULATE;\n"
+        "}\n"
+    )
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {"uri": "file:///blist.gdshader", "languageId": "gdshader", "version": 1, "text": shader_code}
+    }, is_notification=True)
+
+    response = lsp.read_message()
+    assert response["method"] == "textDocument/publishDiagnostics"
+    errors = [d for d in response["params"]["diagnostics"] if d.get("severity", 1) == 1]
+    assert len(errors) == 0, f"Expected no errors for valid blist shader, got: {errors}"
+
+def test_blist_autocomplete_builtins(lsp):
+    shader_code = "shader_type blist;\nvoid blit() {\n    COL \n}\n"
+    lsp.send_message("textDocument/didOpen", {
+        "textDocument": {"uri": "file:///blist_completion.gdshader", "languageId": "gdshader", "version": 1, "text": shader_code}
+    }, is_notification=True)
+    lsp.read_message()  # Consume diags
+
+    msg_id = lsp.send_message("textDocument/completion", {
+        "textDocument": {"uri": "file:///blist_completion.gdshader"}, "position": {"line": 2, "character": 7}
+    })
+    result = lsp.read_message()["result"]
+    items = result["items"] if isinstance(result, dict) else result
+    labels = [item["label"] for item in items]
+
+    assert "COLOR0" in labels
+    assert "COLOR1" in labels
+    assert "COLOR2" in labels
+    assert "COLOR3" in labels
+    assert "MODULATE" in labels
+    assert "FRAGCOORD" in labels

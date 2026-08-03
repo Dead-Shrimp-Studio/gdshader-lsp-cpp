@@ -3,6 +3,8 @@
 #pragma once
 namespace gdshader_lsp::generated {
 
+extern const BuiltinList BLIST;
+extern const BuiltinList BLIST_GLOBAL;
 extern const BuiltinList CANVAS_FRAGMENT;
 extern const BuiltinList CANVAS_GLOBAL;
 extern const BuiltinList CANVAS_LIGHT;
