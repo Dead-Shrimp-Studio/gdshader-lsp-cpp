@@ -36,6 +36,7 @@ void LintingVisitor::visit(FunctionNode* node)
     else if (node->name == "process") currentProcessorFunction = ShaderStage::Process;
     else if (node->name == "sky") currentProcessorFunction = ShaderStage::Sky;
     else if (node->name == "fog") currentProcessorFunction = ShaderStage::Fog;
+    else if (node->name == "blit") currentProcessorFunction = ShaderStage::Blit;
     else currentProcessorFunction = ShaderStage::Global;
 
     // 1. Processor Rules

@@ -94,6 +94,7 @@ void TypeCheckingVisitor::visit(FunctionNode* node)
     if (node->name == "vertex") currentProcessorFunction = ShaderStage::Vertex;
     else if (node->name == "fragment") currentProcessorFunction = ShaderStage::Fragment;
     else if (node->name == "light") currentProcessorFunction = ShaderStage::Light;
+    else if (node->name == "blit") currentProcessorFunction = ShaderStage::Blit;
     else currentProcessorFunction = ShaderStage::Global;
 
     if (node->body) node->body->accept(*this);

@@ -16,6 +16,7 @@ namespace gdshader_lsp {
         else if (funcName == "process") scope = ShaderStage::Process;
         else if (funcName == "sky") scope = ShaderStage::Sky;
         else if (funcName == "fog") scope = ShaderStage::Fog;
+        else if (funcName == "blit") scope = ShaderStage::Blit;
 
         if (scope != ShaderStage::Global)
         {
@@ -159,7 +160,7 @@ namespace gdshader_lsp {
 
         if (currentShaderType == ShaderType::Unknown)
         {
-            diagnostics.push_back(reportError(node, DiagnosticCode::MissingOrUnknownShaderType, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::MissingOrUnknownShaderType, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, fog, or blist."));
         }
 
         loadBuiltinsForFunction(node->name);
@@ -207,10 +208,11 @@ namespace gdshader_lsp {
         else if (node->shaderType == "particles") currentShaderType = ShaderType::Particles;
         else if (node->shaderType == "sky") currentShaderType = ShaderType::Sky;
         else if (node->shaderType == "fog") currentShaderType = ShaderType::Fog;
+        else if (node->shaderType == "blist") currentShaderType = ShaderType::Blist;
         else {
             currentShaderType = ShaderType::Unknown;
             GDSHADER_ERROR_IF(true, "Unknown shader type encountered: {}", node->shaderType);
-            diagnostics.push_back(reportError(node, DiagnosticCode::MissingOrUnknownShaderType, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, or fog."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::MissingOrUnknownShaderType, "shader_type missing. Must be one of spatial, canvas_item, particles, sky, fog, or blist."));
         }
         loadGlobalVariables();
     }
@@ -219,12 +221,16 @@ namespace gdshader_lsp {
     {
         GDSHADER_RETURN_IF(!node, "RenderModeNode is null");
         
-        bool is_not_spatial = (currentShaderType != ShaderType::Spatial);
-        GDSHADER_ERROR_IF(is_not_spatial, "render_mode declared outside spatial shader");
+        // render_mode is valid for spatial, canvas_item, and blist shaders.
+        // It is not valid for particles, sky, fog, or unknown shader types.
+        bool is_invalid_scope = (currentShaderType != ShaderType::Spatial &&
+                                 currentShaderType != ShaderType::CanvasItem &&
+                                 currentShaderType != ShaderType::Blist);
+        GDSHADER_ERROR_IF(is_invalid_scope, "render_mode declared outside a valid shader type");
         
-        if (is_not_spatial)
+        if (is_invalid_scope)
         {
-            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidRenderModeScope, "render_mode declarations are only valid in spatial type shaders."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidRenderModeScope, "render_mode declarations are only valid in spatial, canvas_item, or blist type shaders."));
         }
 
         for (const std::string& mode : node->modes)
