@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Backported fixes from `master` (see individual entries below)
 
+### Fixed
+- `render_mode` now correctly accepts canvas_item shaders
+
 ## [0.2.5.2] - 2026-07-XX
 
 ### Added
