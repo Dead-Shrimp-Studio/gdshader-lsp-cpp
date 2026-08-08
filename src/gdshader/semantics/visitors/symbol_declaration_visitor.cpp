@@ -219,12 +219,13 @@ namespace gdshader_lsp {
     {
         GDSHADER_RETURN_IF(!node, "RenderModeNode is null");
         
-        bool is_not_spatial = (currentShaderType != ShaderType::Spatial);
-        GDSHADER_ERROR_IF(is_not_spatial, "render_mode declared outside spatial shader");
+        bool is_invalid_scope = (currentShaderType != ShaderType::Spatial &&
+                                 currentShaderType != ShaderType::CanvasItem);
+        GDSHADER_ERROR_IF(is_invalid_scope, "render_mode declared outside spatial shader");
         
-        if (is_not_spatial)
+        if (is_invalid_scope)
         {
-            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidRenderModeScope, "render_mode declarations are only valid in spatial type shaders."));
+            diagnostics.push_back(reportError(node, DiagnosticCode::InvalidRenderModeScope, "render_mode declarations are only valid in spatial and canvas_item shaders."));
         }
 
         for (const std::string& mode : node->modes)

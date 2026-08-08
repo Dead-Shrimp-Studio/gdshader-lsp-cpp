@@ -40,7 +40,7 @@ else:
     host_os = 'linux'
 
 is_native_build = (target_platform == host_os)
-print(f"Building for: {target_platform} ({build_target}) | Host: {host_os} | Native: {is_native_build}")
+print(f"Building for: {target_platform} ({build_target}) | Host: {host_os} | Native: {is_native_build}") # type: ignore
 
 # -------------------------------------------------------------------------
 # DEPENDENCIES
