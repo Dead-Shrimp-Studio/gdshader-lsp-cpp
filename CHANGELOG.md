@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.2] - Unreleased
 
+### Added
+- Command line argument ```--log-path=<path>``` to specify logging file dirs. 'none' or 'off' disables file logging
+
 ### Fixed
 - Several latent bugs about thread & request synchonization
   - Requests arriving during a shader units compilation time were neither queued nor rejeceted, but responeded with empty results
