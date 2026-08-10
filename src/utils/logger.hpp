@@ -30,40 +30,46 @@ class Logger
 
     public:
         
-        static void init(const std::string& filename = "gdshader_lsp_log.txt") 
+        static void init(const std::string& log_path = "gdshader_lsp_log.txt") 
         {
             try {
+                std::vector<spdlog::sink_ptr> sinks;
 
-            auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
-            console_sink->set_level(spdlog::level::debug);
-            
-            // [Time] [ThreadID] [ColorLevel] [SourceFile:Line] Message
-            console_sink->set_pattern("[%H:%M:%S.%e] [T:%t] [%^%l%$] [%s:%#] %v");
+                // Console sink (stderr)
+                auto console_sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+                console_sink->set_level(spdlog::level::debug);
+                console_sink->set_pattern("[%H:%M:%S.%e] [T:%t] [%^%l%$] [%s:%#] %v");
+                sinks.push_back(console_sink);
 
-            // Max size: 5MB, Max files: 3. If log exceeds 5MB, it rolls over.
-            auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(filename, 1024 * 1024 * 50, 3);
-            file_sink->set_level(spdlog::level::trace);
-            
-            // [Date Time] [ThreadID] [Level] [Func] [SourceFile:Line] Message
-            file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [T:%t] [%l] [%!] [%s:%#] %v");
+                // Check if file logging is explicitly disabled
+                bool file_logging_disabled = log_path.empty() || log_path == "none" || log_path == "off";
 
-            std::vector<spdlog::sink_ptr> sinks {console_sink, file_sink};
+                if (!file_logging_disabled) {
+                    // Max size: 50MB, Max files: 3
+                    auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(log_path, 1024 * 1024 * 50, 3);
+                    file_sink->set_level(spdlog::level::trace);
+                    file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [T:%t] [%l] [%!] [%s:%#] %v");
+                    sinks.push_back(file_sink);
+                }
 
-            // Queue size is 8192 items. If queue is full, we block (thread_pool settings).
-            spdlog::init_thread_pool(8192, 1);
-            auto logger = std::make_shared<spdlog::async_logger>("server_logger", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
-            logger->enable_backtrace(32);
+                spdlog::init_thread_pool(8192, 1);
+                auto logger = std::make_shared<spdlog::async_logger>(
+                    "server_logger", sinks.begin(), sinks.end(), 
+                    spdlog::thread_pool(), spdlog::async_overflow_policy::block
+                );
+                logger->enable_backtrace(32);
 
-            spdlog::set_default_logger(logger);
-            spdlog::set_level(spdlog::level::trace);
-            
-            spdlog::flush_on(spdlog::level::err); 
-            SPDLOG_INFO("Logging system initialized. Async: Enabled.");
+                spdlog::set_default_logger(logger);
+                spdlog::set_level(spdlog::level::trace);
+                
+                spdlog::flush_on(spdlog::level::err); 
+                SPDLOG_INFO("Logging system initialized. Async: Enabled. File log: {}", 
+                            file_logging_disabled ? "Disabled" : log_path);
 
-        } catch (const spdlog::spdlog_ex& ex) {
-            std::cerr << "Log initialization failed: " << ex.what() << std::endl;
+            } catch (const spdlog::spdlog_ex& ex) {
+                std::cerr << "Log initialization failed: " << ex.what() << std::endl;
+            }
         }
-        };
 
         static void shutdown()
         {
