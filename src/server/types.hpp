@@ -12,6 +12,8 @@
 #include <unordered_set>
 #include <memory>
 #include <mutex>
+#include <condition_variable>
+#include <cstdint>
 
 namespace gdshader_lsp
 {
@@ -22,7 +24,14 @@ struct ShaderUnit {
 
     std::string path;
     std::string source_code;
-    int version = 0;
+
+    // Document versioning and thread synchronization.
+    // contentVersion is bumped for every accepted edit (didOpen/didChange).
+    // compiledVersion is set to the contentVersion whose text ast/symbols reflect.
+    // A reader blocks until compiledVersion >= contentVersion before reading ast.
+    std::uint64_t contentVersion  = 0;
+    std::uint64_t compiledVersion = 0;
+    std::condition_variable compiledCV;
 
     std::unordered_set<std::string> defines;
 
