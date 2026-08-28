@@ -945,29 +945,66 @@ void TypeCheckingVisitor::validateConstructor(const FunctionCallNode* node, cons
     }
 
     if (target->kind == TypeKind::MATRIX) {
-        int expected = target->componentCount * target->componentCount; 
-        if (target->name == "mat2") expected = 4;
-        else if (target->name == "mat3") expected = 9;
-        else if (target->name == "mat4") expected = 16;
-        
-        int provided = 0;
+        // Matrix constructors are strictly typed (Godot shading language docs):
+        //   matN(vecN, vecN, ...)   One column vector per column.
+        //   matN(float)             Diagonal matrix, e.g. mat4(1.0) is the identity.
+        //   matN(matM)              Matrix conversion, only between different dimensions.
+        const int dim = target->componentCount;
+
+        std::vector<TypePtr> argTypes;
+        argTypes.reserve(node->arguments.size());
         for (const auto& arg : node->arguments) {
-            TypePtr argT = resolveType(arg.get());
-            if (argT == typeRegistry.getUnknownType() || argT == typeRegistry.getType("void")) {
-                GDSHADER_ERROR_IF(true, "Invalid matrix constructor argument");
-                diagnostics.push_back(reportError(arg.get(), DiagnosticCode::InvalidArgumentType, "Invalid matrix constructor argument."));
-                continue;
+            argTypes.push_back(resolveType(arg.get()));
+        }
+
+        // An unresolved argument was already reported while visiting it.
+        for (const auto& argT : argTypes) {
+            if (argT->kind == TypeKind::UNKNOWN) return;
+        }
+
+        // Diagonal construction: matN(float), with the usual int/uint -> float conversions.
+        if (argTypes.size() == 1 && argTypes[0]->kind == TypeKind::SCALAR) {
+            TypePtr scalarT = argTypes[0];
+            if (scalarT->name == "void") {
+                GDSHADER_ERROR_IF(true, "Attempted to use void in matrix constructor '{}'", typeName);
+                diagnostics.push_back(reportError(node->arguments[0].get(), DiagnosticCode::CannotConstructType, "Cannot use 'void' expression in constructor."));
+            } else if (getConversionCost(scalarT, typeRegistry.getType("float")) == -1) {
+                GDSHADER_ERROR_IF(true, "Invalid diagonal construction of '{}' from '{}'", typeName, scalarT->toString());
+                diagnostics.push_back(reportError(node->arguments[0].get(), DiagnosticCode::InvalidArgumentType,
+                    "Invalid argument for constructor '" + typeName + "'. Expected 'float', but found '" + scalarT->toString() + "'."));
             }
-
-            if (argT->kind == TypeKind::SCALAR) provided += 1;
-            else if (argT->kind == TypeKind::VECTOR) provided += argT->componentCount;
-            else if (argT->kind == TypeKind::MATRIX) provided += 100; 
+            return;
         }
 
-        if (provided < expected && provided < 50) {
-            GDSHADER_ERROR_IF(true, "Not enough components for matrix constructor '{}'", typeName);
-            diagnostics.push_back(reportError(node, DiagnosticCode::ConstructorArgumentMismatch, "Not enough components to construct '" + typeName + "'."));
+        // Matrix conversion: matN(matM). There is no matN(matN) constructor;
+        // matrices of the same dimension are copied by direct assignment.
+        if (argTypes.size() == 1 && argTypes[0]->kind == TypeKind::MATRIX) {
+            if (argTypes[0]->componentCount == dim) {
+                GDSHADER_ERROR_IF(true, "No same-dimension matrix constructor for '{}'", typeName);
+                diagnostics.push_back(reportError(node, DiagnosticCode::ConstructorArgumentMismatch,
+                    "No matching constructor found for '" + typeName + "'. Matrices of the same dimension can be assigned directly."));
+            }
+            return;
         }
+
+        // Column construction: every argument must be a column vector of the matrix dimension.
+        if (argTypes.size() == (size_t)dim) {
+            for (size_t i = 0; i < argTypes.size(); ++i) {
+                if (*argTypes[i] == *target->baseType) continue;
+
+                GDSHADER_ERROR_IF(true, "Invalid argument {} for matrix constructor '{}'", i + 1, typeName);
+                diagnostics.push_back(reportError(node->arguments[i].get(), DiagnosticCode::InvalidArgumentType,
+                    "Invalid argument " + std::to_string(i + 1) + " for constructor '" + typeName + "'. Expected '" +
+                    target->baseType->toString() + "', but found '" + argTypes[i]->toString() + "'."));
+                break;
+            }
+            return;
+        }
+
+        GDSHADER_ERROR_IF(true, "No matching matrix constructor for '{}' with {} arguments", typeName, argTypes.size());
+        diagnostics.push_back(reportError(node, DiagnosticCode::ConstructorArgumentMismatch,
+            "No matching constructor found for '" + typeName + "'."));
+        return;
     }
 
     if (target->kind == TypeKind::SCALAR) {

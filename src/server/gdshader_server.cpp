@@ -101,7 +101,7 @@ void GdShaderServer::registerHandlers() {
                 .capabilities = caps,
                 .serverInfo = lsp::InitializeResultServerInfo{
                     .name = "gdshader-lsp",
-                    .version = "0.4.2"
+                    .version = "0.3.1"
                 }
             };
         }
@@ -123,6 +123,7 @@ void GdShaderServer::registerHandlers() {
             auto su = pm->getUnit(path);
 
             su->unitMutex.lock();
+            su->contentVersion++;
             pm->updateFile(path, params.textDocument.text);
             su->unitMutex.unlock();
             {
@@ -172,6 +173,7 @@ void GdShaderServer::registerHandlers() {
                 }, changeEvent);
             }
 
+            su->contentVersion++;
             pm->updateFile(path, currentText);
             su->unitMutex.unlock();
             {
@@ -200,6 +202,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return hover; }
 
             su->unitMutex.lock();
             if (!su->symbols) {
@@ -304,15 +307,19 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
 
             su->unitMutex.lock();
             if (!su->symbols || !su->ast) {
                 su->unitMutex.unlock();
+                SPDLOG_DEBUG("textDocument/completion failed: shader unit has no AST");
                 return result;                
             }
 
             int line = params.position.line;
             int col = params.position.character;
+
+            SPDLOG_DEBUG("textDocument/completion: path {}, line {}, col {}", path, line, col);
 
             // We still use the text buffer just to check if the trigger was a '.'
             std::string lineText = getLine(su->source_code, line);
@@ -454,6 +461,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return loc; }
 
             su->unitMutex.lock();
             if (!su->symbols) {
@@ -521,6 +529,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return help; }
 
             su->unitMutex.lock();
             if (!su->symbols) {
@@ -663,6 +672,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return nullptr; }
 
             su->unitMutex.lock();
             if (!su->symbols) {
@@ -690,6 +700,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
 
             su->unitMutex.lock();
             if (!su->ast) {
@@ -748,6 +759,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
             
             su->unitMutex.lock();
             if (!su->symbols) {
@@ -808,6 +820,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
             
             su->unitMutex.lock();
             if (!su->symbols) {
@@ -860,6 +873,7 @@ void GdShaderServer::registerHandlers() {
                     for (const std::string& target_path : affected_files) 
                     {
                         auto target_unit = pm->getUnit(target_path);
+                        if (!waitUntilCurrent(target_unit)) continue;
                         
                         std::lock_guard<std::mutex> lock(target_unit->unitMutex);
                         if (!target_unit->symbols) continue;
@@ -922,6 +936,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
 
             su->unitMutex.lock();
             if (!su->symbols) {
@@ -985,6 +1000,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
 
             su->unitMutex.lock();
             if (su->ast) {
@@ -1009,6 +1025,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return hints; }
 
             su->unitMutex.lock();
             if (!su->ast || !su->symbols) 
@@ -1039,6 +1056,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return colors; }
 
             su->unitMutex.lock();
             if (!su->ast) {
@@ -1102,6 +1120,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
             
             std::lock_guard<std::mutex> lock(su->unitMutex);
 
@@ -1151,8 +1170,9 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
 
-            for (const auto& [path, unit] : pm->getAllUnits()) 
+            for (const auto& [path, unit] : pm->getUnitsSnapshot()) 
             {
+                if (!waitUntilCurrent(unit)) continue;
                 std::lock_guard<std::mutex> lock(unit->unitMutex);
                 if (!unit->symbols) continue;
 
@@ -1213,6 +1233,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
 
             std::lock_guard<std::mutex> lock(su->unitMutex);
             if (!su->ast || !su->symbols) return result;
@@ -1277,6 +1298,7 @@ void GdShaderServer::registerHandlers() {
             for (const std::string& target_path : affected_files) 
             {
                 auto target_unit = pm->getUnit(target_path);
+                if (!waitUntilCurrent(target_unit)) continue;
                 std::lock_guard<std::mutex> lock(target_unit->unitMutex);
                 if (!target_unit->symbols || !target_unit->ast) continue;
 
@@ -1342,6 +1364,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return result; }
 
             std::lock_guard<std::mutex> lock(su->unitMutex);
             if (!su->ast || !su->symbols) return result;
@@ -1409,6 +1432,7 @@ void GdShaderServer::registerHandlers() {
 
             auto pm = ProjectManager::get_singleton();
             auto su = pm->getUnit(path);
+            if (!waitUntilCurrent(su)) { return {}; }
 
             // Lock the unit so the compiler thread doesn't modify the AST while we read it
             std::lock_guard<std::mutex> lock(su->unitMutex);
@@ -1430,7 +1454,7 @@ void GdShaderServer::registerHandlers() {
     handler.add<lsp::notifications::Exit>([]() { exit(0); });
 }
 
-void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri, const std::string &code)
+void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri, const std::string &code, std::uint64_t version)
 {
     std::string path = std::string(uri.path());
     #ifdef _WIN32
@@ -1438,7 +1462,6 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
     #endif
 
     auto pm = ProjectManager::get_singleton();
-    pm->updateFile(path, code);
 
     auto su = pm->getUnit(path);
 
@@ -1462,11 +1485,21 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
         su->symbols = std::make_shared<SymbolTable>(std::move(result.symbols));
         su->types   = std::move(result.types);
         su->tokens = result.tokens;
+        // Only mark the version as compiled once the AST is in place.
+        su->compiledVersion = version;
 
         su->unitMutex.unlock();
+        su->compiledCV.notify_all();
 
         auto semanticErrors = result.diagnostics;
         errors.insert(errors.end(), semanticErrors.begin(), semanticErrors.end());
+    } else {
+        // The file has parse errors (ast stays null). Still mark the version as
+        // compiled so waiting readers can proceed instead of blocking forever.
+        su->unitMutex.lock();
+        su->compiledVersion = version;
+        su->unitMutex.unlock();
+        su->compiledCV.notify_all();
     }
 
     su->diagnostics = errors;
@@ -1517,18 +1550,54 @@ void gdshader_lsp::GdShaderServer::compileAndPublish(const lsp::DocumentUri& uri
 // Thread loop
 //////////////////////////////////////////////////
 
+bool GdShaderServer::waitUntilCurrent(const std::shared_ptr<ShaderUnit>& su)
+{
+    std::unique_lock<std::mutex> lock(su->unitMutex);
+
+    while (su->compiledVersion < su->contentVersion) {
+        if (!running) return false;
+
+        // Ask the background thread to build this file now, without the debounce delay.
+        {
+            std::lock_guard<std::mutex> dl(debounceMutex);
+            forceCompile.insert(su->path);
+        }
+        compileWakeCV.notify_all();
+
+        // Release unitMutex while waiting so the compiler thread can publish.
+        su->compiledCV.wait(lock);
+    }
+
+    // The unique_lock releases unitMutex when this function returns.
+    // Handlers lock the unit again with their own guard before reading.
+    return running;
+}
+
 void GdShaderServer::compilerLoop() 
 {
     while (running) {
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
+
+        // Wake early on a forced compile request, otherwise poll every 50ms.
+        {
+            std::unique_lock<std::mutex> lock(compileWakeMutex);
+            compileWakeCV.wait_for(lock, std::chrono::milliseconds(50));
+        }
+
         std::vector<std::string> toCompile;
         auto now = std::chrono::steady_clock::now();
-        
-        // Safely check which files have "settled" (no keystrokes for > 250ms)
+
         {
             std::lock_guard<std::mutex> lock(debounceMutex);
+
+            // 1. Files whose readers are blocked waiting on their fresh AST:
+            //    build them now, ignoring the debounce window.
+            for (const auto& path : forceCompile) {
+                toCompile.push_back(path);
+                dirtyFiles.erase(path);
+            }
+            forceCompile.clear();
+
+            // 2. Files that have "settled" (no keystrokes for > 250ms).
             for (auto it = dirtyFiles.begin(); it != dirtyFiles.end(); ) 
             {
                 if (now - it->second > std::chrono::milliseconds(250)) 
@@ -1545,11 +1614,23 @@ void GdShaderServer::compilerLoop()
         {
             auto pm = ProjectManager::get_singleton();            
             auto unit = pm->getUnit(uri_str);
+
+            // Snapshot text and version together so compiledVersion stays consistent
+            // even if a new didChange arrives while we are parsing.
+            std::string source;
+            std::uint64_t version = 0;
+            {
+                std::lock_guard<std::mutex> lock(unit->unitMutex);
+                source  = unit->source_code;
+                version = unit->contentVersion;
+            }
+
             SPDLOG_DEBUG("Compiling file at path '{}'.", uri_str.c_str());
-            compileAndPublish(lsp::DocumentUri::fromPath(uri_str), unit->source_code);
+            compileAndPublish(lsp::DocumentUri::fromPath(uri_str), source, version);
         }
     }
 }
+
 
 //////////////////////////////////////////////////
 // Helper

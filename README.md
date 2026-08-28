@@ -3,6 +3,8 @@
 ![Build Status](https://github.com/scump1/gdshader-lsp-cpp/actions/workflows/build.yml/badge.svg)
 ![Test Status](https://github.com/scump1/gdshader-lsp-cpp/actions/workflows/tests.yml/badge.svg)
 
+> This is the Godot v4.5-4.6 branch. The latest Godot version are supported in master.
+
 A high-performance, standalone **Language Server Protocol (LSP)** implementation for the Godot Shading Language (`.gdshader`), developed in C++20.
 
 **GDShader LSP** provides enterprise-grade code intelligence, strict semantic analysis, and real-time diagnostics for Godot shaders. It is designed to be editor-agnostic, integrating seamlessly into VSCode, Neovim, Emacs, or directly into the Godot Engine via GDExtension.
@@ -139,17 +141,7 @@ The binary will be output to `bin/`.
 
 ## Configuration (VSCode Example)
 
-To use this with VSCode, you can use a generic LSP client extension (like *glsl-canvas* or a custom configuration).
-
-```json
-{
-    "godot_shader_lsp.serverPath": "/path/to/bin/gdshader-lsp-release",
-    "godot_shader_lsp.trace.server": "verbose"
-}
-
-```
-
-*Note: A dedicated VSCode extension wrapper is NOT planned. Feel free to implement one!*
+There is a dedicated VSCode Extension available in the Extension store. You can take a look at the files [`here`](https://github.com/scump1/gdshader-lsp-client).
 
 ## Configuration (Neovim Example)
 
@@ -171,23 +163,8 @@ vim.lsp.enable("gdshader_lsp")
 
 ## Roadmap
 
-This project is currently in **Alpha**. While the core analysis engine is robust, the following features are planned:
-
-* [ ] **Code Actions:** Quick fixes for common errors (e.g., "Did you mean...?").
-* [ ] **Formatting:** AST-based code formatting (`textDocument/formatting`).
-* [ ] **Rename Refactoring:** Project-wide symbol renaming.
-* [ ] **Find References:** Locate all usages of a symbol across the project.
+This project will be maintained for the foreseeable future. Godot and its developers are planning on extending the shader capabilities every other update, and we will need a good language server to go along!
 
 ## Contributing
 
 Contributions are welcome! Please submit Pull Requests or open Issues to discuss planned features.
-
-## License
-
-Copyright 2026 5cump1
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

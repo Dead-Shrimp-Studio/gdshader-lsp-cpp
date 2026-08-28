@@ -5,6 +5,7 @@
 #include "gdshader/parser/parser.hpp"
 #include "gdshader/semantics/symbol_table.hpp"
 #include "gdshader/semantics/type_registry.hpp"
+#include "server/types.hpp"
 
 #include <lsp/io/socket.h>
 #include <lsp/connection.h>
@@ -16,9 +17,12 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
+#include <cstdint>
 
 namespace gdshader_lsp {
 
@@ -58,10 +62,20 @@ private:
     // Maps a file URI to the exact time it was last modified
     std::unordered_map<std::string, std::chrono::steady_clock::time_point> dirtyFiles;
 
+    // Files with a reader waiting on their fresh AST (guarded by debounceMutex).
+    // The compiler thread builds these without waiting for the debounce window.
+    std::unordered_set<std::string> forceCompile;
+
+    // Wakes the compiler thread early when a request forces a compile.
+    std::mutex              compileWakeMutex;
+    std::condition_variable compileWakeCV;
+
     void compilerLoop();
+    // Blocks until the unit's AST matches its current text. Returns false on shutdown.
+    bool waitUntilCurrent(const std::shared_ptr<ShaderUnit>& su);
 
     void registerHandlers();
-    void compileAndPublish(const lsp::DocumentUri& uri, const std::string& code);
+    void compileAndPublish(const lsp::DocumentUri& uri, const std::string& code, std::uint64_t version);
 
     // Helper
 
