@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
         return 0;
     }
     
-    gdshader_lsp::Logger::init();
+    gdshader_lsp::Logger::init(config.log_path);
 
     try {
 
