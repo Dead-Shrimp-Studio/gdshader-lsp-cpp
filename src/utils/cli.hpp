@@ -7,6 +7,7 @@ namespace gdshader_lsp
 {
     struct ServerConfig {
         std::string pipe_name = "";
+        std::string log_path = "gdshader_lsp_log.txt";
         int port = 6010;
         bool use_stdio = false;
         bool show_help = false;
@@ -45,7 +46,20 @@ namespace gdshader_lsp
                 } catch (...) {
                     throw std::invalid_argument("Invalid port number provided via --port=");
                 }
-            } 
+            }
+            else if (arg.rfind("--log-path=", 0) == 0) {
+                // Handles: --log-path=/path/to/file.log or --log-path=none
+                arg.remove_prefix(11);
+                config.log_path = std::string(arg);
+            }
+            else if (arg == "--log-path") {
+                // Handles: --log-path /path/to/file.log or --log-path none
+                if (i + 1 < argc) {
+                    config.log_path = argv[++i];
+                } else {
+                    throw std::invalid_argument("--log-path requires a path argument or 'none'");
+                }
+            }
             else if (arg == "--port") {
                 // Handles: --port 6007
                 if (i + 1 < argc) {
@@ -71,6 +85,7 @@ namespace gdshader_lsp
                 << "Options:\n"
                 << "  --stdio        Run the LSP server over standard input/output.\n"
                 << "  --pipe <name>  Run the LSP server over a named pipe / Unix domain socket.\n"
+                << "  --log-path <path> Path for log output (use 'none' or 'off' to disable file logging).\n"
                 << "  --port <num>   Run the LSP server on a TCP socket (default: 6007).\n"
                 << "  -h, --help     Show this help message.\n";
     }
