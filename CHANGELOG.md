@@ -9,8 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Command line argument ```--log-path=<path>``` to specify logging file dirs. 'none' or 'off' disables file logging
+- Test coverage for matrix constructor validation (valid forms produce no diagnostics; error cases for invalid forms, including struct, array, and sampler arguments)
+
+### Changed
+- Matrix constructor validation is now strictly typed, mirroring Godot's shader language
+  - Only the documented forms are accepted: `matN(vecN, ...)` column vectors, `matN(float)` diagonal (e.g. `mat4(1.0)` identity), and `matN(matM)` conversion between different dimensions
+  - Forms Godot rejects (all-scalar construction, wrong column dimensions or types, too many arguments, `matN(matN)` same-dimension copies) now report precise errors instead of passing silently
 
 ### Fixed
+- Matrix construction always produced error diagnostics: a missing early return in the type checking visitor let every constructor call fall through to the generic "Cannot construct type" error
 - Several latent bugs about thread & request synchonization
   - Requests arriving during a shader units compilation time were neither queued nor rejeceted, but responeded with empty results
   - updateFile() nulled ast/symbols during compilation time, which left empty tables to return null results
