@@ -3,13 +3,13 @@ name: Build All Platforms
 on:
   workflow_dispatch:
   push:
-    branches: [ "master", "support/4.5" ]
+    branches: [ "master", "support/4.5+" ]
   pull_request:
-    branches: [ "master", "support/4.5" ]
+    branches: [ "master", "support/4.5+" ]
 
 jobs:
   build:
-    name: Build ${{ matrix.platform }}
+    name: Build ${{ matrix.platform }} (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -17,18 +17,23 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-            scons_target: linux
+            arch: x86_64
             scons_args: ""
           
           - os: windows-latest
             platform: windows
-            scons_target: windows
+            arch: x86_64
             scons_args: "tools=msvc"
           
           - os: macos-latest
             platform: macos
-            scons_target: macos
+            arch: arm64
             scons_args: "CXX=clang++ CC=clang macos_arch=arm64"
+
+          - os: macos-latest
+            platform: macos
+            arch: x86_64
+            scons_args: "CXX=clang++ CC=clang macos_arch=x86_64"
 
     steps:
     - name: Checkout Code
@@ -58,12 +63,12 @@ jobs:
         cmake -B build_linux -DCMAKE_BUILD_TYPE=Release
         cmake --build build_linux
 
-    # macOS: Build into build_macos
+    # macOS: Build into build_macos ( targeting matrix.arch )
     - name: Build Framework (macOS)
       if: matrix.platform == 'macos'
       run: |
         cd extern/lsp-framework
-        cmake -B build_macos -DCMAKE_BUILD_TYPE=Release
+        cmake -B build_macos -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
         cmake --build build_macos
 
     # Windows: Build into build_windows (Using MinGW/MSVC generator)
@@ -78,4 +83,11 @@ jobs:
     # --- BUILD PROJECT ---
     - name: Build GDShader LSP
       run: |
-        scons platform=${{ matrix.platform }} target=release
+        scons platform=${{ matrix.platform }} target=release ${{ matrix.scons_args }}
+
+    # --- UPLOAD BINARIES FOR DOWNLOAD ---
+    - name: Upload Binary Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: gdshader_lsp-${{ matrix.platform }}-${{ matrix.arch }}
+        path: bin/
